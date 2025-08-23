@@ -1,0 +1,924 @@
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Heart,
+  Calendar,
+  FileText,
+  Pill,
+  Activity,
+  Phone,
+  Download,
+  Plus,
+  AlertCircle,
+  TrendingUp,
+  Clock,
+  User,
+  MapPin,
+  Bell,
+  Settings,
+  LogOut,
+  Stethoscope,
+  TestTube,
+  Clipboard,
+  Upload,
+  Save
+} from "lucide-react";
+
+// ------------------------------
+// Hardcoded initial data (unchanged)
+// ------------------------------
+const INITIAL_PATIENT_DATA = {
+  name: "Rajesh Kumar",
+  age: 45,
+  id: "HMS2024001",
+  email: "rajesh.kumar@email.com",
+  phone: "+91 98765 43210",
+  bloodGroup: "B+",
+  address: "Village Rampur, District Meerut, UP - 250001",
+  emergencyContact: "Sunita Kumar (+91 98765 43211)",
+  profilePicture: "/placeholder.svg"
+};
+
+const INITIAL_HEALTH_METRICS = [
+  { label: "Blood Pressure", value: "130/85", status: "warning", lastChecked: "2024-01-15" },
+  { label: "Blood Sugar", value: "110 mg/dL", status: "normal", lastChecked: "2024-01-10" },
+  { label: "Weight", value: "78 kg", status: "normal", lastChecked: "2024-01-12" },
+  { label: "Heart Rate", value: "72 bpm", status: "normal", lastChecked: "2024-01-15" }
+];
+
+const INITIAL_RECENT_RECORDS = [
+  {
+    id: "1",
+    date: "2024-01-15",
+    type: "General Checkup",
+    doctor: "Dr. Priya Sharma",
+    hospital: "Primary Health Center",
+    diagnosis: "Blood pressure slightly elevated, cholesterol normal",
+    status: "Attention Needed",
+    nextCheckup: "2024-04-15",
+    documents: ["Blood Report", "ECG Report"]
+  },
+  {
+    id: "2",
+    date: "2024-01-10",
+    type: "Blood Test",
+    doctor: "Dr. Amit Verma",
+    hospital: "District Hospital",
+    diagnosis: "All parameters within normal range",
+    status: "Normal",
+    documents: ["Complete Blood Count", "Lipid Profile"]
+  },
+  {
+    id: "3",
+    date: "2024-01-05",
+    type: "Heart Screening",
+    doctor: "Dr. Sunita Patel",
+    hospital: "Cardiology Center",
+    diagnosis: "Mild irregularity detected, follow-up recommended",
+    status: "Attention Needed",
+    nextCheckup: "2024-03-05",
+    documents: ["ECG Report", "Echo Report"]
+  }
+];
+
+const INITIAL_UPCOMING_APPOINTMENTS = [
+  {
+    id: "1",
+    date: "2024-04-15",
+    time: "10:00 AM",
+    doctor: "Dr. Priya Sharma",
+    type: "Follow-up Checkup",
+    hospital: "Primary Health Center",
+    status: "confirmed"
+  },
+  {
+    id: "2",
+    date: "2024-03-05",
+    time: "2:30 PM",
+    doctor: "Dr. Sunita Patel",
+    type: "Heart Screening",
+    hospital: "Cardiology Center",
+    status: "pending"
+  }
+];
+
+const INITIAL_MEDICATIONS = [
+  {
+    name: "Amlodipine 5mg",
+    frequency: "Once daily",
+    duration: "30 days",
+    prescribed: "Dr. Priya Sharma",
+    startDate: "2024-01-15",
+    status: "active"
+  },
+  {
+    name: "Vitamin D3",
+    frequency: "Weekly",
+    duration: "90 days",
+    prescribed: "Dr. Amit Verma",
+    startDate: "2024-01-10",
+    status: "active"
+  }
+];
+
+const INITIAL_DOCTORS_LIST = [
+  { id: "doc1", name: "Dr. Priya Sharma", specialization: "Cardiologist" },
+  { id: "doc2", name: "Dr. Amit Verma", specialization: "Pathologist" },
+  { id: "doc3", name: "Dr. Sunita Patel", specialization: "General" }
+];
+
+export default function PatientDashboard() {
+  // ------------------------------
+  // State initialized from hardcoded data (backend-ready)
+  // Replace these via backend responses when ready
+  // ------------------------------
+  const [activeTab, setActiveTab] = useState("overview"); // <-- Replace with backend: default tab if needed
+  const [patientData, setPatientData] = useState(INITIAL_PATIENT_DATA); // <-- Replace with backend: patient data
+  const [healthMetrics, setHealthMetrics] = useState(INITIAL_HEALTH_METRICS); // <-- Replace with backend: health metrics
+  const [recentRecords, setRecentRecords] = useState(INITIAL_RECENT_RECORDS); // <-- Replace with backend: records
+  const [upcomingAppointments, setUpcomingAppointments] = useState(INITIAL_UPCOMING_APPOINTMENTS); // <-- Replace with backend: appointments
+  const [medications, setMedications] = useState(INITIAL_MEDICATIONS); // <-- Replace with backend: medications
+  const [doctorsList, setDoctorsList] = useState(INITIAL_DOCTORS_LIST); // <-- Replace with backend: doctors
+  const [selectedDoctor, setSelectedDoctor] = useState(""); // <-- Replace with backend: preselected doctor if any
+
+  // ------------------------------
+  // Backend integration placeholder
+  // ------------------------------
+  useEffect(() => {
+    // Example template for fetching all dashboard data:
+  //   fetch("/api/patients/dashboard")
+  // .then(r => r.json())
+  // .then(data => {
+  //   setPatientData(data.patient);
+  //   setHealthMetrics(data.healthMetrics);
+  //   setRecentRecords(data.recentRecords);
+  //   setUpcomingAppointments(data.upcomingAppointments);
+  //   setMedications(data.medications);
+  //   setDoctorsList(data.doctorsList);
+  // })
+  // .catch(() => {/* silently keep hardcoded state */});
+  }, []);
+
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case "normal": return "bg-success text-success-foreground";
+      case "attention needed": case "warning": return "bg-warning text-warning-foreground";
+      case "critical": return "bg-destructive text-destructive-foreground";
+      default: return "bg-muted text-muted-foreground";
+    }
+  };
+
+  const getMetricColor = (status: string) => {
+    switch (status) {
+      case "normal": return "text-success";
+      case "warning": return "text-warning";
+      case "critical": return "text-destructive";
+      default: return "text-muted-foreground";
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
+      {/* Header */}
+      <header className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <Link to="/" className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+                <Heart className="w-6 h-6 text-primary-foreground" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-gray-900">HealthTrack</h1>
+                <p className="text-sm text-gray-600">Patient Portal</p>
+              </div>
+            </Link>
+            <nav className="hidden md:flex items-center space-x-6">
+              <button className="text-gray-700 hover:text-primary font-medium">Dashboard</button>
+              <button className="text-gray-700 hover:text-primary font-medium">Appointments</button>
+              <button className="text-gray-700 hover:text-primary font-medium">Records</button>
+              <button className="text-gray-700 hover:text-primary font-medium">Medications</button>
+              <div className="flex items-center space-x-3 ml-6 border-l pl-6">
+                <Button variant="ghost" size="sm">
+                  <Bell className="w-4 h-4" />
+                </Button>
+                <Button variant="ghost" size="sm">
+                  <Settings className="w-4 h-4" />
+                </Button>
+                <Button variant="outline" size="sm">
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Logout
+                </Button>
+              </div>
+            </nav>
+          </div>
+        </div>
+      </header>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Welcome Section */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <Avatar className="w-16 h-16">
+                <AvatarImage src={patientData.profilePicture} alt={patientData.name} />
+                <AvatarFallback>{patientData.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+              </Avatar>
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">Welcome back, {patientData.name}</h1>
+                <p className="text-gray-600">Patient ID: {patientData.id} • Last visit: January 15, 2024</p>
+              </div>
+            </div>
+            <Button onClick={() => {
+              alert("Book Appointment\n\nSelect your preferred:\n• Date & Time\n• Doctor specialization\n• Appointment type\n\nYour appointment request will be sent to the healthcare center for confirmation.");
+            }}>
+              <Plus className="w-4 h-4 mr-2" />
+              Book Appointment
+            </Button>
+          </div>
+        </div>
+
+        {/* Quick Health Status */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          {healthMetrics.map((metric, index) => (
+            <Card key={index}>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">{metric.label}</p>
+                    <p className={`text-2xl font-bold ${getMetricColor(metric.status)}`}>
+                      {metric.value}
+                    </p>
+                    <p className="text-xs text-gray-500">Last checked: {new Date(metric.lastChecked).toLocaleDateString()}</p>
+                  </div>
+                  <Activity className={`w-8 h-8 ${getMetricColor(metric.status)}`} />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Main Dashboard Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="records">Medical Records</TabsTrigger>
+            <TabsTrigger value="appointments">Appointments</TabsTrigger>
+            <TabsTrigger value="medications">Medications</TabsTrigger>
+            <TabsTrigger value="profile">Profile</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="overview" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Recent Medical Records */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <FileText className="w-5 h-5 mr-2" />
+                    Recent Medical Records
+                  </CardTitle>
+                  <CardDescription>Your latest health checkups and diagnoses</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {recentRecords.slice(0, 3).map((record) => (
+                    <div key={record.id} className="border rounded-lg p-4 bg-white">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2 mb-1">
+                            <h4 className="font-medium">{record.type}</h4>
+                            <Badge className={getStatusColor(record.status)}>
+                              {record.status}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-gray-600">Dr. {record.doctor} • {record.hospital}</p>
+                          <p className="text-sm text-gray-800 mt-1">{record.diagnosis}</p>
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {new Date(record.date).toLocaleDateString()}
+                        </div>
+                      </div>
+                      {record.nextCheckup && (
+                        <p className="text-sm text-primary font-medium">
+                          Next checkup: {new Date(record.nextCheckup).toLocaleDateString()}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                  <Button variant="outline" className="w-full">
+                    View All Records
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Upcoming Appointments */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Calendar className="w-5 h-5 mr-2" />
+                    Upcoming Appointments
+                  </CardTitle>
+                  <CardDescription>Your scheduled medical appointments</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {upcomingAppointments.map((appointment) => (
+                    <div key={appointment.id} className="border rounded-lg p-4 bg-white">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-medium">{appointment.type}</h4>
+                          <p className="text-sm text-gray-600">{appointment.doctor}</p>
+                          <p className="text-sm text-gray-600">{appointment.hospital}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-medium">{new Date(appointment.date).toLocaleDateString()}</p>
+                          <p className="text-sm text-gray-500">{appointment.time}</p>
+                          <Badge variant={appointment.status === "confirmed" ? "default" : "secondary"}>
+                            {appointment.status}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  <Button className="w-full">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Book New Appointment
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Active Medications */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Pill className="w-5 h-5 mr-2" />
+                  Active Medications
+                </CardTitle>
+                <CardDescription>Current medications and reminders</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {medications.map((med, index) => (
+                    <div key={index} className="border rounded-lg p-4 bg-white">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h4 className="font-medium">{med.name}</h4>
+                          <p className="text-sm text-gray-600">{med.frequency} • {med.duration}</p>
+                          <p className="text-sm text-gray-500">Prescribed by {med.prescribed}</p>
+                          <p className="text-sm text-gray-500">Started: {new Date(med.startDate).toLocaleDateString()}</p>
+                        </div>
+                        <Badge className="bg-success text-success-foreground">
+                          {med.status}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="records" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Complete Medical Records</CardTitle>
+                    <CardDescription>All your medical history and test results</CardDescription>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    {/* Upload Documents Dialog */}
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" size="sm">
+                          <Upload className="w-4 h-4 mr-2" />
+                          Upload Documents
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                        <DialogHeader className="space-y-3 pb-6">
+                          <DialogTitle className="text-xl font-semibold text-gray-900">
+                            Upload Medical Documents
+                          </DialogTitle>
+                          <DialogDescription className="text-gray-600">
+                            Upload lab reports, prescriptions, or other medical documents you've received from healthcare providers
+                          </DialogDescription>
+                        </DialogHeader>
+
+                        <form className="space-y-8">
+                          {/* Document Information Section */}
+                          <div className="space-y-6">
+                            <div className="border-b border-gray-200 pb-4">
+                              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                                📋 Document Information
+                              </h3>
+                              <p className="text-sm text-gray-600">
+                                Provide details about the medical document you're uploading
+                              </p>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              <div className="space-y-3">
+                                <Label htmlFor="doc-type" className="text-sm font-medium text-gray-700">
+                                  Document Type <span className="text-red-500">*</span>
+                                </Label>
+                                <Select>
+                                  <SelectTrigger id="doc-type" className="w-full h-11">
+                                    <SelectValue placeholder="Choose document type" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="lab-report">���� Lab Report</SelectItem>
+                                    <SelectItem value="prescription">💊 Prescription</SelectItem>
+                                    <SelectItem value="xray">📷 X-Ray/Scan</SelectItem>
+                                    <SelectItem value="discharge">📋 Discharge Summary</SelectItem>
+                                    <SelectItem value="vaccination">💉 Vaccination Record</SelectItem>
+                                    <SelectItem value="other">📄 Other Medical Document</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              <div className="space-y-3">
+                                <Label htmlFor="doc-date" className="text-sm font-medium text-gray-700">
+                                  Date of Test/Visit <span className="text-red-500">*</span>
+                                </Label>
+                                <Input
+                                  id="doc-date"
+                                  type="date"
+                                  className="w-full h-11"
+                                  max={new Date().toISOString().split('T')[0]}
+                                />
+                              </div>
+                            </div>
+
+                            <div className="space-y-3">
+                              <Label htmlFor="hospital-name" className="text-sm font-medium text-gray-700">
+                                Hospital/Lab/Clinic Name <span className="text-red-500">*</span>
+                              </Label>
+                              <Input
+                                id="hospital-name"
+                                placeholder="Enter the name of the healthcare facility"
+                                className="w-full h-11"
+                              />
+                            </div>
+                          </div>
+
+                          {/* File Upload Section */}
+                          <div className="space-y-6">
+                            <div className="border-b border-gray-200 pb-4">
+                              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                                📎 Upload Files
+                              </h3>
+                              <p className="text-sm text-gray-600">
+                                Select the documents you want to upload
+                              </p>
+                            </div>
+
+                            <div className="border-2 border-dashed border-primary/30 rounded-xl p-12 text-center hover:border-primary/50 transition-all duration-200 bg-primary/5">
+                              <div className="flex flex-col items-center space-y-4">
+                                <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
+                                  <Upload className="w-8 h-8 text-primary" />
+                                </div>
+                                <div className="space-y-2">
+                                  <p className="text-lg font-medium text-gray-900">
+                                    Drop files here or click to browse
+                                  </p>
+                                  <p className="text-sm text-gray-500 max-w-sm mx-auto">
+                                    Supported formats: PDF, JPG, JPEG, PNG • Maximum size: 10MB per file
+                                  </p>
+                                </div>
+                                <Button type="button" variant="outline" className="mt-4">
+                                  Choose Files
+                                </Button>
+                                <Input
+                                  type="file"
+                                  className="hidden"
+                                  multiple
+                                  accept=".pdf,.jpg,.jpeg,.png"
+                                  aria-label="Upload medical documents"
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Additional Notes Section */}
+                          <div className="space-y-6">
+                            <div className="border-b border-gray-200 pb-4">
+                              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                                📝 Additional Information
+                              </h3>
+                              <p className="text-sm text-gray-600">
+                                Add any relevant notes or context (optional)
+                              </p>
+                            </div>
+
+                            <div className="space-y-3">
+                              <Label htmlFor="doc-notes" className="text-sm font-medium text-gray-700">
+                                Notes
+                              </Label>
+                              <Textarea
+                                id="doc-notes"
+                                placeholder="Add any relevant notes about this document, symptoms experienced, or additional context that might help your doctor..."
+                                className="min-h-[120px] resize-none"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Submit Section */}
+                          <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200">
+                            <Button type="submit" className="flex-1 h-11">
+                              <Upload className="w-4 h-4 mr-2" />
+                              Upload Documents
+                            </Button>
+                            <Button type="button" variant="outline" className="flex-1 h-11">
+                              Cancel
+                            </Button>
+                          </div>
+                        </form>
+                      </DialogContent>
+                    </Dialog>
+
+                    {/* Add Health Data Dialog - Simplified for space */}
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button size="sm">
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add Health Data
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                        <DialogHeader className="space-y-3 pb-6">
+                          <DialogTitle className="text-xl font-semibold">Add Health Measurements</DialogTitle>
+                          <DialogDescription>Record your vital signs and health measurements</DialogDescription>
+                        </DialogHeader>
+                        <form className="space-y-6">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-3">
+                              <Label>Date</Label>
+                              <Input type="date" defaultValue={new Date().toISOString().split('T')[0]} />
+                            </div>
+                            <div className="space-y-3">
+                              <Label>Time</Label>
+                              <Input type="time" />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-3">
+                              <Label>Blood Pressure</Label>
+                              <div className="flex items-center space-x-2">
+                                <Input placeholder="120" type="number" />
+                                <span>/</span>
+                                <Input placeholder="80" type="number" />
+                                <span className="text-sm text-gray-500">mmHg</span>
+                              </div>
+                            </div>
+                            <div className="space-y-3">
+                              <Label>Blood Sugar (mg/dL)</Label>
+                              <Input placeholder="95" type="number" />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-3">
+                              <Label>Weight (kg)</Label>
+                              <Input placeholder="70" type="number" />
+                            </div>
+                            <div className="space-y-3">
+                              <Label>Heart Rate (bpm)</Label>
+                              <Input placeholder="72" type="number" />
+                            </div>
+                          </div>
+
+                          <div className="space-y-3">
+                            <Label>Notes/Symptoms</Label>
+                            <Textarea placeholder="How are you feeling? Any symptoms or notes..." />
+                          </div>
+
+                          <div className="flex gap-3 pt-4">
+                            <Button type="submit" className="flex-1">
+                              <Save className="w-4 h-4 mr-2" />
+                              Save Health Data
+                            </Button>
+                            <Button type="button" variant="outline" className="flex-1">Cancel</Button>
+                          </div>
+                        </form>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                </div>
+              </CardHeader>
+
+              <CardContent className="space-y-8">
+                {/* Doctor Records */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">
+                    👨‍⚕️ Doctor Records
+                  </h3>
+                  {recentRecords.map((record) => (
+                    <div key={record.id} className="border rounded-lg p-6 bg-white hover:shadow-md transition-shadow">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-3 mb-3">
+                            <h4 className="font-semibold text-lg">{record.type}</h4>
+                            <Badge className={getStatusColor(record.status)}>{record.status}</Badge>
+                            <Badge variant="secondary" className="bg-blue-100 text-blue-800">Doctor Added</Badge>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600 mb-4">
+                            <div className="space-y-1">
+                              <p><span className="font-medium">Doctor:</span> {record.doctor}</p>
+                              <p><span className="font-medium">Hospital:</span> {record.hospital}</p>
+                            </div>
+                            <div className="space-y-1">
+                              <p><span className="font-medium">Date:</span> {new Date(record.date).toLocaleDateString()}</p>
+                              {record.nextCheckup && (
+                                <p><span className="font-medium">Next Checkup:</span> {new Date(record.nextCheckup).toLocaleDateString()}</p>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                            <p className="text-sm"><span className="font-medium">Diagnosis:</span> {record.diagnosis}</p>
+                          </div>
+
+                          <div className="flex flex-wrap gap-2">
+                            {record.documents.map((doc, index) => (
+                              <Button key={index} variant="outline" size="sm">
+                                <Download className="w-3 h-3 mr-1" />
+                                {doc}
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Patient Records */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">
+                    📤 My Health Data & Documents
+                  </h3>
+
+                  <div className="border border-green-200 rounded-lg p-6 bg-green-50/50">
+                    <div className="flex items-center space-x-3 mb-3">
+                      <h4 className="font-semibold">Blood Sugar Self-Monitoring</h4>
+                      <Badge className="bg-green-100 text-green-800">Self-Reported</Badge>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 text-sm text-gray-600 mb-3">
+                      <p><span className="font-medium">Date:</span> Jan 18, 2024 8:00 AM</p>
+                      <p><span className="font-medium">Blood Sugar:</span> 105 mg/dL</p>
+                    </div>
+                    <div className="bg-white rounded-lg p-3">
+                      <p className="text-sm">Fasting measurement at home. Feeling normal.</p>
+                    </div>
+                  </div>
+
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                    <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Add Your Health Information</h3>
+                    <p className="text-gray-600 mb-4">Upload documents or track your health measurements</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="appointments" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Upcoming Appointments</CardTitle>
+                  <CardDescription>Your scheduled visits</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {upcomingAppointments.map((appointment) => (
+                    <div key={appointment.id} className="border rounded-lg p-4 bg-white">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex-1">
+                          <h4 className="font-medium">{appointment.type}</h4>
+                          <p className="text-sm text-gray-600 flex items-center mt-1">
+                            <Stethoscope className="w-4 h-4 mr-1" />
+                            {appointment.doctor}
+                          </p>
+                          <p className="text-sm text-gray-600 flex items-center mt-1">
+                            <MapPin className="w-4 h-4 mr-1" />
+                            {appointment.hospital}
+                          </p>
+                          <p className="text-sm text-gray-600 flex items-center mt-1">
+                            <Clock className="w-4 h-4 mr-1" />
+                            {new Date(appointment.date).toLocaleDateString()} at {appointment.time}
+                          </p>
+                        </div>
+                        <Badge variant={appointment.status === "confirmed" ? "default" : "secondary"}>
+                          {appointment.status}
+                        </Badge>
+                      </div>
+                      <div className="flex space-x-2">
+                        <Button variant="outline" size="sm">Reschedule</Button>
+                        <Button variant="outline" size="sm">Cancel</Button>
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Book New Appointment</CardTitle>
+                  <CardDescription>Schedule your next visit</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-4">
+                    <Button className="w-full justify-start" variant="outline">
+                      <Calendar className="w-4 h-4 mr-2" />
+                      General Checkup
+                    </Button>
+                    <Button className="w-full justify-start" variant="outline">
+                      <TestTube className="w-4 h-4 mr-2" />
+                      Lab Tests
+                    </Button>
+                    <Button className="w-full justify-start" variant="outline">
+                      <Heart className="w-4 h-4 mr-2" />
+                      Specialist Consultation
+                    </Button>
+                    <Button className="w-full justify-start" variant="outline">
+                      <Clipboard className="w-4 h-4 mr-2" />
+                      Follow-up Visit
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="medications" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Current Medications</CardTitle>
+                <CardDescription>Manage your active prescriptions</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {medications.map((med, index) => (
+                  <div key={index} className="border rounded-lg p-4 bg-white">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <h4 className="font-medium text-lg">{med.name}</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-600 mt-2">
+                          <p><strong>Frequency:</strong> {med.frequency}</p>
+                          <p><strong>Duration:</strong> {med.duration}</p>
+                          <p><strong>Prescribed by:</strong> {med.prescribed}</p>
+                          <p><strong>Started:</strong> {new Date(med.startDate).toLocaleDateString()}</p>
+                        </div>
+                      </div>
+                      <Badge className="bg-success text-success-foreground">
+                        {med.status}
+                      </Badge>
+                    </div>
+                    <div className="flex space-x-2">
+                      <Button variant="outline" size="sm">Set Reminder</Button>
+                      <Button variant="outline" size="sm">Mark as Taken</Button>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="profile" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Personal Information</CardTitle>
+                  <CardDescription>Your basic details and contact information</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center space-x-4 mb-6">
+                    <Avatar className="w-20 h-20">
+                      <AvatarImage src={patientData.profilePicture} alt={patientData.name} />
+                      <AvatarFallback>{patientData.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+                    </Avatar>
+                    <Button variant="outline">Change Photo</Button>
+                  </div>
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Full Name</p>
+                      <p className="text-sm">{patientData.name}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Age</p>
+                      <p className="text-sm">{patientData.age} years</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Patient ID</p>
+                      <p className="text-sm">{patientData.id}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Email</p>
+                      <p className="text-sm">{patientData.email}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Phone</p>
+                      <p className="text-sm">{patientData.phone}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Blood Group</p>
+                      <p className="text-sm">{patientData.bloodGroup}</p>
+                    </div>
+                  </div>
+                  <Button className="w-full">Edit Profile</Button>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Address & Emergency Contact</CardTitle>
+                  <CardDescription>Your location and emergency information</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Address</p>
+                      <p className="text-sm">{patientData.address}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Emergency Contact</p>
+                      <p className="text-sm">{patientData.emergencyContact}</p>
+                    </div>
+                  </div>
+
+                  {/* 👨‍⚕️ Select Doctors (kept commented to preserve current UI) */}
+                  <div className="space-y-3">
+                    <Label htmlFor="select-doctor" className="text-sm font-medium text-gray-700">
+                      Select Doctor
+                    </Label>
+                    <Select value={selectedDoctor} onValueChange={setSelectedDoctor}>
+                      <SelectTrigger id="select-doctor" className="w-full h-11">
+                        <SelectValue placeholder="Choose a doctor" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {doctorsList.map((doctor) => (
+                          <SelectItem key={doctor.id} value={doctor.id}>
+                            {doctor.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                 
+
+                  <div className="pt-4 border-t">
+                    <h4 className="font-medium mb-3">Quick Actions</h4>
+                    <div className="space-y-2">
+                      <Button variant="outline" className="w-full justify-start">
+                        <Download className="w-4 h-4 mr-2" />
+                        Download Health Summary
+                      </Button>
+                      <Button variant="outline" className="w-full justify-start">
+                        <Phone className="w-4 h-4 mr-2" />
+                        Emergency Contacts
+                      </Button>
+                      <Button variant="outline" className="w-full justify-start">
+                        <Settings className="w-4 h-4 mr-2" />
+                        Privacy Settings
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        {/* Emergency Banner */}
+        <Card className="mt-8 border-red-200 bg-red-50">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-3">
+              <AlertCircle className="w-6 h-6 text-red-600" />
+              <div className="flex-1">
+                <h3 className="font-medium text-red-800">Emergency Helpline</h3>
+                <p className="text-sm text-red-700">
+                  For medical emergencies, call: <strong>+91 1800-123-4567</strong> (24/7 available)
+                </p>
+              </div>
+              <Button variant="outline" className="border-red-300 text-red-700 hover:bg-red-100">
+                <Phone className="w-4 h-4 mr-2" />
+                Call Now
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
