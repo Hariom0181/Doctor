@@ -32,8 +32,10 @@ import {
   TestTube,
   Clipboard,
   Upload,
-  Save
+  Save,
+  Loader2
 } from "lucide-react";
+import { patientApiService, HealthMetric, LinkedDoctor, AvailableDoctor } from "@/services/patientApi";
 
 // ------------------------------
 // Hardcoded initial data (unchanged)
@@ -149,25 +151,113 @@ export default function PatientDashboard() {
   const [recentRecords, setRecentRecords] = useState(INITIAL_RECENT_RECORDS); // <-- Replace with backend: records
   const [upcomingAppointments, setUpcomingAppointments] = useState(INITIAL_UPCOMING_APPOINTMENTS); // <-- Replace with backend: appointments
   const [medications, setMedications] = useState(INITIAL_MEDICATIONS); // <-- Replace with backend: medications
-  const [doctorsList, setDoctorsList] = useState(INITIAL_DOCTORS_LIST); // <-- Replace with backend: doctors
-  const [selectedDoctor, setSelectedDoctor] = useState(""); // <-- Replace with backend: preselected doctor if any
+  const [doctorsList, setDoctorsList] = useState(INITIAL_DOCTORS_LIST);
+  const [selectedDoctor, setSelectedDoctor] = useState("");
+  
+  // New state for API integration
+  const [linkedDoctors, setLinkedDoctors] = useState<LinkedDoctor[]>([]);
+  const [isLoadingDoctors, setIsLoadingDoctors] = useState(false);
+  const [doctorsError, setDoctorsError] = useState<string | null>(null);
+  const [availableDoctors, setAvailableDoctors] = useState<AvailableDoctor[]>([]);
+  const [isLoadingAvailableDoctors, setIsLoadingAvailableDoctors] = useState(false);
 
   // ------------------------------
-  // Backend integration placeholder
+  // Backend integration for linked doctors
   // ------------------------------
   useEffect(() => {
-    // Example template for fetching all dashboard data:
-  //   fetch("/api/patients/dashboard")
-  // .then(r => r.json())
-  // .then(data => {
-  //   setPatientData(data.patient);
-  //   setHealthMetrics(data.healthMetrics);
-  //   setRecentRecords(data.recentRecords);
-  //   setUpcomingAppointments(data.upcomingAppointments);
-  //   setMedications(data.medications);
-  //   setDoctorsList(data.doctorsList);
-  // })
-  // .catch(() => {/* silently keep hardcoded state */});
+    const fetchLinkedDoctors = async () => {
+      setIsLoadingDoctors(true);
+      setDoctorsError(null);
+      
+      try {
+        // First, get the list of available patients
+        const patientsResponse = await fetch('http://localhost:5000/api/patients/list');
+        if (patientsResponse.ok) {
+          const patientsData = await patientsResponse.json();
+          if (patientsData.success && patientsData.data.length > 0) {
+            // Use the first available patient ID
+            const patientId = patientsData.data[0].id.toString();
+            console.log('Using patient ID:', patientId);
+            
+            const doctors = await patientApiService.getLinkedDoctors(patientId);
+            setLinkedDoctors(doctors);
+            
+            // Update the doctors list for the profile section
+            if (doctors.length > 0) {
+              const transformedDoctors = doctors.map(doctor => ({
+                id: doctor.id.toString(),
+                name: doctor.name,
+                specialization: doctor.specialization
+              }));
+              setDoctorsList(transformedDoctors);
+            }
+          } else {
+            throw new Error('No patients found in database');
+          }
+        } else {
+          throw new Error('Failed to get patients list');
+        }
+      } catch (error) {
+        console.error('Failed to fetch linked doctors:', error);
+        
+        // Check if it's a backend connection error
+        if (error instanceof Error && error.message.includes('Backend service not available')) {
+          setDoctorsError('Backend server is not running. Using sample data for now.');
+        } else {
+          setDoctorsError('Failed to fetch linked doctors. Using sample data for now.');
+        }
+        
+        // Keep the hardcoded doctors list as fallback
+        console.log('Using fallback doctors list');
+      } finally {
+        setIsLoadingDoctors(false);
+      }
+    };
+
+    // Only fetch if backend is available, otherwise use fallback
+    fetchLinkedDoctors();
+  }, []);
+
+  // Fetch available doctors for selection
+  useEffect(() => {
+    const fetchAvailableDoctors = async () => {
+      console.log('🔄 Fetching available doctors...');
+      setIsLoadingAvailableDoctors(true);
+      
+      try {
+        const doctors = await patientApiService.getAvailableDoctors();
+        console.log('✅ Available doctors fetched:', doctors);
+        setAvailableDoctors(doctors);
+        
+        // Update the doctors list for the profile section dropdown
+        if (doctors.length > 0) {
+          const transformedDoctors = doctors.map(doctor => ({
+            id: doctor.id.toString(),
+            name: doctor.name,
+            specialization: doctor.specialization
+          }));
+          console.log('🔄 Transforming doctors for dropdown:', transformedDoctors);
+          setDoctorsList(transformedDoctors);
+          console.log('🔄 Updated doctorsList state with:', transformedDoctors.length, 'doctors');
+          
+          // Force a re-render by updating a timestamp
+          console.log('🔄 Doctors list updated, should re-render dropdown');
+        } else {
+          console.log('⚠️ No doctors found in API response');
+        }
+      } catch (error) {
+        console.error('❌ Failed to fetch available doctors:', error);
+        // Keep the hardcoded doctors list as fallback
+        console.log('🔄 Using fallback doctors list');
+      } finally {
+        setIsLoadingAvailableDoctors(false);
+      }
+    };
+
+    // Add a small delay to ensure this runs after the first useEffect
+    setTimeout(() => {
+      fetchAvailableDoctors();
+    }, 100);
   }, []);
 
   const getStatusColor = (status: string) => {
@@ -185,6 +275,34 @@ export default function PatientDashboard() {
       case "warning": return "text-warning";
       case "critical": return "text-destructive";
       default: return "text-muted-foreground";
+    }
+  };
+
+  const handleDoctorSelection = async (doctorId: string) => {
+    if (!doctorId) return;
+    
+    try {
+      // Get the current patient ID (using the same logic as in useEffect)
+      const patientsResponse = await fetch('http://localhost:5000/api/patients/list');
+      if (patientsResponse.ok) {
+        const patientsData = await patientsResponse.json();
+        if (patientsData.success && patientsData.data.length > 0) {
+          const patientId = patientsData.data[0].id.toString();
+          
+          // Update the doctor relationship
+          await patientApiService.updateDoctorRelationship(patientId, doctorId);
+          
+          // Refresh the linked doctors
+          const doctors = await patientApiService.getLinkedDoctors(patientId);
+          setLinkedDoctors(doctors);
+          
+          // Show success message
+          alert('Doctor relationship updated successfully!');
+        }
+      }
+    } catch (error) {
+      console.error('Failed to update doctor relationship:', error);
+      alert('Failed to update doctor relationship. Please try again.');
     }
   };
 
@@ -266,6 +384,81 @@ export default function PatientDashboard() {
               </CardContent>
             </Card>
           ))}
+        </div>
+
+        {/* Linked Doctors Section */}
+        <div className="mb-8">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Stethoscope className="w-5 h-5 mr-2" />
+                My Healthcare Team
+              </CardTitle>
+              <CardDescription>Doctors currently managing your care</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingDoctors ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {Array.from({ length: 3 }).map((_, index) => (
+                    <div key={index} className="border rounded-lg p-4 bg-white">
+                      <div className="space-y-3">
+                        <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
+                        <div className="h-3 bg-gray-200 rounded animate-pulse"></div>
+                        <div className="h-3 bg-gray-200 rounded animate-pulse"></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : doctorsError ? (
+                <div className="text-center py-8">
+                  <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-3" />
+                  <h3 className="font-medium text-red-800 mb-2">Error Loading Doctors</h3>
+                  <p className="text-sm text-red-600 mb-4">{doctorsError}</p>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => window.location.reload()}
+                  >
+                    Retry
+                  </Button>
+                </div>
+              ) : linkedDoctors.length === 0 ? (
+                <div className="text-center py-8">
+                  <User className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                  <h3 className="font-medium text-gray-800 mb-2">No Doctors Linked</h3>
+                  <p className="text-sm text-gray-600">Your healthcare team will appear here once doctors are assigned to your care.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {linkedDoctors.map((doctor) => (
+                    <div key={doctor.id} className="border rounded-lg p-4 bg-white hover:shadow-md transition-shadow">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-lg">{doctor.name}</h4>
+                          <p className="text-sm text-gray-600 mb-1">{doctor.specialization}</p>
+                          <p className="text-sm text-gray-500 mb-1">{doctor.hospital}</p>
+                          <p className="text-xs text-gray-400">Linked since: {new Date(doctor.linkedDate).toLocaleDateString()}</p>
+                        </div>
+                        <Badge className="bg-green-100 text-green-800">
+                          {doctor.relationshipStatus}
+                        </Badge>
+                      </div>
+                      <div className="flex space-x-2">
+                        <Button variant="outline" size="sm" className="flex-1">
+                          <Phone className="w-3 h-3 mr-1" />
+                          Contact
+                        </Button>
+                        <Button variant="outline" size="sm" className="flex-1">
+                          <Calendar className="w-3 h-3 mr-1" />
+                          Book
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         {/* Main Dashboard Tabs */}
@@ -857,23 +1050,64 @@ export default function PatientDashboard() {
                     </div>
                   </div>
 
-                  {/* 👨‍⚕️ Select Doctors (kept commented to preserve current UI) */}
+                  {/* 👨‍⚕️ Select Doctors */}
                   <div className="space-y-3">
                     <Label htmlFor="select-doctor" className="text-sm font-medium text-gray-700">
                       Select Doctor
                     </Label>
-                    <Select value={selectedDoctor} onValueChange={setSelectedDoctor}>
-                      <SelectTrigger id="select-doctor" className="w-full h-11">
-                        <SelectValue placeholder="Choose a doctor" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {doctorsList.map((doctor) => (
-                          <SelectItem key={doctor.id} value={doctor.id}>
-                            {doctor.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    
+                    {/* Show current doctor if linked */}
+                    {linkedDoctors.length > 0 && (
+                      <div className="bg-blue-50 p-3 rounded-lg mb-3">
+                        <p className="text-sm font-medium text-blue-800">Current Doctor:</p>
+                        <p className="text-sm text-blue-700">
+                          {linkedDoctors[0].name} - {linkedDoctors[0].specialization}
+                        </p>
+                        <p className="text-xs text-blue-600">
+                          Linked since: {new Date(linkedDoctors[0].linkedDate).toLocaleDateString()}
+                        </p>
+                      </div>
+                    )}
+                    
+                    <div className="flex space-x-2">
+                      <Select value={selectedDoctor} onValueChange={setSelectedDoctor}>
+                        <SelectTrigger id="select-doctor" className="flex-1 h-11">
+                          <SelectValue placeholder="Choose a doctor" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {isLoadingAvailableDoctors ? (
+                            <SelectItem value="" disabled>Loading doctors...</SelectItem>
+                          ) : doctorsList.length > 0 ? (
+                            <>
+                              {console.log('🎯 Rendering doctors in dropdown:', doctorsList)}
+                              {doctorsList.map((doctor) => (
+                                <SelectItem key={doctor.id} value={doctor.id}>
+                                  {doctor.name} - {doctor.specialization}
+                                </SelectItem>
+                              ))}
+                            </>
+                          ) : (
+                            <>
+                              {console.log('⚠️ No doctors in doctorsList state, length:', doctorsList.length)}
+                              <SelectItem value="" disabled>No doctors available</SelectItem>
+                            </>
+                          )}
+                        </SelectContent>
+                      </Select>
+                      {selectedDoctor && (
+                        <Button 
+                          onClick={() => handleDoctorSelection(selectedDoctor)}
+                          className="h-11 px-4"
+                        >
+                          Update
+                        </Button>
+                      )}
+                    </div>
+                    {selectedDoctor && (
+                      <p className="text-xs text-gray-500">
+                        Click Update to change your doctor
+                      </p>
+                    )}
                   </div>
                  
 
