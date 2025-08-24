@@ -331,6 +331,10 @@ router.get("/available-doctors", (req, res) => {
 });
 
 // Update patient's doctor relationship
+// Update patient's doctor relationship
+// Update patient's doctor relationship - FIXED VERSION
+// Update patient's doctor relationship - ONE DOCTOR PER PATIENT VERSION
+// Update patient's doctor relationship - HANDLES REACTIVATION
 router.post("/:patientId/update-doctor", (req, res) => {
   const patientId = req.params.patientId;
   const { doctorId } = req.body;
@@ -342,69 +346,78 @@ router.post("/:patientId/update-doctor", (req, res) => {
     });
   }
   
-  // First, check if this patient already has a doctor relationship
-  const checkSql = "SELECT * FROM patient_doctors WHERE patient_id = ?";
+  // First, check if this patient-doctor relationship already exists (active or inactive)
+  const checkExistingSql = "SELECT * FROM patient_doctors WHERE patient_id = ? AND doctor_id = ?";
   
-  db.query(checkSql, [patientId], (checkErr, existing) => {
+  db.query(checkExistingSql, [patientId, doctorId], (checkErr, existingRelation) => {
     if (checkErr) {
-      console.error("Database error checking existing relationship:", checkErr);
+      console.error("Error checking existing relationship:", checkErr);
       return res.status(500).json({
         success: false,
         message: "Database error checking relationship"
       });
     }
     
-    if (existing.length > 0) {
-      // Patient already has a doctor, UPDATE the existing record
-      const updateSql = `
-        UPDATE patient_doctors 
-        SET 
-          doctor_id = ?, 
-          linked_date = NOW(), 
-          status = 'active', 
-          notes = 'Doctor updated by patient selection'
-        WHERE patient_id = ?
-      `;
-      
-      db.query(updateSql, [doctorId, patientId], (updateErr) => {
-        if (updateErr) {
-          console.error("Database error updating doctor relationship:", updateErr);
-          return res.status(500).json({
-            success: false,
-            message: "Database error updating doctor relationship"
-          });
-        }
-        
-        res.json({
-          success: true,
-          message: "Doctor relationship updated successfully",
-          action: "updated"
+    // Deactivate all other doctor relationships for this patient
+    const deactivateOthersSql = "UPDATE patient_doctors SET status = 'inactive' WHERE patient_id = ? AND doctor_id != ? AND status = 'active'";
+    
+    db.query(deactivateOthersSql, [patientId, doctorId], (deactivateErr) => {
+      if (deactivateErr) {
+        console.error("Error deactivating other relationships:", deactivateErr);
+        return res.status(500).json({
+          success: false,
+          message: "Database error updating relationships"
         });
-      });
-    } else {
-      // Patient has no doctor yet, INSERT new relationship
-      const insertSql = `
-        INSERT INTO patient_doctors 
-        (patient_id, doctor_id, linked_date, status, notes, created_at) 
-        VALUES (?, ?, NOW(), 'active', 'Doctor selected by patient', NOW())
-      `;
+      }
       
-      db.query(insertSql, [patientId, doctorId], (insertErr) => {
-        if (insertErr) {
-          console.error("Database error creating doctor relationship:", insertErr);
-          return res.status(500).json({
-            success: false,
-            message: "Database error creating doctor relationship"
-          });
-        }
+      if (existingRelation.length > 0) {
+        // Relationship exists - reactivate it
+        const reactivateSql = `
+          UPDATE patient_doctors 
+          SET status = 'active', linked_date = NOW(), notes = 'Doctor reactivated by patient selection'
+          WHERE patient_id = ? AND doctor_id = ?
+        `;
         
-        res.json({
-          success: true,
-          message: "Doctor relationship created successfully",
-          action: "created"
+        db.query(reactivateSql, [patientId, doctorId], (reactivateErr) => {
+          if (reactivateErr) {
+            console.error("Error reactivating relationship:", reactivateErr);
+            return res.status(500).json({
+              success: false,
+              message: "Database error reactivating relationship"
+            });
+          }
+          
+          res.json({
+            success: true,
+            message: "Doctor relationship reactivated successfully",
+            action: "reactivated"
+          });
         });
-      });
-    }
+      } else {
+        // No existing relationship - create new one
+        const insertSql = `
+          INSERT INTO patient_doctors 
+          (patient_id, doctor_id, linked_date, status, notes, created_at) 
+          VALUES (?, ?, NOW(), 'active', 'Doctor selected by patient', NOW())
+        `;
+        
+        db.query(insertSql, [patientId, doctorId], (insertErr) => {
+          if (insertErr) {
+            console.error("Error creating new relationship:", insertErr);
+            return res.status(500).json({
+              success: false,
+              message: "Database error creating relationship"
+            });
+          }
+          
+          res.json({
+            success: true,
+            message: "Doctor relationship created successfully",
+            action: "created"
+          });
+        });
+      }
+    });
   });
 });
 
@@ -601,5 +614,118 @@ router.get(
     }
   }
 );
+// Add this to your doctor routes
+// router.get("/:id/linked-patients", async (req, res) => {
+//   try {
+//     const doctorId = req.params.id;
+    
+//     // Validate doctor ID
+//     if (!doctorId || isNaN(doctorId)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Valid doctor ID is required"
+//       });
+//     }
+
+//     // Check if doctor exists and is active
+//     const checkDoctorSql = "SELECT id, status FROM doctors WHERE id = ?";
+//     db.query(checkDoctorSql, [doctorId], (err, doctorResults) => {
+//       if (err) {
+//         console.error("Database error during doctor check:", err);
+//         return res.status(500).json({
+//           success: false,
+//           message: "Database error during doctor verification"
+//         });
+//       }
+
+//       if (doctorResults.length === 0) {
+//         return res.status(404).json({
+//           success: false,
+//           message: "Doctor not found"
+//         });
+//       }
+
+//       if (doctorResults[0].status !== 'active') {
+//         return res.status(403).json({
+//           success: false,
+//           message: "Doctor account is not active"
+//         });
+//       }
+
+//       // Fetch linked patients for the doctor
+//       const getLinkedPatientsSql = `
+//         SELECT 
+//           p.id,
+//           p.first_name,
+//           p.last_name,
+//           p.age,
+//           p.phone,
+//           p.blood_group,
+//           p.medical_history,
+//           pd.linked_date,
+//           pd.status as relationship_status,
+//           pd.notes as relationship_notes,
+//           pd.last_visit_date,
+//           pd.next_appointment_date
+//         FROM patient_doctors pd
+//         INNER JOIN patients p ON pd.patient_id = p.id
+//         WHERE pd.doctor_id = ? AND pd.status = 'active'
+//         ORDER BY pd.linked_date DESC
+//       `;
+
+//       db.query(getLinkedPatientsSql, [doctorId], (patientsErr, patientsResults) => {
+//         if (patientsErr) {
+//           console.error("Database error during linked patients fetch:", patientsErr);
+//           return res.status(500).json({
+//             success: false,
+//             message: "Database error during linked patients retrieval",
+//             details: patientsErr.message
+//           });
+//         }
+
+//         // Transform the data to match frontend expectations
+//         const transformedPatients = patientsResults.map(patient => {
+//           // Determine status based on medical history or other criteria
+//           let status = "Normal";
+//           if (patient.medical_history && patient.medical_history.toLowerCase().includes('critical')) {
+//             status = "Critical";
+//           } else if (patient.medical_history && patient.medical_history.toLowerCase().includes('attention')) {
+//             status = "Attention Needed";
+//           }
+
+//           return {
+//             id: patient.id,
+//             name: `${patient.first_name} ${patient.last_name}`,
+//             age: patient.age,
+//             phone: patient.phone,
+//             bloodGroup: patient.blood_group,
+//             lastVisit: patient.last_visit_date || patient.linked_date,
+//             status: status,
+//             condition: patient.medical_history || "Regular Checkup",
+//             nextAppointment: patient.next_appointment_date,
+//             linkedDate: patient.linked_date,
+//             relationshipStatus: patient.relationship_status,
+//             relationshipNotes: patient.relationship_notes
+//           };
+//         });
+
+//         res.status(200).json({
+//           success: true,
+//           message: "Linked patients retrieved successfully",
+//           data: transformedPatients,
+//           count: transformedPatients.length
+//         });
+
+//       });
+//     });
+
+//   } catch (error) {
+//     console.error("Server error:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Internal server error"
+//     });
+//   }
+// });
 
 module.exports = router;

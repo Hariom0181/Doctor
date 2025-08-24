@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -33,7 +34,10 @@ import {
   MapPin,
   Save,
   Eye,
-  Upload
+  Upload,
+  Loader2,
+  AlertCircle,
+  RefreshCw
 } from "lucide-react";
 
 // Sample doctor data
@@ -116,6 +120,52 @@ export default function DoctorDashboard() {
   const [isAddPatientOpen, setIsAddPatientOpen] = useState(false);
   const [isPatientViewOpen, setIsPatientViewOpen] = useState(false);
   const [notifications, setNotifications] = useState(3);
+  const [linkedPatients, setLinkedPatients] = useState([]);
+const [isLoadingPatients, setIsLoadingPatients] = useState(true);
+const [patientsError, setPatientsError] = useState(null);
+// Fetch linked patients when component mounts
+useEffect(() => {
+  fetchLinkedPatients();
+}, []);
+
+const fetchLinkedPatients = async () => {
+  try {
+    setIsLoadingPatients(true);
+    setPatientsError(null);
+    
+    const token = localStorage.getItem('doctorToken'); // This should now exist
+    
+    if (!token) {
+      throw new Error('No authentication token found. Please login again.');
+    }
+    
+    // Updated URL - removed the doctorId parameter since we're getting it from token
+    const response = await fetch(`http://localhost:5000/api/doctors/linked-patients`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      setLinkedPatients(data.data || []);
+    } else {
+      throw new Error(data.message || 'Failed to fetch patients');
+    }
+  } catch (error) {
+    console.error('Error fetching linked patients:', error);
+    setPatientsError(error.message);
+  } finally {
+    setIsLoadingPatients(false);
+  }
+};
+  
   const [newRecord, setNewRecord] = useState({
     patientId: "",
     type: "",
@@ -143,6 +193,38 @@ export default function DoctorDashboard() {
     duration: "",
     instructions: ""
   });
+
+  
+  
+  // Helper functions
+  // const calculateAge = (dateOfBirth) => {
+  //   const today = new Date();
+  //   const birthDate = new Date(dateOfBirth);
+  //   let age = today.getFullYear() - birthDate.getFullYear();
+  //   const monthDiff = today.getMonth() - birthDate.getMonth();
+  //   if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+  //     age--;
+  //   }
+  //   return age;
+  // };
+  
+  // const getPatientStatus = (patient) => {
+  //   // Customize this logic based on your business rules
+  //   if (patient.medicalHistory && patient.medicalHistory.toLowerCase().includes('critical')) {
+  //     return "Critical";
+  //   } else if (patient.medicalHistory && patient.medicalHistory.toLowerCase().includes('attention')) {
+  //     return "Attention Needed";
+  //   } else {
+  //     return "Normal";
+  //   }
+  // };
+  
+  // const getNextAppointmentDate = () => {
+  //   // Generate a future date (you can customize this logic)
+  //   const date = new Date();
+  //   date.setDate(date.getDate() + Math.floor(Math.random() * 30) + 7); // 7-37 days from now
+  //   return date.toISOString().split('T')[0];
+  // };
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -199,7 +281,7 @@ export default function DoctorDashboard() {
     setIsPrescriptionOpen(false);
   };
 
-  const filteredPatients = patientsData.filter(patient =>
+  const filteredPatients = linkedPatients.filter(patient =>
     patient.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     patient.id.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -356,7 +438,7 @@ export default function DoctorDashboard() {
                             <SelectValue placeholder="Select patient" />
                           </SelectTrigger>
                           <SelectContent>
-                            {patientsData.map(patient => (
+                          {linkedPatients.map(patient => (
                               <SelectItem key={patient.id} value={patient.id}>
                                 {patient.name} ({patient.id})
                               </SelectItem>
@@ -448,7 +530,7 @@ export default function DoctorDashboard() {
                           <SelectValue placeholder="Select patient" />
                         </SelectTrigger>
                         <SelectContent>
-                          {patientsData.map(patient => (
+                        {linkedPatients.map(patient => (
                             <SelectItem key={patient.id} value={patient.id}>
                               {patient.name} ({patient.id})
                             </SelectItem>
@@ -512,7 +594,7 @@ export default function DoctorDashboard() {
                       Prescribe Medication
                     </Button>
                   </div>
-                  </DialogContent>
+                </DialogContent>
               </Dialog>
               <Dialog open={isAddHealthMetricsOpen} onOpenChange={setIsAddHealthMetricsOpen}>
                 <DialogTrigger asChild>
@@ -536,12 +618,12 @@ export default function DoctorDashboard() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>Patient</Label>
-                        <Select value={newHealthMetrics.patientId} onValueChange={(value) => setNewHealthMetrics({...newHealthMetrics, patientId: value})}>
+                        <Select value={newHealthMetrics.patientId} onValueChange={(value) => setNewHealthMetrics({ ...newHealthMetrics, patientId: value })}>
                           <SelectTrigger>
                             <SelectValue placeholder="Select patient" />
                           </SelectTrigger>
                           <SelectContent>
-                            {patientsData.map(patient => (
+                          {linkedPatients.map(patient => (
                               <SelectItem key={patient.id} value={patient.id}>
                                 {patient.name} ({patient.id})
                               </SelectItem>
@@ -551,69 +633,69 @@ export default function DoctorDashboard() {
                       </div>
                       <div className="space-y-2">
                         <Label>Date</Label>
-                        <Input 
+                        <Input
                           type="date"
                           value={newHealthMetrics.date}
-                          onChange={(e) => setNewHealthMetrics({...newHealthMetrics, date: e.target.value})}
+                          onChange={(e) => setNewHealthMetrics({ ...newHealthMetrics, date: e.target.value })}
                         />
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>Blood Pressure (Systolic)</Label>
-                        <Input 
+                        <Input
                           type="number"
                           placeholder="120"
                           value={newHealthMetrics.bloodPressureSystolic}
-                          onChange={(e) => setNewHealthMetrics({...newHealthMetrics, bloodPressureSystolic: e.target.value})}
+                          onChange={(e) => setNewHealthMetrics({ ...newHealthMetrics, bloodPressureSystolic: e.target.value })}
                         />
                       </div>
                       <div className="space-y-2">
                         <Label>Blood Pressure (Diastolic)</Label>
-                        <Input 
+                        <Input
                           type="number"
                           placeholder="80"
                           value={newHealthMetrics.bloodPressureDiastolic}
-                          onChange={(e) => setNewHealthMetrics({...newHealthMetrics, bloodPressureDiastolic: e.target.value})}
+                          onChange={(e) => setNewHealthMetrics({ ...newHealthMetrics, bloodPressureDiastolic: e.target.value })}
                         />
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>Blood Sugar (mg/dL)</Label>
-                        <Input 
+                        <Input
                           type="number"
                           placeholder="110"
                           value={newHealthMetrics.bloodSugar}
-                          onChange={(e) => setNewHealthMetrics({...newHealthMetrics, bloodSugar: e.target.value})}
+                          onChange={(e) => setNewHealthMetrics({ ...newHealthMetrics, bloodSugar: e.target.value })}
                         />
                       </div>
                       <div className="space-y-2">
                         <Label>Weight (kg)</Label>
-                        <Input 
+                        <Input
                           type="number"
                           placeholder="70"
                           step="0.1"
                           value={newHealthMetrics.weight}
-                          onChange={(e) => setNewHealthMetrics({...newHealthMetrics, weight: e.target.value})}
+                          onChange={(e) => setNewHealthMetrics({ ...newHealthMetrics, weight: e.target.value })}
                         />
                       </div>
                     </div>
                     <div className="space-y-2">
                       <Label>Heart Rate (bpm)</Label>
-                      <Input 
+                      <Input
                         type="number"
                         placeholder="72"
                         value={newHealthMetrics.heartRate}
-                        onChange={(e) => setNewHealthMetrics({...newHealthMetrics, heartRate: e.target.value})}
+                        onChange={(e) => setNewHealthMetrics({ ...newHealthMetrics, heartRate: e.target.value })}
                       />
                     </div>
                     <div className="space-y-2">
                       <Label>Notes</Label>
-                      <Textarea 
+                      <Textarea
                         placeholder="Additional observations or notes..."
                         value={newHealthMetrics.notes}
-                        onChange={(e) => setNewHealthMetrics({...newHealthMetrics, notes: e.target.value})}
+                        onChange={(e) => setNewHealthMetrics({ ...newHealthMetrics, notes: e.target.value })}
                       />
                     </div>
                     <Button onClick={handleAddHealthMetrics} className="w-full">
@@ -636,7 +718,7 @@ export default function DoctorDashboard() {
               <div className="flex items-center">
                 <Users className="w-8 h-8 text-primary mr-3" />
                 <div>
-                  <p className="text-2xl font-bold text-gray-900">{patientsData.length}</p>
+                <p className="text-2xl font-bold text-gray-900">{isLoadingPatients ? '...' : linkedPatients.length}</p>
                   <p className="text-sm text-gray-600">Active Patients</p>
                 </div>
               </div>
@@ -766,38 +848,44 @@ export default function DoctorDashboard() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {patientsData.filter(p => p.status === "Critical").map(patient => (
-                    <div key={patient.id} className="flex items-center justify-between p-3 bg-white border border-red-200 rounded-lg">
-                      <div>
-                        <p className="font-medium text-red-800">{patient.name}</p>
-                        <p className="text-sm text-red-600">{patient.condition}</p>
-                      </div>
-                      <div className="flex space-x-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            alert(`Calling ${patient.name}...\n\nPhone: ${patient.phone}\nCondition: ${patient.condition}\n\nNote: This is a critical patient requiring immediate attention.`);
-                          }}
-                        >
-                          <Phone className="w-4 h-4 mr-1" />
-                          Call
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            setSelectedPatient(patient);
-                            alert(`CRITICAL PATIENT DETAILS\n\nName: ${patient.name}\nID: ${patient.id}\nAge: ${patient.age}\nCondition: ${patient.condition}\nLast Visit: ${patient.lastVisit}\nNext Appointment: ${patient.nextAppointment}\n\nIMPORTATE: This patient requires immediate medical attention!`);
-                          }}
-                        >
-                          <Eye className="w-4 h-4 mr-1" />
-                          View
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+              <div className="space-y-3">
+  {linkedPatients.filter(p => p.status === "Critical").length === 0 ? (
+    <div className="text-center py-4 text-gray-500">
+      <p>No critical patients at this time</p>
+    </div>
+  ) : (
+    linkedPatients.filter(p => p.status === "Critical").map(patient => (
+      <div key={patient.id} className="flex items-center justify-between p-3 bg-white border border-red-200 rounded-lg">
+        <div>
+          <p className="font-medium text-red-800">{patient.name}</p>
+          <p className="text-sm text-red-600">{patient.condition}</p>
+        </div>
+        <div className="flex space-x-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              alert(`Calling ${patient.name}...\n\nPhone: ${patient.phone}\nCondition: ${patient.condition}\n\nNote: This is a critical patient requiring immediate attention.`);
+            }}
+          >
+            <Phone className="w-4 h-4 mr-1" />
+            Call
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => {
+              setSelectedPatient(patient);
+              alert(`CRITICAL PATIENT DETAILS\n\nName: ${patient.name}\nID: ${patient.id}\nAge: ${patient.age}\nCondition: ${patient.condition}\nLast Visit: ${patient.lastVisit}\nNext Appointment: ${patient.nextAppointment}\n\nIMPORTANT: This patient requires immediate medical attention!`);
+            }}
+          >
+            <Eye className="w-4 h-4 mr-1" />
+            View
+          </Button>
+        </div>
+      </div>
+    ))
+  )}
+</div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -808,8 +896,33 @@ export default function DoctorDashboard() {
                 <CardTitle>Patient Management</CardTitle>
                 <CardDescription>View and manage all your patients</CardDescription>
               </CardHeader>
+
+
+
+
               <CardContent>
-                <div className="flex justify-between items-center mb-6">
+  {isLoadingPatients ? (
+    <div className="flex items-center justify-center py-8">
+      <Loader2 className="w-6 h-6 animate-spin mr-2" />
+      <span>Loading patients...</span>
+    </div>
+  ) : patientsError ? (
+    <div className="flex items-center justify-center py-8 text-red-600">
+      <AlertCircle className="w-6 h-6 mr-2" />
+      <span>Error: {patientsError}</span>
+      <Button 
+        variant="outline" 
+        size="sm" 
+        className="ml-4"
+        onClick={fetchLinkedPatients}
+      >
+        <RefreshCw className="w-4 h-4 mr-2" />
+        Retry
+      </Button>
+    </div>
+  ) : (
+    <>
+      <div className="flex justify-between items-center mb-6">
                   <div className="relative w-64">
                     <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                     <Input
@@ -828,66 +941,88 @@ export default function DoctorDashboard() {
                   </Button>
                 </div>
 
+
+
+
+
+
+
                 <div className="space-y-4">
-                  {filteredPatients.map((patient) => (
-                    <div key={patient.id} className="border rounded-lg p-4 bg-white">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-4">
-                          <Avatar>
-                            <AvatarFallback>{patient.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <h4 className="font-medium">{patient.name}</h4>
-                            <p className="text-sm text-gray-600">ID: {patient.id} • Age: {patient.age}</p>
-                            <p className="text-sm text-gray-600">Blood Group: {patient.bloodGroup} • Last Visit: {patient.lastVisit}</p>
-                            <p className="text-sm text-gray-600">Condition: {patient.condition}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-3">
-                          <Badge className={getStatusColor(patient.status)}>
-                            {patient.status}
-                          </Badge>
-                          <div className="flex space-x-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setSelectedPatient(patient);
-                                setIsPatientViewOpen(true);
-                                alert(`Viewing detailed profile for ${patient.name}\nID: ${patient.id}\nCondition: ${patient.condition}\nStatus: ${patient.status}`);
-                              }}
-                            >
-                              <Eye className="w-4 h-4 mr-1" />
-                              View
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                alert(`Edit form for ${patient.name} would open here`);
-                              }}
-                            >
-                              <Edit className="w-4 h-4 mr-1" />
-                              Edit
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setNewRecord({ ...newRecord, patientId: patient.id });
-                                setIsAddRecordOpen(true);
-                              }}
-                            >
-                              <Plus className="w-4 h-4 mr-1" />
-                              Add Record
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
+  {filteredPatients.length === 0 ? (
+    <div className="text-center py-8 text-gray-500">
+      <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+      <p>No patients found</p>
+      <p className="text-sm">
+        {searchQuery ? 'Try adjusting your search terms' : 'No patients are currently linked to your account'}
+      </p>
+    </div>
+  ) : (
+    filteredPatients.map((patient) => (
+      <div key={patient.id} className="border rounded-lg p-4 bg-white">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Avatar>
+              <AvatarFallback>{patient.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+            </Avatar>
+            <div>
+              <h4 className="font-medium">{patient.name}</h4>
+              <p className="text-sm text-gray-600">ID: {patient.id} • Age: {patient.age}</p>
+              <p className="text-sm text-gray-600">Blood Group: {patient.bloodGroup} • Last Visit: {patient.lastVisit}</p>
+              <p className="text-sm text-gray-600">Condition: {patient.condition}</p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-3">
+            <Badge className={getStatusColor(patient.status)}>
+              {patient.status}
+            </Badge>
+            <div className="flex space-x-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setSelectedPatient(patient);
+                  setIsPatientViewOpen(true);
+                  alert(`Viewing detailed profile for ${patient.name}\nID: ${patient.id}\nCondition: ${patient.condition}\nStatus: ${patient.status}`);
+                }}
+              >
+                <Eye className="w-4 h-4 mr-1" />
+                View
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  alert(`Edit form for ${patient.name} would open here`);
+                }}
+              >
+                <Edit className="w-4 h-4 mr-1" />
+                Edit
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setNewRecord({ ...newRecord, patientId: patient.id });
+                  setIsAddRecordOpen(true);
+                }}
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Add Record
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    ))
+  )}
+</div>
+
+
+
+                </>
+  )}
+</CardContent>
+            
             </Card>
           </TabsContent>
 
@@ -992,7 +1127,7 @@ export default function DoctorDashboard() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">All Patients</SelectItem>
-                          {patientsData.map(patient => (
+                          {linkedPatients.map(patient => (
                             <SelectItem key={patient.id} value={patient.id}>
                               {patient.name}
                             </SelectItem>

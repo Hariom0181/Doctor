@@ -68,17 +68,17 @@ export default function DoctorLogin() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitMessage(null);
-
+  
     if (!validateForm()) {
       setSubmitMessage({ type: 'error', message: 'Please fix the errors below and try again.' });
       return;
     }
-
+  
     setIsLoading(true);
-
+  
     try {
       console.log("Doctor login data:", formData);
-
+  
       const response = await fetch("http://localhost:5000/api/doctors/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -87,10 +87,10 @@ export default function DoctorLogin() {
           password: formData.password,
         }),
       });
-
+  
       const data = await response.json();
       console.log("Server response:", data);
-
+  
       if (!response.ok) {
         if (data.errors) {
           const serverErrors: ValidationErrors = {};
@@ -107,19 +107,21 @@ export default function DoctorLogin() {
         }
         return;
       }
-
-      // Store doctor data for authenticated requests
-      if (data.doctor) {
+  
+      // Store doctor data for authenticated requests - FIX THE KEYS HERE
+      if (data.token) {
+        localStorage.setItem("doctorToken", data.token); // Changed from "authToken"
+        localStorage.setItem("doctorId", data.doctor.id.toString()); // Added doctorId
         localStorage.setItem("doctorData", JSON.stringify(data.doctor));
       }
-
+  
       setSubmitMessage({ type: 'success', message: "Login successful! Redirecting..." });
-
+  
       // Redirect after a short delay to show success message
       setTimeout(() => {
         navigate("/doctor/dashboard");
       }, 1000);
-
+  
     } catch (error) {
       console.error("Error during login:", error);
       setSubmitMessage({ 

@@ -170,51 +170,35 @@ export default function PatientDashboard() {
       setDoctorsError(null);
       
       try {
-        // First, get the list of available patients
-        const patientsResponse = await fetch('http://localhost:5000/api/patients/list');
-        if (patientsResponse.ok) {
-          const patientsData = await patientsResponse.json();
-          if (patientsData.success && patientsData.data.length > 0) {
-            // Use the first available patient ID
-            const patientId = patientsData.data[0].id.toString();
-            console.log('Using patient ID:', patientId);
-            
-            const doctors = await patientApiService.getLinkedDoctors(patientId);
-            setLinkedDoctors(doctors);
-            
-            // Update the doctors list for the profile section
-            if (doctors.length > 0) {
-              const transformedDoctors = doctors.map(doctor => ({
-                id: doctor.id.toString(),
-                name: doctor.name,
-                specialization: doctor.specialization
-              }));
-              setDoctorsList(transformedDoctors);
-            }
-          } else {
-            throw new Error('No patients found in database');
-          }
-        } else {
-          throw new Error('Failed to get patients list');
+        // Get the current logged-in patient's ID
+        const patientId = getCurrentPatientId();
+        
+        if (!patientId) {
+          throw new Error('No patient logged in');
+        }
+        
+        console.log('Using current patient ID:', patientId);
+        
+        const doctors = await patientApiService.getLinkedDoctors(patientId);
+        setLinkedDoctors(doctors);
+        
+        // Update the doctors list for the profile section
+        if (doctors.length > 0) {
+          const transformedDoctors = doctors.map(doctor => ({
+            id: doctor.id.toString(),
+            name: doctor.name,
+            specialization: doctor.specialization
+          }));
+          setDoctorsList(transformedDoctors);
         }
       } catch (error) {
         console.error('Failed to fetch linked doctors:', error);
-        
-        // Check if it's a backend connection error
-        if (error instanceof Error && error.message.includes('Backend service not available')) {
-          setDoctorsError('Backend server is not running. Using sample data for now.');
-        } else {
-          setDoctorsError('Failed to fetch linked doctors. Using sample data for now.');
-        }
-        
-        // Keep the hardcoded doctors list as fallback
-        console.log('Using fallback doctors list');
+        setDoctorsError('Failed to fetch linked doctors. Please try logging in again.');
       } finally {
         setIsLoadingDoctors(false);
       }
     };
-
-    // Only fetch if backend is available, otherwise use fallback
+  
     fetchLinkedDoctors();
   }, []);
 
@@ -277,34 +261,43 @@ export default function PatientDashboard() {
       default: return "text-muted-foreground";
     }
   };
+  const getCurrentPatientId = () => {
+    const patientData = localStorage.getItem("patientData");
+    if (patientData) {
+      const patient = JSON.parse(patientData);
+      return patient.id?.toString();
+    }
+    return null;
+  };
 
   const handleDoctorSelection = async (doctorId: string) => {
-    if (!doctorId) return;
+  if (!doctorId) return;
+  
+  try {
+    // Get the current logged-in patient's ID
+    const patientId = getCurrentPatientId();
     
-    try {
-      // Get the current patient ID (using the same logic as in useEffect)
-      const patientsResponse = await fetch('http://localhost:5000/api/patients/list');
-      if (patientsResponse.ok) {
-        const patientsData = await patientsResponse.json();
-        if (patientsData.success && patientsData.data.length > 0) {
-          const patientId = patientsData.data[0].id.toString();
-          
-          // Update the doctor relationship
-          await patientApiService.updateDoctorRelationship(patientId, doctorId);
-          
-          // Refresh the linked doctors
-          const doctors = await patientApiService.getLinkedDoctors(patientId);
-          setLinkedDoctors(doctors);
-          
-          // Show success message
-          alert('Doctor relationship updated successfully!');
-        }
-      }
-    } catch (error) {
-      console.error('Failed to update doctor relationship:', error);
-      alert('Failed to update doctor relationship. Please try again.');
+    if (!patientId) {
+      alert('Please log in again to update your doctor.');
+      return;
     }
-  };
+    
+    console.log('Updating doctor for patient:', patientId, 'to doctor:', doctorId);
+    
+    // Update the doctor relationship for the current patient
+    await patientApiService.updateDoctorRelationship(patientId, doctorId);
+    
+    // Refresh the linked doctors
+    const doctors = await patientApiService.getLinkedDoctors(patientId);
+    setLinkedDoctors(doctors);
+    
+    // Show success message
+    alert('Doctor relationship updated successfully!');
+  } catch (error) {
+    console.error('Failed to update doctor relationship:', error);
+    alert('Failed to update doctor relationship. Please try again.');
+  }
+};
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
