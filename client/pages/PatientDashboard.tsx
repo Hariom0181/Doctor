@@ -147,13 +147,14 @@ export default function PatientDashboard() {
   // ------------------------------
   const [activeTab, setActiveTab] = useState("overview"); // <-- Replace with backend: default tab if needed
   const [patientData, setPatientData] = useState(INITIAL_PATIENT_DATA); // <-- Replace with backend: patient data
-  const [healthMetrics, setHealthMetrics] = useState(INITIAL_HEALTH_METRICS); // <-- Replace with backend: health metrics
+  const [healthMetrics, setHealthMetrics] = useState<any[]>([]);
+  // <-- Replace with backend: health metrics
   const [recentRecords, setRecentRecords] = useState(INITIAL_RECENT_RECORDS); // <-- Replace with backend: records
   const [upcomingAppointments, setUpcomingAppointments] = useState(INITIAL_UPCOMING_APPOINTMENTS); // <-- Replace with backend: appointments
   const [medications, setMedications] = useState(INITIAL_MEDICATIONS); // <-- Replace with backend: medications
   const [doctorsList, setDoctorsList] = useState(INITIAL_DOCTORS_LIST);
   const [selectedDoctor, setSelectedDoctor] = useState("");
-  
+
   // New state for API integration
   const [linkedDoctors, setLinkedDoctors] = useState<LinkedDoctor[]>([]);
   const [isLoadingDoctors, setIsLoadingDoctors] = useState(false);
@@ -162,26 +163,75 @@ export default function PatientDashboard() {
   const [isLoadingAvailableDoctors, setIsLoadingAvailableDoctors] = useState(false);
 
   // ------------------------------
+  useEffect(() => {
+    fetchMetrics();
+  }, []);
+  // In your PatientDashboard.tsx
+  // Add this to your fetchMetrics function for better debugging
+  const fetchMetrics = async () => {
+    try {
+      const patientToken = localStorage.getItem("PatientToken");
+
+      if (!patientToken) {
+        console.error("No patient token found. User may not be logged in.");
+        return;
+      }
+
+      const tokenPayload = JSON.parse(atob(patientToken.split('.')[1]));
+      console.log("JWT Token payload:", tokenPayload);
+      console.log("Patient ID from token:", tokenPayload.id);
+
+      const response = await fetch(`http://localhost:5000/api/patients/health-metrics`, {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${patientToken}`,
+          "Content-Type": "application/json"
+        },
+      });
+
+      console.log("Response status:", response.status);
+      console.log("Response OK:", response.ok);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Response error:", errorText);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log("Full API response:", result); // This will show us what we're getting
+
+      if (result.success) {
+        setHealthMetrics(result.data);
+        console.log("Health metrics loaded:", result.data);
+        console.log("Number of metrics:", result.data.length);
+      } else {
+        console.error("Failed to fetch health metrics:", result.message);
+      }
+    } catch (error) {
+      console.error("Failed to fetch health metrics:", error);
+    }
+  };
   // Backend integration for linked doctors
   // ------------------------------
   useEffect(() => {
     const fetchLinkedDoctors = async () => {
       setIsLoadingDoctors(true);
       setDoctorsError(null);
-      
+
       try {
         // Get the current logged-in patient's ID
         const patientId = getCurrentPatientId();
-        
+
         if (!patientId) {
           throw new Error('No patient logged in');
         }
-        
+
         console.log('Using current patient ID:', patientId);
-        
+
         const doctors = await patientApiService.getLinkedDoctors(patientId);
         setLinkedDoctors(doctors);
-        
+
         // Update the doctors list for the profile section
         if (doctors.length > 0) {
           const transformedDoctors = doctors.map(doctor => ({
@@ -198,21 +248,21 @@ export default function PatientDashboard() {
         setIsLoadingDoctors(false);
       }
     };
-  
+
     fetchLinkedDoctors();
   }, []);
 
   // Fetch available doctors for selection
   useEffect(() => {
     const fetchAvailableDoctors = async () => {
-      console.log('🔄 Fetching available doctors...');
+      // console.log('🔄 Fetching available doctors...');
       setIsLoadingAvailableDoctors(true);
-      
+
       try {
         const doctors = await patientApiService.getAvailableDoctors();
-        console.log('✅ Available doctors fetched:', doctors);
+        // console.log('✅ Available doctors fetched:', doctors);
         setAvailableDoctors(doctors);
-        
+
         // Update the doctors list for the profile section dropdown
         if (doctors.length > 0) {
           const transformedDoctors = doctors.map(doctor => ({
@@ -220,12 +270,12 @@ export default function PatientDashboard() {
             name: doctor.name,
             specialization: doctor.specialization
           }));
-          console.log('🔄 Transforming doctors for dropdown:', transformedDoctors);
+          // console.log('🔄 Transforming doctors for dropdown:', transformedDoctors);
           setDoctorsList(transformedDoctors);
-          console.log('🔄 Updated doctorsList state with:', transformedDoctors.length, 'doctors');
-          
+          // console.log('🔄 Updated doctorsList state with:', transformedDoctors.length, 'doctors');
+
           // Force a re-render by updating a timestamp
-          console.log('🔄 Doctors list updated, should re-render dropdown');
+          // console.log('🔄 Doctors list updated, should re-render dropdown');
         } else {
           console.log('⚠️ No doctors found in API response');
         }
@@ -254,11 +304,11 @@ export default function PatientDashboard() {
   };
 
   const getMetricColor = (status: string) => {
-    switch (status) {
-      case "normal": return "text-success";
-      case "warning": return "text-warning";
-      case "critical": return "text-destructive";
-      default: return "text-muted-foreground";
+    switch (status?.toLowerCase()) {
+      case "normal": return "text-green-600";
+      case "warning": return "text-yellow-600";
+      case "critical": return "text-red-600";
+      default: return "text-gray-500";
     }
   };
   const getCurrentPatientId = () => {
@@ -269,35 +319,43 @@ export default function PatientDashboard() {
     }
     return null;
   };
-
+  const formatDate = (dateString) => {
+    if (!dateString) return "Not recorded";
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
   const handleDoctorSelection = async (doctorId: string) => {
-  if (!doctorId) return;
-  
-  try {
-    // Get the current logged-in patient's ID
-    const patientId = getCurrentPatientId();
-    
-    if (!patientId) {
-      alert('Please log in again to update your doctor.');
-      return;
+    if (!doctorId) return;
+
+    try {
+      // Get the current logged-in patient's ID
+      const patientId = getCurrentPatientId();
+
+      if (!patientId) {
+        alert('Please log in again to update your doctor.');
+        return;
+      }
+
+      console.log('Updating doctor for patient:', patientId, 'to doctor:', doctorId);
+
+      // Update the doctor relationship for the current patient
+      await patientApiService.updateDoctorRelationship(patientId, doctorId);
+
+      // Refresh the linked doctors
+      const doctors = await patientApiService.getLinkedDoctors(patientId);
+      setLinkedDoctors(doctors);
+
+      // Show success message
+      alert('Doctor relationship updated successfully!');
+    } catch (error) {
+      console.error('Failed to update doctor relationship:', error);
+      alert('Failed to update doctor relationship. Please try again.');
     }
-    
-    console.log('Updating doctor for patient:', patientId, 'to doctor:', doctorId);
-    
-    // Update the doctor relationship for the current patient
-    await patientApiService.updateDoctorRelationship(patientId, doctorId);
-    
-    // Refresh the linked doctors
-    const doctors = await patientApiService.getLinkedDoctors(patientId);
-    setLinkedDoctors(doctors);
-    
-    // Show success message
-    alert('Doctor relationship updated successfully!');
-  } catch (error) {
-    console.error('Failed to update doctor relationship:', error);
-    alert('Failed to update doctor relationship. Please try again.');
-  }
-};
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
@@ -360,24 +418,58 @@ export default function PatientDashboard() {
         </div>
 
         {/* Quick Health Status */}
+        {/* Fixed Health Metrics Display */}
+
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          {healthMetrics.map((metric, index) => (
-            <Card key={index}>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">{metric.label}</p>
-                    <p className={`text-2xl font-bold ${getMetricColor(metric.status)}`}>
-                      {metric.value}
-                    </p>
-                    <p className="text-xs text-gray-500">Last checked: {new Date(metric.lastChecked).toLocaleDateString()}</p>
+          {healthMetrics.length > 0 ? (
+            healthMetrics.map((metric, index) => (
+              <Card key={metric.id || index}>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">{metric.label}</p>
+                      <p className={`text-2xl font-bold ${getMetricColor(metric.status)}`}>
+                        {metric.value}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Last checked: {formatDate(metric.lastChecked)}
+                      </p>
+                      {metric.notes && (
+                        <p className="text-xs text-gray-400 mt-1">
+                          Notes: {metric.notes}
+                        </p>
+                      )}
+                    </div>
+                    <Activity className={`w-8 h-8 ${getMetricColor(metric.status)}`} />
                   </div>
-                  <Activity className={`w-8 h-8 ${getMetricColor(metric.status)}`} />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            // Show placeholder cards when no data
+            Array.from({ length: 4 }).map((_, index) => (
+              <Card key={index}>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-400">
+                        {['Blood Pressure', 'Blood Sugar', 'Weight', 'Heart Rate'][index]}
+                      </p>
+                      <p className="text-2xl font-bold text-gray-300">
+                        No data
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        Not recorded yet
+                      </p>
+                    </div>
+                    <Activity className="w-8 h-8 text-gray-300" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
         </div>
+
 
         {/* Linked Doctors Section */}
         <div className="mb-8">
@@ -407,8 +499,8 @@ export default function PatientDashboard() {
                   <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-3" />
                   <h3 className="font-medium text-red-800 mb-2">Error Loading Doctors</h3>
                   <p className="text-sm text-red-600 mb-4">{doctorsError}</p>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     size="sm"
                     onClick={() => window.location.reload()}
                   >
@@ -1048,7 +1140,7 @@ export default function PatientDashboard() {
                     <Label htmlFor="select-doctor" className="text-sm font-medium text-gray-700">
                       Select Doctor
                     </Label>
-                    
+
                     {/* Show current doctor if linked */}
                     {linkedDoctors.length > 0 && (
                       <div className="bg-blue-50 p-3 rounded-lg mb-3">
@@ -1061,7 +1153,7 @@ export default function PatientDashboard() {
                         </p>
                       </div>
                     )}
-                    
+
                     <div className="flex space-x-2">
                       <Select value={selectedDoctor} onValueChange={setSelectedDoctor}>
                         <SelectTrigger id="select-doctor" className="flex-1 h-11">
@@ -1072,7 +1164,7 @@ export default function PatientDashboard() {
                             <SelectItem value="" disabled>Loading doctors...</SelectItem>
                           ) : doctorsList.length > 0 ? (
                             <>
-                              {console.log('🎯 Rendering doctors in dropdown:', doctorsList)}
+                              {/* {console.log('🎯 Rendering doctors in dropdown:', doctorsList)} */}
                               {doctorsList.map((doctor) => (
                                 <SelectItem key={doctor.id} value={doctor.id}>
                                   {doctor.name} - {doctor.specialization}
@@ -1088,7 +1180,7 @@ export default function PatientDashboard() {
                         </SelectContent>
                       </Select>
                       {selectedDoctor && (
-                        <Button 
+                        <Button
                           onClick={() => handleDoctorSelection(selectedDoctor)}
                           className="h-11 px-4"
                         >
@@ -1102,7 +1194,7 @@ export default function PatientDashboard() {
                       </p>
                     )}
                   </div>
-                 
+
 
                   <div className="pt-4 border-t">
                     <h4 className="font-medium mb-3">Quick Actions</h4>

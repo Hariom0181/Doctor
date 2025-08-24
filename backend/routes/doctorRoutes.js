@@ -6,10 +6,12 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 
 
+
+
 // Add this middleware function
 const authenticateDoctor = (req, res, next) => {
   const token = req.header('Authorization')?.replace('Bearer ', '');
-  
+
   if (!token) {
     return res.status(401).json({
       success: false,
@@ -496,7 +498,7 @@ router.post(
 router.get("/linked-patients", authenticateDoctor, async (req, res) => {
   try {
     const doctorId = req.doctor.id; // Get from JWT token instead of URL param
-    
+
     // Rest of your code remains the same...
     // Validate doctor ID
     if (!doctorId || isNaN(doctorId)) {
@@ -650,6 +652,318 @@ router.get("/linked-patients", authenticateDoctor, async (req, res) => {
           count: transformedPatients.length,
           doctorId: doctorId
         });
+      });
+    });
+
+  } catch (error) {
+    console.error("Server error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error"
+    });
+  }
+});
+// Get health metrics for a specific patient
+// Get health metrics for a specific patient
+router.get("/patient/:patientId/health-metrics", authenticateDoctor, async (req, res) => {
+  try {
+    const { patientId } = req.params;
+    const doctorId = req.doctor.id;
+
+    // Verify patient is linked to this doctor
+    const checkLinkSql = `
+      SELECT id FROM patient_doctors 
+      WHERE patient_id = ? AND doctor_id = ? AND status = 'active'
+    `;
+
+    db.query(checkLinkSql, [patientId, doctorId], (err, linkResults) => {
+      if (err) {
+        console.error("Database error during link check:", err);
+        return res.status(500).json({
+          success: false,
+          message: "Database error"
+        });
+      }
+
+      if (linkResults.length === 0) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied - Patient not linked to this doctor"
+        });
+      }
+
+      // Get health metrics for the patient
+      const getMetricsSql = `
+        SELECT 
+          id, metric_type, value_systolic, value_diastolic, value_numeric,
+          unit, status, recorded_date, recorded_time, notes, created_at
+        FROM health_metrics 
+        WHERE patient_id = ? 
+        ORDER BY metric_type, recorded_date DESC, recorded_time DESC
+      `;
+
+      db.query(getMetricsSql, [patientId], (metricsErr, metricsResults) => {
+        if (metricsErr) {
+          console.error("Database error during metrics fetch:", metricsErr);
+          return res.status(500).json({
+            success: false,
+            message: "Database error during metrics retrieval"
+          });
+        }
+
+        // Group by metric type and get the latest for each type
+        const groupedMetrics = {};
+        metricsResults.forEach(metric => {
+          if (!groupedMetrics[metric.metric_type]) {
+            groupedMetrics[metric.metric_type] = metric; // Take the first (latest) one
+          }
+        });
+
+        // Format for frontend display
+        const formattedMetrics = Object.values(groupedMetrics).map(metric => {
+          let displayValue = "";
+          let label = "";
+
+          switch (metric.metric_type) {
+            case "blood_pressure":
+              displayValue = `${metric.value_systolic}/${metric.value_diastolic}`;
+              label = "Blood Pressure";
+              break;
+            case "blood_sugar":
+              displayValue = `${metric.value_numeric} ${metric.unit || 'mg/dL'}`;
+              label = "Blood Sugar";
+              break;
+            case "weight":
+              displayValue = `${metric.value_numeric} ${metric.unit || 'kg'}`;
+              label = "Weight";
+              break;
+            case "heart_rate":
+              displayValue = `${metric.value_numeric} ${metric.unit || 'bpm'}`;
+              label = "Heart Rate";
+              break;
+            default:
+              displayValue = metric.value_numeric ? `${metric.value_numeric} ${metric.unit || ''}`.trim() : "";
+              label = metric.metric_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+          }
+
+          return {
+            id: metric.id,
+            label: label,
+            value: displayValue,
+            status: metric.status || "normal",
+            lastChecked: metric.recorded_date,
+            notes: metric.notes
+          };
+        });
+
+        res.json({
+          success: true,
+          message: "Health metrics retrieved successfully",
+          data: formattedMetrics,
+          patientId: patientId
+        });
+      });
+    });
+
+  } catch (error) {
+    console.error("Server error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error"
+    });
+  }
+});
+
+// Add or UPDATE health metrics (this handles both create and update)
+router.post("/patient/:patientId/health-metrics", authenticateDoctor, [
+  body("metricType")
+    .notEmpty()
+    .isIn(['blood_pressure', 'blood_sugar', 'weight', 'heart_rate'])
+    .withMessage("Valid metric type is required (blood_pressure, blood_sugar, weight, heart_rate)"),
+
+  body("valueSystolic")
+    .optional({ nullable: true })
+    .isNumeric()
+    .withMessage("Systolic value must be numeric"),
+
+  body("valueDiastolic")
+    .optional({ nullable: true })
+    .isNumeric()
+    .withMessage("Diastolic value must be numeric"),
+
+  body("valueNumeric")
+    .optional({ nullable: true })
+    .isNumeric()
+    .withMessage("Numeric value must be numeric"),
+
+  body("unit")
+    .optional({ nullable: true })
+    .trim()
+    .isLength({ max: 20 })
+    .withMessage("Unit must not exceed 20 characters"),
+
+  body("status")
+    .optional({ nullable: true })
+    .isIn(['normal', 'warning', 'critical'])
+    .withMessage("Status must be normal, warning, or critical"),
+
+  body("notes")
+    .optional({ nullable: true })
+    .trim()
+    .isLength({ max: 1000 })
+    .withMessage("Notes must not exceed 1000 characters")
+], async (req, res) => {
+  try {
+    // Check validation errors
+    console.log("🟢 Received body:", req.body);
+    console.log("🟢 PatientId param:", req.params.patientId);
+
+    const errors = validationResult(req);
+    console.log("Validation errors:", errors.array());
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: "Validation failed",
+        errors: errors.array()
+      });
+    }
+
+    const { patientId } = req.params;
+    const doctorId = req.doctor.id;
+    const {
+      metricType,
+      valueSystolic,
+      valueDiastolic,
+      valueNumeric,
+      unit,
+      status,
+      notes
+    } = req.body;
+
+    // Verify patient is linked to this doctor
+    const checkLinkSql = `
+      SELECT id FROM patient_doctors 
+      WHERE patient_id = ? AND doctor_id = ? AND status = 'active'
+    `;
+
+    db.query(checkLinkSql, [patientId, doctorId], (err, linkResults) => {
+      if (err) {
+        console.error("Database error during link check:", err);
+        return res.status(500).json({
+          success: false,
+          message: "Database error"
+        });
+      }
+
+      if (linkResults.length === 0) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied - Patient not linked to this doctor"
+        });
+      }
+
+      // Check if metric already exists for this patient and metric type
+      const checkExistingSql = `
+        SELECT id FROM health_metrics 
+        WHERE patient_id = ? AND metric_type = ?
+        ORDER BY created_at DESC LIMIT 1
+      `;
+
+      db.query(checkExistingSql, [patientId, metricType], (checkErr, existingResults) => {
+        if (checkErr) {
+          console.error("Database error during existing metric check:", checkErr);
+          return res.status(500).json({
+            success: false,
+            message: "Database error during metric check"
+          });
+        }
+
+        const currentDate = new Date().toISOString().split('T')[0];
+        const currentTime = new Date().toTimeString().slice(0, 5);
+
+        if (existingResults.length > 0) {
+          // UPDATE existing metric
+          const updateSql = `
+            UPDATE health_metrics SET
+              value_systolic = ?,
+              value_diastolic = ?,
+              value_numeric = ?,
+              unit = ?,
+              status = ?,
+              recorded_date = ?,
+              recorded_time = ?,
+              notes = ?,
+              created_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+          `;
+
+          const updateValues = [
+            valueSystolic || null,
+            valueDiastolic || null,
+            valueNumeric || null,
+            unit || null,
+            status || 'normal',
+            currentDate,
+            currentTime,
+            notes || null,
+            existingResults[0].id
+          ];
+
+          db.query(updateSql, updateValues, (updateErr, updateResult) => {
+            if (updateErr) {
+              console.error("Database error during metric update:", updateErr);
+              return res.status(500).json({
+                success: false,
+                message: "Failed to update health metric"
+              });
+            }
+
+            res.json({
+              success: true,
+              message: "Health metric updated successfully",
+              action: "updated",
+              metricId: existingResults[0].id
+            });
+          });
+
+        } else {
+          // INSERT new metric
+          const insertSql = `
+            INSERT INTO health_metrics 
+            (patient_id, metric_type, value_systolic, value_diastolic, value_numeric, unit, status, recorded_date, recorded_time, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `;
+
+          const insertValues = [
+            patientId,
+            metricType,
+            valueSystolic || null,
+            valueDiastolic || null,
+            valueNumeric || null,
+            unit || null,
+            status || 'normal',
+            currentDate,
+            currentTime,
+            notes || null
+          ];
+
+          db.query(insertSql, insertValues, (insertErr, insertResult) => {
+            if (insertErr) {
+              console.error("Database error during metric insertion:", insertErr);
+              return res.status(500).json({
+                success: false,
+                message: "Failed to add health metric"
+              });
+            }
+
+            res.status(201).json({
+              success: true,
+              message: "Health metric added successfully",
+              action: "created",
+              metricId: insertResult.insertId
+            });
+          });
+        }
       });
     });
 

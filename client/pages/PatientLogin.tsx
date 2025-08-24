@@ -107,7 +107,7 @@ export default function PatientLogin() {
 
       // ✅ Store JWT token for authenticated requests
       if (data.token) {
-        localStorage.setItem("authToken", data.token);
+        localStorage.setItem("PatientToken", data.token);
         localStorage.setItem("patientData", JSON.stringify(data.patient));
       }
 

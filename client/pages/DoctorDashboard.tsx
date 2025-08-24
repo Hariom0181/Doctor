@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,DialogFooter } from "@/components/ui/dialog";
 import {
   Heart,
   Calendar,
@@ -121,51 +121,223 @@ export default function DoctorDashboard() {
   const [isPatientViewOpen, setIsPatientViewOpen] = useState(false);
   const [notifications, setNotifications] = useState(3);
   const [linkedPatients, setLinkedPatients] = useState([]);
-const [isLoadingPatients, setIsLoadingPatients] = useState(true);
-const [patientsError, setPatientsError] = useState(null);
-// Fetch linked patients when component mounts
-useEffect(() => {
-  fetchLinkedPatients();
-}, []);
+  const [isLoadingPatients, setIsLoadingPatients] = useState(true);
+  const [patientsError, setPatientsError] = useState(null);
+  const [isAddHealthMetricsOpen, setIsAddHealthMetricsOpen] = useState(false);
 
-const fetchLinkedPatients = async () => {
+  // Your existing useState declarations
+
+
+// ADD THE NEW CODE HERE (all the functions from the artifact)
+const [newHealthMetrics, setNewHealthMetrics] = useState({
+  patientId: '',
+  metricType: '',
+  valueSystolic: '',
+  valueDiastolic: '',
+  valueNumeric: '',
+  unit: '',
+  status: 'normal',
+  notes: ''
+});
+
+const [isAddingMetrics, setIsAddingMetrics] = useState(false);
+
+// Available metric types (NO TEMPERATURE)
+const METRIC_TYPES = [
+  { value: 'blood_pressure', label: 'Blood Pressure', requiresBoth: true, unit: 'mmHg' },
+  { value: 'blood_sugar', label: 'Blood Sugar', requiresBoth: false, unit: 'mg/dL' },
+  { value: 'weight', label: 'Weight', requiresBoth: false, unit: 'kg' },
+  { value: 'heart_rate', label: 'Heart Rate', requiresBoth: false, unit: 'bpm' }
+];
+const formatDate = (dateString) => {
+  if (!dateString) return "Not recorded";
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', { 
+    year: 'numeric', 
+    month: 'short', 
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+};
+// Function to add/update health metrics
+const handleAddHealthMetrics = async () => {
+  if (!newHealthMetrics.patientId || !newHealthMetrics.metricType) {
+    alert('Please select a patient and metric type');
+    return;
+  }
+
+  const selectedMetricType = METRIC_TYPES.find(m => m.value === newHealthMetrics.metricType);
+  
+  // Validate required fields based on metric type
+  if (selectedMetricType?.requiresBoth) {
+    if (!newHealthMetrics.valueSystolic || !newHealthMetrics.valueDiastolic) {
+      alert('Please enter both systolic and diastolic values for blood pressure');
+      return;
+    }
+  } else {
+    if (!newHealthMetrics.valueNumeric) {
+      alert('Please enter a numeric value');
+      return;
+    }
+  }
+
+  setIsAddingMetrics(true);
+
   try {
-    setIsLoadingPatients(true);
-    setPatientsError(null);
+    const token = localStorage.getItem('doctorToken');
+ 
     
-    const token = localStorage.getItem('doctorToken'); // This should now exist
-    
-    if (!token) {
-      throw new Error('No authentication token found. Please login again.');
-    }
-    
-    // Updated URL - removed the doctorId parameter since we're getting it from token
-    const response = await fetch(`http://localhost:5000/api/doctors/linked-patients`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
+    const response = await fetch(
+      `http://localhost:5000/api/doctors/patient/${newHealthMetrics.patientId}/health-metrics`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          metricType: newHealthMetrics.metricType,
+          valueSystolic: Number(newHealthMetrics.valueSystolic) || null,
+          valueDiastolic: Number(newHealthMetrics.valueDiastolic) || null,
+          valueNumeric: Number(newHealthMetrics.valueNumeric) || null,
+          unit: newHealthMetrics.unit || "",
+          status: newHealthMetrics.status,
+          notes: newHealthMetrics.notes
+        })
       }
-    });
+    );
     
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
+
     const data = await response.json();
-    
+
     if (data.success) {
-      setLinkedPatients(data.data || []);
+      alert(`Health metrics ${data.action} successfully!`);
+      setIsAddHealthMetricsOpen(false);
+      
+      // Reset form
+      setNewHealthMetrics({
+        patientId: '',
+        metricType: '',
+        valueSystolic: '',
+        valueDiastolic: '',
+        valueNumeric: '',
+        unit: '',
+        status: 'normal',
+        notes: ''
+      });
+      
+      // Refresh patients list to show updated metrics
+      fetchLinkedPatients();
     } else {
-      throw new Error(data.message || 'Failed to fetch patients');
+      alert(`Error: ${data.message}`);
+      console.log("Data being sent to backend:", {
+        metricType: newHealthMetrics.metricType,
+        valueSystolic: newHealthMetrics.valueSystolic || null,
+        valueDiastolic: newHealthMetrics.valueDiastolic || null,
+        valueNumeric: newHealthMetrics.valueNumeric || null,
+        unit: newHealthMetrics.unit || selectedMetricType?.unit || '',
+        status: newHealthMetrics.status,
+        notes: newHealthMetrics.notes
+      });
+      // console.log("Data being sent to backend:", submitData);
+
     }
   } catch (error) {
-    console.error('Error fetching linked patients:', error);
-    setPatientsError(error.message);
+    console.error('Error adding health metrics:', error);
+    alert('Failed to add health metrics. Please try again.');
   } finally {
-    setIsLoadingPatients(false);
+    setIsAddingMetrics(false);
   }
 };
-  
+
+// Function to get health metrics for a specific patient  
+const fetchPatientHealthMetrics = async (patientId) => {
+  try {
+    const token = localStorage.getItem('doctorToken');
+    
+    const response = await fetch(
+      `http://localhost:5000/api/doctors/patient/${patientId}/health-metrics`,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    const data = await response.json();
+
+    if (data.success) {
+      return data.data;
+    } else {
+      console.error('Error fetching health metrics:', data.message);
+      return [];
+    }
+  } catch (error) {
+    console.error('Error fetching health metrics:', error);
+    return [];
+  }
+};
+
+// REPLACE your existing fetchLinkedPatients function with the new one
+
+
+
+  // Fetch linked patients when component mounts
+  useEffect(() => {
+    fetchLinkedPatients();
+  }, []);
+
+  const fetchLinkedPatients = async () => {
+    try {
+      setIsLoadingPatients(true);
+      setPatientsError(null);
+      
+      const token = localStorage.getItem('doctorToken');
+      
+      if (!token) {
+        throw new Error('No authentication token found. Please login again.');
+      }
+      
+      const response = await fetch(`http://localhost:5000/api/doctors/linked-patients`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        // Fetch health metrics for each patient
+        const patientsWithMetrics = await Promise.all(
+          data.data.map(async (patient) => {
+            const healthMetrics = await fetchPatientHealthMetrics(patient.id);
+            return {
+              ...patient,
+              healthMetrics: healthMetrics || []
+            };
+          })
+        );
+        
+        setLinkedPatients(patientsWithMetrics);
+      } else {
+        throw new Error(data.message || 'Failed to fetch patients');
+      }
+    } catch (error) {
+      console.error('Error fetching linked patients:', error);
+      setPatientsError(error.message);
+    } finally {
+      setIsLoadingPatients(false);
+    }
+  };
+
+
   const [newRecord, setNewRecord] = useState({
     patientId: "",
     type: "",
@@ -174,17 +346,7 @@ const fetchLinkedPatients = async () => {
     nextCheckup: "",
     notes: ""
   });
-  const [isAddHealthMetricsOpen, setIsAddHealthMetricsOpen] = useState(false);
-  const [newHealthMetrics, setNewHealthMetrics] = useState({
-    patientId: "",
-    date: new Date().toISOString().split('T')[0],
-    bloodPressureSystolic: "",
-    bloodPressureDiastolic: "",
-    bloodSugar: "",
-    weight: "",
-    heartRate: "",
-    notes: ""
-  });
+
   const [newMedication, setNewMedication] = useState({
     patientId: "",
     medicationName: "",
@@ -194,37 +356,37 @@ const fetchLinkedPatients = async () => {
     instructions: ""
   });
 
-  
-  
+
+
   // Helper functions
-  // const calculateAge = (dateOfBirth) => {
-  //   const today = new Date();
-  //   const birthDate = new Date(dateOfBirth);
-  //   let age = today.getFullYear() - birthDate.getFullYear();
-  //   const monthDiff = today.getMonth() - birthDate.getMonth();
-  //   if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-  //     age--;
-  //   }
-  //   return age;
-  // };
-  
-  // const getPatientStatus = (patient) => {
-  //   // Customize this logic based on your business rules
-  //   if (patient.medicalHistory && patient.medicalHistory.toLowerCase().includes('critical')) {
-  //     return "Critical";
-  //   } else if (patient.medicalHistory && patient.medicalHistory.toLowerCase().includes('attention')) {
-  //     return "Attention Needed";
-  //   } else {
-  //     return "Normal";
-  //   }
-  // };
-  
-  // const getNextAppointmentDate = () => {
-  //   // Generate a future date (you can customize this logic)
-  //   const date = new Date();
-  //   date.setDate(date.getDate() + Math.floor(Math.random() * 30) + 7); // 7-37 days from now
-  //   return date.toISOString().split('T')[0];
-  // };
+  const calculateAge = (dateOfBirth) => {
+    const today = new Date();
+    const birthDate = new Date(dateOfBirth);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age;
+  };
+
+  const getPatientStatus = (patient) => {
+    // Customize this logic based on your business rules
+    if (patient.medicalHistory && patient.medicalHistory.toLowerCase().includes('critical')) {
+      return "Critical";
+    } else if (patient.medicalHistory && patient.medicalHistory.toLowerCase().includes('attention')) {
+      return "Attention Needed";
+    } else {
+      return "Normal";
+    }
+  };
+
+  const getNextAppointmentDate = () => {
+    // Generate a future date (you can customize this logic)
+    const date = new Date();
+    date.setDate(date.getDate() + Math.floor(Math.random() * 30) + 7); // 7-37 days from now
+    return date.toISOString().split('T')[0];
+  };
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -234,22 +396,11 @@ const fetchLinkedPatients = async () => {
       default: return "bg-muted text-muted-foreground";
     }
   };
-  const handleAddHealthMetrics = () => {
-    console.log("Adding health metrics:", newHealthMetrics);
-    // Here you would typically send this to your backend
-    alert(`Health metrics added successfully for patient ${newHealthMetrics.patientId}!`);
-    setNewHealthMetrics({
-      patientId: "",
-      date: new Date().toISOString().split('T')[0],
-      bloodPressureSystolic: "",
-      bloodPressureDiastolic: "",
-      bloodSugar: "",
-      weight: "",
-      heartRate: "",
-      notes: ""
-    });
-    setIsAddHealthMetricsOpen(false);
-  };
+
+
+
+
+  // Validate required fields based on metric type
 
   const handleAddRecord = () => {
     console.log("Adding medical record:", newRecord);
@@ -438,7 +589,7 @@ const fetchLinkedPatients = async () => {
                             <SelectValue placeholder="Select patient" />
                           </SelectTrigger>
                           <SelectContent>
-                          {linkedPatients.map(patient => (
+                            {linkedPatients.map(patient => (
                               <SelectItem key={patient.id} value={patient.id}>
                                 {patient.name} ({patient.id})
                               </SelectItem>
@@ -530,7 +681,7 @@ const fetchLinkedPatients = async () => {
                           <SelectValue placeholder="Select patient" />
                         </SelectTrigger>
                         <SelectContent>
-                        {linkedPatients.map(patient => (
+                          {linkedPatients.map(patient => (
                             <SelectItem key={patient.id} value={patient.id}>
                               {patient.name} ({patient.id})
                             </SelectItem>
@@ -596,6 +747,8 @@ const fetchLinkedPatients = async () => {
                   </div>
                 </DialogContent>
               </Dialog>
+
+
               <Dialog open={isAddHealthMetricsOpen} onOpenChange={setIsAddHealthMetricsOpen}>
                 <DialogTrigger asChild>
                   <Button variant="outline" onClick={(e) => {
@@ -611,98 +764,161 @@ const fetchLinkedPatients = async () => {
                   <DialogHeader>
                     <DialogTitle>Add Health Metrics</DialogTitle>
                     <DialogDescription>
-                      Record health measurements for a patient
+                      Record health measurements for a patient (will update existing data if already present)
                     </DialogDescription>
                   </DialogHeader>
+
                   <div className="space-y-4">
+                    {/* Patient Selection */}
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label>Patient</Label>
-                        <Select value={newHealthMetrics.patientId} onValueChange={(value) => setNewHealthMetrics({ ...newHealthMetrics, patientId: value })}>
+                        <Label>Patient *</Label>
+                        <Select
+                          value={newHealthMetrics.patientId}
+                          onValueChange={(value) => setNewHealthMetrics({ ...newHealthMetrics, patientId: value })}
+                        >
                           <SelectTrigger>
                             <SelectValue placeholder="Select patient" />
                           </SelectTrigger>
                           <SelectContent>
-                          {linkedPatients.map(patient => (
-                              <SelectItem key={patient.id} value={patient.id}>
-                                {patient.name} ({patient.id})
+                            {linkedPatients.map(patient => (
+                              <SelectItem key={patient.id} value={patient.id.toString()}>
+                                {patient.name} (ID: {patient.id})
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       </div>
+
+                      {/* Metric Type Selection */}
                       <div className="space-y-2">
-                        <Label>Date</Label>
-                        <Input
-                          type="date"
-                          value={newHealthMetrics.date}
-                          onChange={(e) => setNewHealthMetrics({ ...newHealthMetrics, date: e.target.value })}
-                        />
+                        <Label>Metric Type *</Label>
+                        <Select
+                          value={newHealthMetrics.metricType}
+                          onValueChange={(value) => {
+                            const selectedType = METRIC_TYPES.find(m => m.value === value);
+                            setNewHealthMetrics({
+                              ...newHealthMetrics,
+                              metricType: value,
+                              unit: selectedType?.unit || '',
+                              // Reset values when changing metric type
+                              valueSystolic: '',
+                              valueDiastolic: '',
+                              valueNumeric: ''
+                            });
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select metric type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {METRIC_TYPES.map(type => (
+                              <SelectItem key={type.value} value={type.value}>
+                                {type.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Blood Pressure (Systolic)</Label>
-                        <Input
-                          type="number"
-                          placeholder="120"
-                          value={newHealthMetrics.bloodPressureSystolic}
-                          onChange={(e) => setNewHealthMetrics({ ...newHealthMetrics, bloodPressureSystolic: e.target.value })}
-                        />
+
+                    {/* Values Input */}
+                    {newHealthMetrics.metricType && (
+                      <div className="space-y-4">
+                        {METRIC_TYPES.find(m => m.value === newHealthMetrics.metricType)?.requiresBoth ? (
+                          // Blood Pressure (Systolic/Diastolic)
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label>Systolic *</Label>
+                              <Input
+                                type="number"
+                                placeholder="120"
+                                value={newHealthMetrics.valueSystolic}
+                                onChange={(e) => setNewHealthMetrics({ ...newHealthMetrics, valueSystolic: e.target.value })}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Diastolic *</Label>
+                              <Input
+                                type="number"
+                                placeholder="80"
+                                value={newHealthMetrics.valueDiastolic}
+                                onChange={(e) => setNewHealthMetrics({ ...newHealthMetrics, valueDiastolic: e.target.value })}
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          // Single Numeric Value
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label>Value *</Label>
+                              <Input
+                                type="number"
+                                step="0.1"
+                                placeholder="Enter value"
+                                value={newHealthMetrics.valueNumeric}
+                                onChange={(e) => setNewHealthMetrics({ ...newHealthMetrics, valueNumeric: e.target.value })}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Unit</Label>
+                              <Input
+                                type="text"
+                                placeholder="Unit"
+                                value={newHealthMetrics.unit}
+                                onChange={(e) => setNewHealthMetrics({ ...newHealthMetrics, unit: e.target.value })}
+                              />
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <div className="space-y-2">
-                        <Label>Blood Pressure (Diastolic)</Label>
-                        <Input
-                          type="number"
-                          placeholder="80"
-                          value={newHealthMetrics.bloodPressureDiastolic}
-                          onChange={(e) => setNewHealthMetrics({ ...newHealthMetrics, bloodPressureDiastolic: e.target.value })}
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Blood Sugar (mg/dL)</Label>
-                        <Input
-                          type="number"
-                          placeholder="110"
-                          value={newHealthMetrics.bloodSugar}
-                          onChange={(e) => setNewHealthMetrics({ ...newHealthMetrics, bloodSugar: e.target.value })}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Weight (kg)</Label>
-                        <Input
-                          type="number"
-                          placeholder="70"
-                          step="0.1"
-                          value={newHealthMetrics.weight}
-                          onChange={(e) => setNewHealthMetrics({ ...newHealthMetrics, weight: e.target.value })}
-                        />
-                      </div>
-                    </div>
+                    )}
+
+                    {/* Status */}
                     <div className="space-y-2">
-                      <Label>Heart Rate (bpm)</Label>
-                      <Input
-                        type="number"
-                        placeholder="72"
-                        value={newHealthMetrics.heartRate}
-                        onChange={(e) => setNewHealthMetrics({ ...newHealthMetrics, heartRate: e.target.value })}
-                      />
+                      <Label>Status</Label>
+                      <Select
+                        value={newHealthMetrics.status}
+                        onValueChange={(value) => setNewHealthMetrics({ ...newHealthMetrics, status: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="normal">Normal</SelectItem>
+                          <SelectItem value="warning">Warning</SelectItem>
+                          <SelectItem value="critical">Critical</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
+
+                    {/* Notes */}
                     <div className="space-y-2">
                       <Label>Notes</Label>
                       <Textarea
-                        placeholder="Additional observations or notes..."
+                        placeholder="Additional notes or observations..."
                         value={newHealthMetrics.notes}
                         onChange={(e) => setNewHealthMetrics({ ...newHealthMetrics, notes: e.target.value })}
+                        rows={3}
                       />
                     </div>
-                    <Button onClick={handleAddHealthMetrics} className="w-full">
-                      <Save className="w-4 h-4 mr-2" />
-                      Save Health Metrics
-                    </Button>
                   </div>
+
+                  <DialogFooter>
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsAddHealthMetricsOpen(false)}
+                      disabled={isAddingMetrics}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleAddHealthMetrics}
+                      disabled={isAddingMetrics || !newHealthMetrics.patientId || !newHealthMetrics.metricType}
+                    >
+                      {isAddingMetrics ? "Saving..." : "Save Metrics"}
+                    </Button>
+                  </DialogFooter>
                 </DialogContent>
               </Dialog>
 
@@ -718,7 +934,7 @@ const fetchLinkedPatients = async () => {
               <div className="flex items-center">
                 <Users className="w-8 h-8 text-primary mr-3" />
                 <div>
-                <p className="text-2xl font-bold text-gray-900">{isLoadingPatients ? '...' : linkedPatients.length}</p>
+                  <p className="text-2xl font-bold text-gray-900">{isLoadingPatients ? '...' : linkedPatients.length}</p>
                   <p className="text-sm text-gray-600">Active Patients</p>
                 </div>
               </div>
@@ -848,44 +1064,44 @@ const fetchLinkedPatients = async () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-              <div className="space-y-3">
-  {linkedPatients.filter(p => p.status === "Critical").length === 0 ? (
-    <div className="text-center py-4 text-gray-500">
-      <p>No critical patients at this time</p>
-    </div>
-  ) : (
-    linkedPatients.filter(p => p.status === "Critical").map(patient => (
-      <div key={patient.id} className="flex items-center justify-between p-3 bg-white border border-red-200 rounded-lg">
-        <div>
-          <p className="font-medium text-red-800">{patient.name}</p>
-          <p className="text-sm text-red-600">{patient.condition}</p>
-        </div>
-        <div className="flex space-x-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              alert(`Calling ${patient.name}...\n\nPhone: ${patient.phone}\nCondition: ${patient.condition}\n\nNote: This is a critical patient requiring immediate attention.`);
-            }}
-          >
-            <Phone className="w-4 h-4 mr-1" />
-            Call
-          </Button>
-          <Button
-            size="sm"
-            onClick={() => {
-              setSelectedPatient(patient);
-              alert(`CRITICAL PATIENT DETAILS\n\nName: ${patient.name}\nID: ${patient.id}\nAge: ${patient.age}\nCondition: ${patient.condition}\nLast Visit: ${patient.lastVisit}\nNext Appointment: ${patient.nextAppointment}\n\nIMPORTANT: This patient requires immediate medical attention!`);
-            }}
-          >
-            <Eye className="w-4 h-4 mr-1" />
-            View
-          </Button>
-        </div>
-      </div>
-    ))
-  )}
-</div>
+                <div className="space-y-3">
+                  {linkedPatients.filter(p => p.status === "Critical").length === 0 ? (
+                    <div className="text-center py-4 text-gray-500">
+                      <p>No critical patients at this time</p>
+                    </div>
+                  ) : (
+                    linkedPatients.filter(p => p.status === "Critical").map(patient => (
+                      <div key={patient.id} className="flex items-center justify-between p-3 bg-white border border-red-200 rounded-lg">
+                        <div>
+                          <p className="font-medium text-red-800">{patient.name}</p>
+                          <p className="text-sm text-red-600">{patient.condition}</p>
+                        </div>
+                        <div className="flex space-x-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              alert(`Calling ${patient.name}...\n\nPhone: ${patient.phone}\nCondition: ${patient.condition}\n\nNote: This is a critical patient requiring immediate attention.`);
+                            }}
+                          >
+                            <Phone className="w-4 h-4 mr-1" />
+                            Call
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              setSelectedPatient(patient);
+                              alert(`CRITICAL PATIENT DETAILS\n\nName: ${patient.name}\nID: ${patient.id}\nAge: ${patient.age}\nCondition: ${patient.condition}\nLast Visit: ${formatDate(patient.lastVisit)}\nNext Appointment: ${patient.nextAppointment}\n\nIMPORTANT: This patient requires immediate medical attention!`);
+                            }}
+                          >
+                            <Eye className="w-4 h-4 mr-1" />
+                            View
+                          </Button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -901,45 +1117,45 @@ const fetchLinkedPatients = async () => {
 
 
               <CardContent>
-  {isLoadingPatients ? (
-    <div className="flex items-center justify-center py-8">
-      <Loader2 className="w-6 h-6 animate-spin mr-2" />
-      <span>Loading patients...</span>
-    </div>
-  ) : patientsError ? (
-    <div className="flex items-center justify-center py-8 text-red-600">
-      <AlertCircle className="w-6 h-6 mr-2" />
-      <span>Error: {patientsError}</span>
-      <Button 
-        variant="outline" 
-        size="sm" 
-        className="ml-4"
-        onClick={fetchLinkedPatients}
-      >
-        <RefreshCw className="w-4 h-4 mr-2" />
-        Retry
-      </Button>
-    </div>
-  ) : (
-    <>
-      <div className="flex justify-between items-center mb-6">
-                  <div className="relative w-64">
-                    <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                    <Input
-                      placeholder="Search patients..."
-                      className="pl-10"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                    />
+                {isLoadingPatients ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin mr-2" />
+                    <span>Loading patients...</span>
                   </div>
-                  <Button onClick={() => {
-                    setIsAddPatientOpen(true);
-                    alert("Add New Patient form would open here");
-                  }}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add New Patient
-                  </Button>
-                </div>
+                ) : patientsError ? (
+                  <div className="flex items-center justify-center py-8 text-red-600">
+                    <AlertCircle className="w-6 h-6 mr-2" />
+                    <span>Error: {patientsError}</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="ml-4"
+                      onClick={fetchLinkedPatients}
+                    >
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Retry
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex justify-between items-center mb-6">
+                      <div className="relative w-64">
+                        <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        <Input
+                          placeholder="Search patients..."
+                          className="pl-10"
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                      </div>
+                      <Button onClick={() => {
+                        setIsAddPatientOpen(true);
+                        alert("Add New Patient form would open here");
+                      }}>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add New Patient
+                      </Button>
+                    </div>
 
 
 
@@ -947,82 +1163,82 @@ const fetchLinkedPatients = async () => {
 
 
 
-                <div className="space-y-4">
-  {filteredPatients.length === 0 ? (
-    <div className="text-center py-8 text-gray-500">
-      <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-      <p>No patients found</p>
-      <p className="text-sm">
-        {searchQuery ? 'Try adjusting your search terms' : 'No patients are currently linked to your account'}
-      </p>
-    </div>
-  ) : (
-    filteredPatients.map((patient) => (
-      <div key={patient.id} className="border rounded-lg p-4 bg-white">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Avatar>
-              <AvatarFallback>{patient.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
-            </Avatar>
-            <div>
-              <h4 className="font-medium">{patient.name}</h4>
-              <p className="text-sm text-gray-600">ID: {patient.id} • Age: {patient.age}</p>
-              <p className="text-sm text-gray-600">Blood Group: {patient.bloodGroup} • Last Visit: {patient.lastVisit}</p>
-              <p className="text-sm text-gray-600">Condition: {patient.condition}</p>
-            </div>
-          </div>
-          <div className="flex items-center space-x-3">
-            <Badge className={getStatusColor(patient.status)}>
-              {patient.status}
-            </Badge>
-            <div className="flex space-x-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  setSelectedPatient(patient);
-                  setIsPatientViewOpen(true);
-                  alert(`Viewing detailed profile for ${patient.name}\nID: ${patient.id}\nCondition: ${patient.condition}\nStatus: ${patient.status}`);
-                }}
-              >
-                <Eye className="w-4 h-4 mr-1" />
-                View
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  alert(`Edit form for ${patient.name} would open here`);
-                }}
-              >
-                <Edit className="w-4 h-4 mr-1" />
-                Edit
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  setNewRecord({ ...newRecord, patientId: patient.id });
-                  setIsAddRecordOpen(true);
-                }}
-              >
-                <Plus className="w-4 h-4 mr-1" />
-                Add Record
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-    ))
-  )}
-</div>
+                    <div className="space-y-4">
+                      {filteredPatients.length === 0 ? (
+                        <div className="text-center py-8 text-gray-500">
+                          <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                          <p>No patients found</p>
+                          <p className="text-sm">
+                            {searchQuery ? 'Try adjusting your search terms' : 'No patients are currently linked to your account'}
+                          </p>
+                        </div>
+                      ) : (
+                        filteredPatients.map((patient) => (
+                          <div key={patient.id} className="border rounded-lg p-4 bg-white">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-4">
+                                <Avatar>
+                                  <AvatarFallback>{patient.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+                                </Avatar>
+                                <div>
+                                  <h4 className="font-medium">{patient.name}</h4>
+                                  <p className="text-sm text-gray-600">ID: {patient.id} • Age: {patient.age}</p>
+                                  <p className="text-sm text-gray-600">Blood Group: {patient.bloodGroup} • Last Visit: {formatDate(patient.lastVisit)}</p>
+                                  <p className="text-sm text-gray-600">Condition: {patient.condition}</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center space-x-3">
+                                <Badge className={getStatusColor(patient.status)}>
+                                  {patient.status}
+                                </Badge>
+                                <div className="flex space-x-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      setSelectedPatient(patient);
+                                      setIsPatientViewOpen(true);
+                                      alert(`Viewing detailed profile for ${patient.name}\nID: ${patient.id}\nCondition: ${patient.condition}\nStatus: ${patient.status}`);
+                                    }}
+                                  >
+                                    <Eye className="w-4 h-4 mr-1" />
+                                    View
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      alert(`Edit form for ${patient.name} would open here`);
+                                    }}
+                                  >
+                                    <Edit className="w-4 h-4 mr-1" />
+                                    Edit
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      setNewRecord({ ...newRecord, patientId: patient.id });
+                                      setIsAddRecordOpen(true);
+                                    }}
+                                  >
+                                    <Plus className="w-4 h-4 mr-1" />
+                                    Add Record
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
 
 
 
-                </>
-  )}
-</CardContent>
-            
+                  </>
+                )}
+              </CardContent>
+
             </Card>
           </TabsContent>
 

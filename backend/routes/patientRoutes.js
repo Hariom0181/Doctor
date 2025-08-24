@@ -4,6 +4,29 @@ const router = express.Router();
 const db = require("../config/db");
 const jwt = require("jsonwebtoken"); 
 
+const authenticatePatient = (req, res, next) => {
+  const token = req.header('Authorization')?.replace('Bearer ', '');
+  if (!token) {
+    return res.status(401).json({
+      success: false,
+      message: "Access denied. No token provided."
+    });
+  }
+  
+  try {
+    const jwtSecret = process.env.JWT_SECRET || "your-fallback-secret-key-change-in-production";
+    const decoded = jwt.verify(token, jwtSecret);
+    // ✅ FIXED: Set req.patient instead of req.doctor
+    req.patient = decoded;
+    next();
+  } catch (error) {
+    res.status(401).json({
+      success: false,
+      message: "Invalid token"
+    });
+  }
+};
+
 // Patient Registration API
 router.post(
   "/register",
@@ -290,7 +313,7 @@ router.get("/list", (req, res) => {
 });
 
 // Get all available doctors for patient selection
-router.get("/available-doctors", (req, res) => {
+router.get("/available-doctors", authenticatePatient, (req, res) => {
   const sql = `
     SELECT 
       id, 
@@ -467,56 +490,6 @@ router.get("/check-doctors", (req, res) => {
   });
 });
 
-// Test endpoint to create a sample doctor-patient link
-// router.post("/test-link", (req, res) => {
-//   // First, check if we have any doctors
-//   const checkDoctorsSql = "SELECT id, first_name, last_name, specialization FROM doctors LIMIT 1";
-  
-//   db.query(checkDoctorsSql, (err, doctors) => {
-//     if (err) {
-//       console.error("Database error checking doctors:", err);
-//       return res.status(500).json({
-//         success: false,
-//         message: "Database error checking doctors"
-//       });
-//     }
-    
-//     if (doctors.length === 0) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "No doctors found in database. Please add doctors first."
-//       });
-//     }
-    
-//     // Create a link between the first doctor and patient Hari (ID: 6)
-//     const createLinkSql = `
-//       INSERT INTO patient_doctors 
-//       (patient_id, doctor_id, linked_date, status, notes) 
-//       VALUES (?, ?, NOW(), 'active', 'Test link for demonstration')
-//     `;
-    
-//     db.query(createLinkSql, [6, doctors[0].id], (linkErr, result) => {
-//       if (linkErr) {
-//         console.error("Database error creating link:", linkErr);
-//         return res.status(500).json({
-//           success: false,
-//           message: "Database error creating link"
-//         });
-//       }
-      
-//       res.json({
-//         success: true,
-//         message: "Test link created successfully",
-//         data: {
-//           patientId: 6,
-//           doctorId: doctors[0].id,
-//           doctorName: `${doctors[0].first_name} ${doctors[0].last_name}`,
-//           specialization: doctors[0].specialization
-//         }
-//       });
-//     });
-//   });
-// });
 
 // Get Patient's Linked Doctors API
 router.get(
@@ -614,118 +587,119 @@ router.get(
     }
   }
 );
-// Add this to your doctor routes
-// router.get("/:id/linked-patients", async (req, res) => {
-//   try {
-//     const doctorId = req.params.id;
+// Add this to your patientRoutes.js file
+router.get("/health-metrics", authenticatePatient, async (req, res) => {
+  try {
+    const patientId = req.patient.id; // Get patient ID from token
     
-//     // Validate doctor ID
-//     if (!doctorId || isNaN(doctorId)) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Valid doctor ID is required"
-//       });
-//     }
+    console.log("=== PATIENT HEALTH METRICS DEBUG ===");
+    console.log("Patient ID from token:", patientId);
+    console.log("Patient object:", req.patient);
+    
+    // Get health metrics for this patient
+    const getMetricsSql = `
+      SELECT 
+        id, metric_type, value_systolic, value_diastolic, value_numeric,
+        unit, status, recorded_date, recorded_time, notes, created_at
+      FROM health_metrics 
+      WHERE patient_id = ? 
+      ORDER BY metric_type, recorded_date DESC, recorded_time DESC
+    `;
 
-//     // Check if doctor exists and is active
-//     const checkDoctorSql = "SELECT id, status FROM doctors WHERE id = ?";
-//     db.query(checkDoctorSql, [doctorId], (err, doctorResults) => {
-//       if (err) {
-//         console.error("Database error during doctor check:", err);
-//         return res.status(500).json({
-//           success: false,
-//           message: "Database error during doctor verification"
-//         });
-//       }
+    db.query(getMetricsSql, [patientId], (metricsErr, metricsResults) => {
+      if (metricsErr) {
+        console.error("Database error during metrics fetch:", metricsErr);
+        return res.status(500).json({
+          success: false,
+          message: "Database error during metrics retrieval"
+        });
+      }
 
-//       if (doctorResults.length === 0) {
-//         return res.status(404).json({
-//           success: false,
-//           message: "Doctor not found"
-//         });
-//       }
+      console.log("Raw metrics from database:", metricsResults);
+      console.log("Number of raw metrics:", metricsResults.length);
 
-//       if (doctorResults[0].status !== 'active') {
-//         return res.status(403).json({
-//           success: false,
-//           message: "Doctor account is not active"
-//         });
-//       }
+      // If no metrics found, return empty array but with success
+      if (metricsResults.length === 0) {
+        console.log("No metrics found for patient:", patientId);
+        return res.json({
+          success: true,
+          message: "No health metrics found for this patient",
+          data: [],
+          patientId: patientId
+        });
+      }
 
-//       // Fetch linked patients for the doctor
-//       const getLinkedPatientsSql = `
-//         SELECT 
-//           p.id,
-//           p.first_name,
-//           p.last_name,
-//           p.age,
-//           p.phone,
-//           p.blood_group,
-//           p.medical_history,
-//           pd.linked_date,
-//           pd.status as relationship_status,
-//           pd.notes as relationship_notes,
-//           pd.last_visit_date,
-//           pd.next_appointment_date
-//         FROM patient_doctors pd
-//         INNER JOIN patients p ON pd.patient_id = p.id
-//         WHERE pd.doctor_id = ? AND pd.status = 'active'
-//         ORDER BY pd.linked_date DESC
-//       `;
+      // Group by metric type and get the latest for each type
+      const groupedMetrics = {};
+      metricsResults.forEach(metric => {
+        if (!groupedMetrics[metric.metric_type]) {
+          groupedMetrics[metric.metric_type] = metric; // Take the first (latest) one
+        }
+      });
 
-//       db.query(getLinkedPatientsSql, [doctorId], (patientsErr, patientsResults) => {
-//         if (patientsErr) {
-//           console.error("Database error during linked patients fetch:", patientsErr);
-//           return res.status(500).json({
-//             success: false,
-//             message: "Database error during linked patients retrieval",
-//             details: patientsErr.message
-//           });
-//         }
+      console.log("Grouped metrics:", groupedMetrics);
 
-//         // Transform the data to match frontend expectations
-//         const transformedPatients = patientsResults.map(patient => {
-//           // Determine status based on medical history or other criteria
-//           let status = "Normal";
-//           if (patient.medical_history && patient.medical_history.toLowerCase().includes('critical')) {
-//             status = "Critical";
-//           } else if (patient.medical_history && patient.medical_history.toLowerCase().includes('attention')) {
-//             status = "Attention Needed";
-//           }
+      // Format for frontend display
+      const formattedMetrics = Object.values(groupedMetrics).map(metric => {
+        let displayValue = "";
+        let label = "";
 
-//           return {
-//             id: patient.id,
-//             name: `${patient.first_name} ${patient.last_name}`,
-//             age: patient.age,
-//             phone: patient.phone,
-//             bloodGroup: patient.blood_group,
-//             lastVisit: patient.last_visit_date || patient.linked_date,
-//             status: status,
-//             condition: patient.medical_history || "Regular Checkup",
-//             nextAppointment: patient.next_appointment_date,
-//             linkedDate: patient.linked_date,
-//             relationshipStatus: patient.relationship_status,
-//             relationshipNotes: patient.relationship_notes
-//           };
-//         });
+        switch (metric.metric_type) {
+          case "blood_pressure":
+            displayValue = `${metric.value_systolic}/${metric.value_diastolic}`;
+            label = "Blood Pressure";
+            break;
+          case "blood_sugar":
+            displayValue = `${metric.value_numeric} ${metric.unit || 'mg/dL'}`;
+            label = "Blood Sugar";
+            break;
+          case "weight":
+            displayValue = `${metric.value_numeric} ${metric.unit || 'kg'}`;
+            label = "Weight";
+            break;
+          case "heart_rate":
+            displayValue = `${metric.value_numeric} ${metric.unit || 'bpm'}`;
+            label = "Heart Rate";
+            break;
+          default:
+            displayValue = metric.value_numeric ? `${metric.value_numeric} ${metric.unit || ''}`.trim() : "";
+            label = metric.metric_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        }
 
-//         res.status(200).json({
-//           success: true,
-//           message: "Linked patients retrieved successfully",
-//           data: transformedPatients,
-//           count: transformedPatients.length
-//         });
+        return {
+          id: metric.id,
+          label: label,
+          value: displayValue,
+          status: metric.status || "normal",
+          lastChecked: metric.recorded_date,
+          notes: metric.notes
+        };
+      });
 
-//       });
-//     });
+      console.log("Formatted metrics for frontend:", formattedMetrics);
 
-//   } catch (error) {
-//     console.error("Server error:", error);
-//     res.status(500).json({
-//       success: false,
-//       message: "Internal server error"
-//     });
-//   }
-// });
+      res.json({
+        success: true,
+        message: "Health metrics retrieved successfully",
+        data: formattedMetrics,
+        patientId: patientId
+      });
+    });
 
+  } catch (error) {
+    console.error("Server error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error"
+    });
+  }
+});
+
+// Add this test route right after the authenticatePatient function
+router.get("/test", (req, res) => {
+  res.json({ 
+    message: "Patient routes are working!",
+    timestamp: new Date().toISOString()
+  });
+});
 module.exports = router;

@@ -90,7 +90,7 @@ class PatientApiService {
 
   async getAvailableDoctors(): Promise<AvailableDoctor[]> {
     try {
-      console.log('🌐 Calling API:', `${API_BASE_URL}/patients/available-doctors`);
+      // console.log('🌐 Calling API:', `${API_BASE_URL}/patients/available-doctors`);
       
       const response = await fetch(`${API_BASE_URL}/patients/available-doctors`, {
         method: 'GET',
