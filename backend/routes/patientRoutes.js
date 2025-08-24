@@ -455,55 +455,55 @@ router.get("/check-doctors", (req, res) => {
 });
 
 // Test endpoint to create a sample doctor-patient link
-router.post("/test-link", (req, res) => {
-  // First, check if we have any doctors
-  const checkDoctorsSql = "SELECT id, first_name, last_name, specialization FROM doctors LIMIT 1";
+// router.post("/test-link", (req, res) => {
+//   // First, check if we have any doctors
+//   const checkDoctorsSql = "SELECT id, first_name, last_name, specialization FROM doctors LIMIT 1";
   
-  db.query(checkDoctorsSql, (err, doctors) => {
-    if (err) {
-      console.error("Database error checking doctors:", err);
-      return res.status(500).json({
-        success: false,
-        message: "Database error checking doctors"
-      });
-    }
+//   db.query(checkDoctorsSql, (err, doctors) => {
+//     if (err) {
+//       console.error("Database error checking doctors:", err);
+//       return res.status(500).json({
+//         success: false,
+//         message: "Database error checking doctors"
+//       });
+//     }
     
-    if (doctors.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "No doctors found in database. Please add doctors first."
-      });
-    }
+//     if (doctors.length === 0) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "No doctors found in database. Please add doctors first."
+//       });
+//     }
     
-    // Create a link between the first doctor and patient Hari (ID: 6)
-    const createLinkSql = `
-      INSERT INTO patient_doctors 
-      (patient_id, doctor_id, linked_date, status, notes) 
-      VALUES (?, ?, NOW(), 'active', 'Test link for demonstration')
-    `;
+//     // Create a link between the first doctor and patient Hari (ID: 6)
+//     const createLinkSql = `
+//       INSERT INTO patient_doctors 
+//       (patient_id, doctor_id, linked_date, status, notes) 
+//       VALUES (?, ?, NOW(), 'active', 'Test link for demonstration')
+//     `;
     
-    db.query(createLinkSql, [6, doctors[0].id], (linkErr, result) => {
-      if (linkErr) {
-        console.error("Database error creating link:", linkErr);
-        return res.status(500).json({
-          success: false,
-          message: "Database error creating link"
-        });
-      }
+//     db.query(createLinkSql, [6, doctors[0].id], (linkErr, result) => {
+//       if (linkErr) {
+//         console.error("Database error creating link:", linkErr);
+//         return res.status(500).json({
+//           success: false,
+//           message: "Database error creating link"
+//         });
+//       }
       
-      res.json({
-        success: true,
-        message: "Test link created successfully",
-        data: {
-          patientId: 6,
-          doctorId: doctors[0].id,
-          doctorName: `${doctors[0].first_name} ${doctors[0].last_name}`,
-          specialization: doctors[0].specialization
-        }
-      });
-    });
-  });
-});
+//       res.json({
+//         success: true,
+//         message: "Test link created successfully",
+//         data: {
+//           patientId: 6,
+//           doctorId: doctors[0].id,
+//           doctorName: `${doctors[0].first_name} ${doctors[0].last_name}`,
+//           specialization: doctors[0].specialization
+//         }
+//       });
+//     });
+//   });
+// });
 
 // Get Patient's Linked Doctors API
 router.get(
