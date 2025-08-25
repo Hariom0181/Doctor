@@ -314,6 +314,7 @@ router.get("/list", (req, res) => {
 
 // Get all available doctors for patient selection
 router.get("/available-doctors", authenticatePatient, (req, res) => {
+  // consol.log("Patient_id",req.patient.id);
   const sql = `
     SELECT 
       id, 
@@ -592,9 +593,7 @@ router.get("/health-metrics", authenticatePatient, async (req, res) => {
   try {
     const patientId = req.patient.id; // Get patient ID from token
     
-    console.log("=== PATIENT HEALTH METRICS DEBUG ===");
-    console.log("Patient ID from token:", patientId);
-    console.log("Patient object:", req.patient);
+    
     
     // Get health metrics for this patient
     const getMetricsSql = `

@@ -47,7 +47,7 @@ export interface ApiResponse<T> {
 
 class PatientApiService {
   private getAuthHeaders(): HeadersInit {
-    const token = localStorage.getItem('authToken');
+    const token = localStorage.getItem('PatientToken');
     return {
       'Content-Type': 'application/json',
       ...(token && { Authorization: `Bearer ${token}` })
@@ -89,15 +89,22 @@ class PatientApiService {
   }
 
   async getAvailableDoctors(): Promise<AvailableDoctor[]> {
+    //this files is from patientApi.ts
     try {
       // console.log('🌐 Calling API:', `${API_BASE_URL}/patients/available-doctors`);
+      
       
       const response = await fetch(`${API_BASE_URL}/patients/available-doctors`, {
         method: 'GET',
         headers: this.getAuthHeaders(),
+        
       });
 
-      console.log('📡 API Response status:', response.status);
+      
+      // console.log('📡 Response status:', response.status);
+      
+      // Log the response text to see the exact error
+  
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);

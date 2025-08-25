@@ -260,7 +260,7 @@ export default function PatientDashboard() {
 
       try {
         const doctors = await patientApiService.getAvailableDoctors();
-        // console.log('✅ Available doctors fetched:', doctors);
+        console.log('✅ Available doctors fetched:', doctors);
         setAvailableDoctors(doctors);
 
         // Update the doctors list for the profile section dropdown
@@ -270,9 +270,9 @@ export default function PatientDashboard() {
             name: doctor.name,
             specialization: doctor.specialization
           }));
-          // console.log('🔄 Transforming doctors for dropdown:', transformedDoctors);
+          console.log('🔄 Transforming doctors for dropdown:', transformedDoctors);
           setDoctorsList(transformedDoctors);
-          // console.log('🔄 Updated doctorsList state with:', transformedDoctors.length, 'doctors');
+          console.log('🔄 Updated doctorsList state with:', transformedDoctors.length, 'doctors');
 
           // Force a re-render by updating a timestamp
           // console.log('🔄 Doctors list updated, should re-render dropdown');

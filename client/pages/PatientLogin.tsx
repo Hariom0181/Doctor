@@ -74,7 +74,7 @@ export default function PatientLogin() {
     setIsLoading(true);
 
     try {
-      console.log("Patient login data:", formData);
+      // console.log("Patient login data:", formData);
 
       const response = await fetch("http://localhost:5000/api/patients/login", {
         method: "POST",
@@ -86,7 +86,7 @@ export default function PatientLogin() {
       });
 
       const data = await response.json();
-      console.log("Server response:", data);
+      // console.log("Server response:", data);
 
       if (!response.ok) {
         if (data.errors) {

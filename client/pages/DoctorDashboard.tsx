@@ -10,7 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { doctorApiService } from '@/services/doctorApi'
 import {
   Heart,
   Calendar,
@@ -124,163 +125,164 @@ export default function DoctorDashboard() {
   const [isLoadingPatients, setIsLoadingPatients] = useState(true);
   const [patientsError, setPatientsError] = useState(null);
   const [isAddHealthMetricsOpen, setIsAddHealthMetricsOpen] = useState(false);
+  const [isAddingRecord, setIsAddingRecord] = useState(false);
 
   // Your existing useState declarations
 
 
-// ADD THE NEW CODE HERE (all the functions from the artifact)
-const [newHealthMetrics, setNewHealthMetrics] = useState({
-  patientId: '',
-  metricType: '',
-  valueSystolic: '',
-  valueDiastolic: '',
-  valueNumeric: '',
-  unit: '',
-  status: 'normal',
-  notes: ''
-});
-
-const [isAddingMetrics, setIsAddingMetrics] = useState(false);
-
-// Available metric types (NO TEMPERATURE)
-const METRIC_TYPES = [
-  { value: 'blood_pressure', label: 'Blood Pressure', requiresBoth: true, unit: 'mmHg' },
-  { value: 'blood_sugar', label: 'Blood Sugar', requiresBoth: false, unit: 'mg/dL' },
-  { value: 'weight', label: 'Weight', requiresBoth: false, unit: 'kg' },
-  { value: 'heart_rate', label: 'Heart Rate', requiresBoth: false, unit: 'bpm' }
-];
-const formatDate = (dateString) => {
-  if (!dateString) return "Not recorded";
-  const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', { 
-    year: 'numeric', 
-    month: 'short', 
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
+  // ADD THE NEW CODE HERE (all the functions from the artifact)
+  const [newHealthMetrics, setNewHealthMetrics] = useState({
+    patientId: '',
+    metricType: '',
+    valueSystolic: '',
+    valueDiastolic: '',
+    valueNumeric: '',
+    unit: '',
+    status: 'normal',
+    notes: ''
   });
-};
-// Function to add/update health metrics
-const handleAddHealthMetrics = async () => {
-  if (!newHealthMetrics.patientId || !newHealthMetrics.metricType) {
-    alert('Please select a patient and metric type');
-    return;
-  }
 
-  const selectedMetricType = METRIC_TYPES.find(m => m.value === newHealthMetrics.metricType);
-  
-  // Validate required fields based on metric type
-  if (selectedMetricType?.requiresBoth) {
-    if (!newHealthMetrics.valueSystolic || !newHealthMetrics.valueDiastolic) {
-      alert('Please enter both systolic and diastolic values for blood pressure');
+  const [isAddingMetrics, setIsAddingMetrics] = useState(false);
+
+  // Available metric types (NO TEMPERATURE)
+  const METRIC_TYPES = [
+    { value: 'blood_pressure', label: 'Blood Pressure', requiresBoth: true, unit: 'mmHg' },
+    { value: 'blood_sugar', label: 'Blood Sugar', requiresBoth: false, unit: 'mg/dL' },
+    { value: 'weight', label: 'Weight', requiresBoth: false, unit: 'kg' },
+    { value: 'heart_rate', label: 'Heart Rate', requiresBoth: false, unit: 'bpm' }
+  ];
+  const formatDate = (dateString) => {
+    if (!dateString) return "Not recorded";
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+  // Function to add/update health metrics
+  const handleAddHealthMetrics = async () => {
+    if (!newHealthMetrics.patientId || !newHealthMetrics.metricType) {
+      alert('Please select a patient and metric type');
       return;
     }
-  } else {
-    if (!newHealthMetrics.valueNumeric) {
-      alert('Please enter a numeric value');
-      return;
+
+    const selectedMetricType = METRIC_TYPES.find(m => m.value === newHealthMetrics.metricType);
+
+    // Validate required fields based on metric type
+    if (selectedMetricType?.requiresBoth) {
+      if (!newHealthMetrics.valueSystolic || !newHealthMetrics.valueDiastolic) {
+        alert('Please enter both systolic and diastolic values for blood pressure');
+        return;
+      }
+    } else {
+      if (!newHealthMetrics.valueNumeric) {
+        alert('Please enter a numeric value');
+        return;
+      }
     }
-  }
 
-  setIsAddingMetrics(true);
+    setIsAddingMetrics(true);
 
-  try {
-    const token = localStorage.getItem('doctorToken');
- 
-    
-    const response = await fetch(
-      `http://localhost:5000/api/doctors/patient/${newHealthMetrics.patientId}/health-metrics`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
+    try {
+      const token = localStorage.getItem('doctorToken');
+
+
+      const response = await fetch(
+        `http://localhost:5000/api/doctors/patient/${newHealthMetrics.patientId}/health-metrics`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            metricType: newHealthMetrics.metricType,
+            valueSystolic: Number(newHealthMetrics.valueSystolic) || null,
+            valueDiastolic: Number(newHealthMetrics.valueDiastolic) || null,
+            valueNumeric: Number(newHealthMetrics.valueNumeric) || null,
+            unit: newHealthMetrics.unit || "",
+            status: newHealthMetrics.status,
+            notes: newHealthMetrics.notes
+          })
+        }
+      );
+
+
+      const data = await response.json();
+
+      if (data.success) {
+        alert(`Health metrics ${data.action} successfully!`);
+        setIsAddHealthMetricsOpen(false);
+
+        // Reset form
+        setNewHealthMetrics({
+          patientId: '',
+          metricType: '',
+          valueSystolic: '',
+          valueDiastolic: '',
+          valueNumeric: '',
+          unit: '',
+          status: 'normal',
+          notes: ''
+        });
+
+        // Refresh patients list to show updated metrics
+        fetchLinkedPatients();
+      } else {
+        alert(`Error: ${data.message}`);
+        console.log("Data being sent to backend:", {
           metricType: newHealthMetrics.metricType,
-          valueSystolic: Number(newHealthMetrics.valueSystolic) || null,
-          valueDiastolic: Number(newHealthMetrics.valueDiastolic) || null,
-          valueNumeric: Number(newHealthMetrics.valueNumeric) || null,
-          unit: newHealthMetrics.unit || "",
+          valueSystolic: newHealthMetrics.valueSystolic || null,
+          valueDiastolic: newHealthMetrics.valueDiastolic || null,
+          valueNumeric: newHealthMetrics.valueNumeric || null,
+          unit: newHealthMetrics.unit || selectedMetricType?.unit || '',
           status: newHealthMetrics.status,
           notes: newHealthMetrics.notes
-        })
+        });
+        // console.log("Data being sent to backend:", submitData);
+
       }
-    );
-    
-
-    const data = await response.json();
-
-    if (data.success) {
-      alert(`Health metrics ${data.action} successfully!`);
-      setIsAddHealthMetricsOpen(false);
-      
-      // Reset form
-      setNewHealthMetrics({
-        patientId: '',
-        metricType: '',
-        valueSystolic: '',
-        valueDiastolic: '',
-        valueNumeric: '',
-        unit: '',
-        status: 'normal',
-        notes: ''
-      });
-      
-      // Refresh patients list to show updated metrics
-      fetchLinkedPatients();
-    } else {
-      alert(`Error: ${data.message}`);
-      console.log("Data being sent to backend:", {
-        metricType: newHealthMetrics.metricType,
-        valueSystolic: newHealthMetrics.valueSystolic || null,
-        valueDiastolic: newHealthMetrics.valueDiastolic || null,
-        valueNumeric: newHealthMetrics.valueNumeric || null,
-        unit: newHealthMetrics.unit || selectedMetricType?.unit || '',
-        status: newHealthMetrics.status,
-        notes: newHealthMetrics.notes
-      });
-      // console.log("Data being sent to backend:", submitData);
-
+    } catch (error) {
+      console.error('Error adding health metrics:', error);
+      alert('Failed to add health metrics. Please try again.');
+    } finally {
+      setIsAddingMetrics(false);
     }
-  } catch (error) {
-    console.error('Error adding health metrics:', error);
-    alert('Failed to add health metrics. Please try again.');
-  } finally {
-    setIsAddingMetrics(false);
-  }
-};
+  };
 
-// Function to get health metrics for a specific patient  
-const fetchPatientHealthMetrics = async (patientId) => {
-  try {
-    const token = localStorage.getItem('doctorToken');
-    
-    const response = await fetch(
-      `http://localhost:5000/api/doctors/patient/${patientId}/health-metrics`,
-      {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+  // Function to get health metrics for a specific patient  
+  const fetchPatientHealthMetrics = async (patientId) => {
+    try {
+      const token = localStorage.getItem('doctorToken');
+
+      const response = await fetch(
+        `http://localhost:5000/api/doctors/patient/${patientId}/health-metrics`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
         }
+      );
+
+      const data = await response.json();
+
+      if (data.success) {
+        return data.data;
+      } else {
+        console.error('Error fetching health metrics:', data.message);
+        return [];
       }
-    );
-
-    const data = await response.json();
-
-    if (data.success) {
-      return data.data;
-    } else {
-      console.error('Error fetching health metrics:', data.message);
+    } catch (error) {
+      console.error('Error fetching health metrics:', error);
       return [];
     }
-  } catch (error) {
-    console.error('Error fetching health metrics:', error);
-    return [];
-  }
-};
+  };
 
-// REPLACE your existing fetchLinkedPatients function with the new one
+  // REPLACE your existing fetchLinkedPatients function with the new one
 
 
 
@@ -293,26 +295,26 @@ const fetchPatientHealthMetrics = async (patientId) => {
     try {
       setIsLoadingPatients(true);
       setPatientsError(null);
-      
+
       const token = localStorage.getItem('doctorToken');
-      
+
       if (!token) {
         throw new Error('No authentication token found. Please login again.');
       }
-      
+
       const response = await fetch(`http://localhost:5000/api/doctors/linked-patients`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const data = await response.json();
-      
+
       if (data.success) {
         // Fetch health metrics for each patient
         const patientsWithMetrics = await Promise.all(
@@ -324,7 +326,7 @@ const fetchPatientHealthMetrics = async (patientId) => {
             };
           })
         );
-        
+
         setLinkedPatients(patientsWithMetrics);
       } else {
         throw new Error(data.message || 'Failed to fetch patients');
@@ -402,21 +404,58 @@ const fetchPatientHealthMetrics = async (patientId) => {
 
   // Validate required fields based on metric type
 
-  const handleAddRecord = () => {
-    console.log("Adding medical record:", newRecord);
-    // Here you would typically send this to your backend
-    alert(`Medical record added successfully for patient ${newRecord.patientId}!`);
-    setNewRecord({
-      patientId: "",
-      type: "",
-      diagnosis: "",
-      prescription: "",
-      nextCheckup: "",
-      notes: ""
-    });
-    setIsAddRecordOpen(false);
-  };
 
+
+  const handleAddRecord = async () => {
+    try {
+      // Validation
+      if (!newRecord.patientId || !newRecord.type || !newRecord.diagnosis) {
+        alert("Please fill in all required fields (Patient, Examination Type, and Diagnosis)");
+        return;
+      }
+
+      setIsAddingRecord(true);
+      console.log("Adding medical record:", newRecord);
+
+      // Prepare the data for API
+      const recordData = {
+        patientId: newRecord.patientId,
+        type: newRecord.type,
+        diagnosis: newRecord.diagnosis,
+        prescription: newRecord.prescription || undefined,
+        nextCheckup: newRecord.nextCheckup || undefined,
+        notes: newRecord.notes || undefined
+      };
+
+      // Call the API service
+      const addedRecord = await doctorApiService.addMedicalRecord(recordData);
+
+      console.log("✅ Medical record added successfully:", addedRecord);
+      alert(`Medical record added successfully for patient ${newRecord.patientId}!`);
+
+      // Reset the form
+      setNewRecord({
+        patientId: "",
+        type: "",
+        diagnosis: "",
+        prescription: "",
+        nextCheckup: "",
+        notes: ""
+      });
+
+      // Close the dialog
+      setIsAddRecordOpen(false);
+
+      // Optional: Refresh any medical records list if you have one displayed
+      // await fetchMedicalRecords(); // Uncomment if you have this function
+
+    } catch (error) {
+      console.error("❌ Failed to add medical record:", error);
+      alert(`Failed to add medical record: ${error.message}`);
+    } finally {
+      setIsAddingRecord(false);
+    }
+  };
   const handlePrescribeMedication = () => {
     console.log("Prescribing medication:", newMedication);
     // Here you would typically send this to your backend
@@ -561,8 +600,8 @@ const fetchPatientHealthMetrics = async (patientId) => {
                 <DialogTrigger asChild>
                   <Button onClick={(e) => {
                     e.preventDefault();
-                    console.log("Add Medical Record clicked");
-                    alert("Add Medical Record clicked!");
+                    // console.log("Add Medical Record clicked");
+                    // alert("Add Medical Record clicked!");
                     setIsAddRecordOpen(true);
                   }}>
                     <Plus className="w-4 h-4 mr-2" />
@@ -647,11 +686,28 @@ const fetchPatientHealthMetrics = async (patientId) => {
                         />
                       </div>
                     </div>
-                    <Button onClick={handleAddRecord} className="w-full">
-                      <Save className="w-4 h-4 mr-2" />
-                      Save Medical Record
+                    <Button
+                      onClick={handleAddRecord}
+                      className="w-full"
+                      disabled={isAddingRecord}
+                    >
+                      {isAddingRecord ? (
+                        <>
+                          <div className="w-4 h-4 mr-2 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-4 h-4 mr-2" />
+                          Save Medical Record
+                        </>
+                      )}
                     </Button>
+
                   </div>
+
+
+
                 </DialogContent>
               </Dialog>
               <Dialog open={isPrescriptionOpen} onOpenChange={setIsPrescriptionOpen}>

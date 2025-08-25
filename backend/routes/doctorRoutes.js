@@ -976,4 +976,200 @@ router.post("/patient/:patientId/health-metrics", authenticateDoctor, [
   }
 });
 
+// Add these routes to your doctor routes file (e.g., doctorRoutes.js)
+
+// POST - Add new medical record
+router.post("/medical-records", authenticateDoctor, (req, res) => {
+  try {
+    console.log("Adding medical record for doctor:", req.doctor.id);
+    console.log("Medical record data:", req.body);
+
+    const {
+      patientId,
+      type,
+      diagnosis,
+      prescription,
+      nextCheckup,
+      notes
+    } = req.body;
+
+    // Validation
+    if (!patientId || !type || !diagnosis) {
+      return res.status(400).json({
+        success: false,
+        message: "Patient ID, examination type, and diagnosis are required"
+      });
+    }
+
+    const sql = `
+      INSERT INTO medical_records (
+        patient_id, 
+        doctor_id, 
+        examination_type, 
+        diagnosis, 
+        prescription, 
+        next_checkup_date, 
+        additional_notes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `;
+
+    const values = [
+      patientId,
+      req.doctor.id, // From authenticated doctor token
+      type,
+      diagnosis,
+      prescription || null,
+      nextCheckup || null,
+      notes || null
+    ];
+
+    db.query(sql, values, (err, result) => {
+      if (err) {
+        console.error("Database error adding medical record:", err);
+        return res.status(500).json({
+          success: false,
+          message: "Database error adding medical record",
+          details: err.message
+        });
+      }
+
+      console.log("Medical record added successfully, ID:", result.insertId);
+      
+      res.json({
+        success: true,
+        message: "Medical record added successfully",
+        data: {
+          id: result.insertId,
+          patientId,
+          type,
+          diagnosis,
+          prescription,
+          nextCheckup,
+          notes,
+          doctorId: req.doctor.id,
+          createdAt: new Date()
+        }
+      });
+    });
+
+  } catch (error) {
+    console.error("Unexpected error adding medical record:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      details: error.message
+    });
+  }
+});
+
+// GET - Fetch medical records for a specific patient (for doctor to view)
+router.get("/patients/:patientId/medical-records", authenticateDoctor, (req, res) => {
+  try {
+    const { patientId } = req.params;
+
+    const sql = `
+      SELECT 
+        mr.*,
+        d.first_name as doctor_first_name,
+        d.last_name as doctor_last_name,
+        d.specialization as doctor_specialization
+      FROM medical_records mr
+      JOIN doctors d ON mr.doctor_id = d.id
+      WHERE mr.patient_id = ?
+      ORDER BY mr.created_at DESC
+    `;
+
+    db.query(sql, [patientId], (err, results) => {
+      if (err) {
+        console.error("Database error fetching medical records:", err);
+        return res.status(500).json({
+          success: false,
+          message: "Database error fetching medical records",
+          details: err.message
+        });
+      }
+
+      const transformedRecords = results.map(record => ({
+        id: record.id,
+        patientId: record.patient_id,
+        doctorId: record.doctor_id,
+        doctorName: `${record.doctor_first_name} ${record.doctor_last_name}`,
+        doctorSpecialization: record.doctor_specialization,
+        examinationType: record.examination_type,
+        diagnosis: record.diagnosis,
+        prescription: record.prescription,
+        nextCheckupDate: record.next_checkup_date,
+        additionalNotes: record.additional_notes,
+        createdAt: record.created_at,
+        updatedAt: record.updated_at
+      }));
+
+      res.json({
+        success: true,
+        message: "Medical records retrieved successfully",
+        data: transformedRecords,
+        count: transformedRecords.length
+      });
+    });
+
+  } catch (error) {
+    console.error("Unexpected error fetching medical records:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      details: error.message
+    });
+  }
+});
+
+// GET - Fetch all medical records created by the current doctor
+router.get("/my-medical-records", authenticateDoctor, (req, res) => {
+  try {
+    const sql = `
+      SELECT 
+        mr.*
+      FROM medical_records mr
+      WHERE mr.doctor_id = ?
+      ORDER BY mr.created_at DESC
+    `;
+
+    db.query(sql, [req.doctor.id], (err, results) => {
+      if (err) {
+        console.error("Database error fetching doctor's medical records:", err);
+        return res.status(500).json({
+          success: false,
+          message: "Database error fetching medical records",
+          details: err.message
+        });
+      }
+
+      const transformedRecords = results.map(record => ({
+        id: record.id,
+        patientId: record.patient_id,
+        examinationType: record.examination_type,
+        diagnosis: record.diagnosis,
+        prescription: record.prescription,
+        nextCheckupDate: record.next_checkup_date,
+        additionalNotes: record.additional_notes,
+        createdAt: record.created_at,
+      }));
+
+      res.json({
+        success: true,
+        message: "Medical records retrieved successfully",
+        data: transformedRecords,
+        count: transformedRecords.length
+      });
+    });
+
+  } catch (error) {
+    console.error("Unexpected error fetching doctor's medical records:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      details: error.message
+    });
+  }
+});
+
 module.exports = router;
