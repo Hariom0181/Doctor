@@ -35,7 +35,7 @@ import {
   Save,
   Loader2
 } from "lucide-react";
-import { patientApiService, HealthMetric, LinkedDoctor, AvailableDoctor } from "@/services/patientApi";
+import { patientApiService, HealthMetric, LinkedDoctor, AvailableDoctor, PatientMedicalRecord } from "@/services/patientApi";
 
 // ------------------------------
 // Hardcoded initial data (unchanged)
@@ -149,7 +149,9 @@ export default function PatientDashboard() {
   const [patientData, setPatientData] = useState(INITIAL_PATIENT_DATA); // <-- Replace with backend: patient data
   const [healthMetrics, setHealthMetrics] = useState<any[]>([]);
   // <-- Replace with backend: health metrics
-  const [recentRecords, setRecentRecords] = useState(INITIAL_RECENT_RECORDS); // <-- Replace with backend: records
+  const [recentRecords, setRecentRecords] = useState([]);
+  const [isLoadingRecentRecords, setIsLoadingRecentRecords] = useState(false);
+
   const [upcomingAppointments, setUpcomingAppointments] = useState(INITIAL_UPCOMING_APPOINTMENTS); // <-- Replace with backend: appointments
   const [medications, setMedications] = useState(INITIAL_MEDICATIONS); // <-- Replace with backend: medications
   const [doctorsList, setDoctorsList] = useState(INITIAL_DOCTORS_LIST);
@@ -161,8 +163,9 @@ export default function PatientDashboard() {
   const [doctorsError, setDoctorsError] = useState<string | null>(null);
   const [availableDoctors, setAvailableDoctors] = useState<AvailableDoctor[]>([]);
   const [isLoadingAvailableDoctors, setIsLoadingAvailableDoctors] = useState(false);
-
-  // ------------------------------
+  const [medicalRecords, setMedicalRecords] = useState<PatientMedicalRecord[]>([]);
+  const [isLoadingMedicalRecords, setIsLoadingMedicalRecords] = useState(false);
+  const [medicalRecordsError, setMedicalRecordsError] = useState<string | null>(null);
   useEffect(() => {
     fetchMetrics();
   }, []);
@@ -212,8 +215,87 @@ export default function PatientDashboard() {
       console.error("Failed to fetch health metrics:", error);
     }
   };
+
+
   // Backend integration for linked doctors
   // ------------------------------
+  const formatExaminationType = (type: string) => {
+    switch (type?.toLowerCase()) {
+      case 'general':
+        return 'General Checkup';
+      case 'blood':
+        return 'Blood Test';
+      case 'heart':
+        return 'Heart Screening';
+      default:
+        return type?.charAt(0).toUpperCase() + type?.slice(1) || 'Medical Examination';
+    }
+  };
+  const getRecordStatus = (record: PatientMedicalRecord) => {
+    // Logic to determine status based on diagnosis or other factors
+    const diagnosis = record.diagnosis?.toLowerCase() || '';
+
+    if (diagnosis.includes('critical') || diagnosis.includes('urgent')) {
+      return 'Critical';
+    } else if (diagnosis.includes('attention') || diagnosis.includes('elevated')) {
+      return 'Attention Needed';
+    } else {
+      return 'Normal';
+    }
+  };
+  useEffect(() => {
+    // Always fetch on mount, and also when records tab is accessed
+    if (activeTab === "records" || !recentRecords.length) {
+      fetchMedicalRecords();
+    }
+  }, [activeTab]);
+  
+  // Also fetch immediately on component mount
+  useEffect(() => {
+    fetchMedicalRecords();
+  }, []);
+
+
+  const fetchMedicalRecords = async () => {
+    try {
+      setIsLoadingMedicalRecords(true);
+      setIsLoadingRecentRecords(true);
+      setMedicalRecordsError(null);
+
+      const patientData = JSON.parse(localStorage.getItem('patientData') || '{}');
+      const patientId = patientData.id;
+
+      if (!patientId) {
+        throw new Error('Patient ID not found');
+      }
+
+      console.log('🏥 Fetching medical records for patient:', patientId);
+      const records = await patientApiService.getMedicalRecords(patientId);
+
+      console.log('📄 Fetched medical records:', records);
+      setMedicalRecords(records);
+
+      // Update recentRecords state - Fixed mapping
+      setRecentRecords(records.map(record => ({
+        id: String(record.id),
+        type: formatExaminationType(record.examinationType),
+        doctor: record.doctorName || `Doctor ${record.doctorId}`,
+        currentHospital: record.currentHospital || 'Hospital Name', // Changed from 'hospital' to 'currentHospital'
+        date: record.createdAt,
+        status: getRecordStatus(record),
+        diagnosis: record.diagnosis,
+        nextCheckup: record.nextCheckupDate || null,
+        documents: ['Medical Report']
+      })));
+    } catch (error) {
+      console.error('❌ Error fetching medical records:', error);
+      setMedicalRecordsError(error.message);
+      setRecentRecords([]); // Add fallback empty array
+    } finally {
+      setIsLoadingMedicalRecords(false);
+      setIsLoadingRecentRecords(false); // Don't forget this
+    }
+  };
   useEffect(() => {
     const fetchLinkedDoctors = async () => {
       setIsLoadingDoctors(true);
@@ -319,6 +401,7 @@ export default function PatientDashboard() {
     }
     return null;
   };
+  // --------------------------------------------------------------------------------------------------------
   const formatDate = (dateString) => {
     if (!dateString) return "Not recorded";
     const date = new Date(dateString);
@@ -568,30 +651,38 @@ export default function PatientDashboard() {
                   <CardDescription>Your latest health checkups and diagnoses</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {recentRecords.slice(0, 3).map((record) => (
-                    <div key={record.id} className="border rounded-lg p-4 bg-white">
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-2 mb-1">
-                            <h4 className="font-medium">{record.type}</h4>
-                            <Badge className={getStatusColor(record.status)}>
-                              {record.status}
-                            </Badge>
+                  {isLoadingRecentRecords ? (
+                    <div className="text-center py-4">Loading recent records...</div>
+                  ) : recentRecords && recentRecords.length > 0 ? (
+                    recentRecords.slice(0, 3).map((record) => (
+                      <div key={record.id} className="border rounded-lg p-4 bg-white">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-2 mb-1">
+                              <h4 className="font-medium">{record.type}</h4>
+                              <Badge className={getStatusColor(record.status)}>
+                                {record.status}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-gray-600">
+                              {record.doctor} • {record.currentHospital} {/* Fixed: removed "Dr." prefix since it's already in record.doctor */}
+                            </p>
+                            <p className="text-sm text-gray-800 mt-1">{record.diagnosis}</p>
                           </div>
-                          <p className="text-sm text-gray-600">Dr. {record.doctor} • {record.hospital}</p>
-                          <p className="text-sm text-gray-800 mt-1">{record.diagnosis}</p>
+                          <div className="text-sm text-gray-500">
+                            {new Date(record.date).toLocaleDateString()}
+                          </div>
                         </div>
-                        <div className="text-sm text-gray-500">
-                          {new Date(record.date).toLocaleDateString()}
-                        </div>
+                        {record.nextCheckup && (
+                          <p className="text-sm text-primary font-medium">
+                            Next checkup: {new Date(record.nextCheckup).toLocaleDateString()}
+                          </p>
+                        )}
                       </div>
-                      {record.nextCheckup && (
-                        <p className="text-sm text-primary font-medium">
-                          Next checkup: {new Date(record.nextCheckup).toLocaleDateString()}
-                        </p>
-                      )}
-                    </div>
-                  ))}
+                    ))
+                  ) : (
+                    <div className="text-center py-4 text-gray-500">No recent records available</div>
+                  )}
                   <Button variant="outline" className="w-full">
                     View All Records
                   </Button>
@@ -901,45 +992,89 @@ export default function PatientDashboard() {
                   <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">
                     👨‍⚕️ Doctor Records
                   </h3>
-                  {recentRecords.map((record) => (
-                    <div key={record.id} className="border rounded-lg p-6 bg-white hover:shadow-md transition-shadow">
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-3 mb-3">
-                            <h4 className="font-semibold text-lg">{record.type}</h4>
-                            <Badge className={getStatusColor(record.status)}>{record.status}</Badge>
-                            <Badge variant="secondary" className="bg-blue-100 text-blue-800">Doctor Added</Badge>
-                          </div>
 
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600 mb-4">
-                            <div className="space-y-1">
-                              <p><span className="font-medium">Doctor:</span> {record.doctor}</p>
-                              <p><span className="font-medium">Hospital:</span> {record.hospital}</p>
+                  {/* Loading State */}
+                  {isLoadingMedicalRecords && (
+                    <div className="text-center py-8">
+                      <p className="text-gray-600">Loading your medical records...</p>
+                    </div>
+                  )}
+
+                  {/* Error State */}
+                  {medicalRecordsError && (
+                    <div className="text-center py-8">
+                      <p className="text-red-600">Error loading records: {medicalRecordsError}</p>
+                      <Button
+                        variant="outline"
+                        onClick={fetchMedicalRecords}
+                        className="mt-2"
+                      >
+                        Try Again
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* No Records State */}
+                  {!isLoadingMedicalRecords && !medicalRecordsError && medicalRecords.length === 0 && (
+                    <div className="text-center py-12">
+                      <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                        <FileText className="w-8 h-8 text-gray-400" />
+                      </div>
+                      <p className="text-gray-600 font-medium">No medical records found</p>
+                      <p className="text-sm text-gray-500 mt-1">Your medical records will appear here when doctors add them.</p>
+                    </div>
+                  )}
+
+                  {/* Medical Records List */}
+                  {!isLoadingMedicalRecords && !medicalRecordsError && medicalRecords.length > 0 && (
+                    <div className="max-h-96 overflow-y-auto space-y-4">
+                      {medicalRecords.map((record) => (
+                        <div key={record.id} className="border rounded-lg p-6 bg-white hover:shadow-md transition-shadow">
+                          <div className="flex items-start justify-between mb-4">
+                            <div className="flex-1">
+                              <div className="flex items-center space-x-3 mb-3">
+                                <h4 className="font-semibold text-lg">{formatExaminationType(record.examinationType)}</h4>
+                                <Badge className={getStatusColor(getRecordStatus(record))}>
+                                  {getRecordStatus(record)}
+                                </Badge>
+                                <Badge variant="secondary" className="bg-blue-100 text-blue-800">Doctor Added</Badge>
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600 mb-4">
+                                <div className="space-y-1">
+                                  <p><span className="font-medium">Doctor:</span> {record.doctorName || `Dr. ${record.doctorId}`}</p>
+                                  <p><span className="font-medium">Specialization:</span> {record.doctorSpecialization || 'General Medicine'}</p>
+                                </div>
+                                <div className="space-y-1">
+                                  <p><span className="font-medium">Date:</span> {new Date(record.createdAt).toLocaleDateString()}</p>
+                                  {record.nextCheckupDate && (
+                                    <p><span className="font-medium">Next Checkup:</span> {new Date(record.nextCheckupDate).toLocaleDateString()}</p>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                                <p className="text-sm"><span className="font-medium">Diagnosis:</span> {record.diagnosis}</p>
+                                {record.prescription && (
+                                  <p className="text-sm mt-2"><span className="font-medium">Prescription:</span> {record.prescription}</p>
+                                )}
+                                {record.additionalNotes && (
+                                  <p className="text-sm mt-2"><span className="font-medium">Notes:</span> {record.additionalNotes}</p>
+                                )}
+                              </div>
+
+                              <div className="flex flex-wrap gap-2">
+                                <Button variant="outline" size="sm">
+                                  <Download className="w-3 h-3 mr-1" />
+                                  Medical Report
+                                </Button>
+                              </div>
                             </div>
-                            <div className="space-y-1">
-                              <p><span className="font-medium">Date:</span> {new Date(record.date).toLocaleDateString()}</p>
-                              {record.nextCheckup && (
-                                <p><span className="font-medium">Next Checkup:</span> {new Date(record.nextCheckup).toLocaleDateString()}</p>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                            <p className="text-sm"><span className="font-medium">Diagnosis:</span> {record.diagnosis}</p>
-                          </div>
-
-                          <div className="flex flex-wrap gap-2">
-                            {record.documents.map((doc, index) => (
-                              <Button key={index} variant="outline" size="sm">
-                                <Download className="w-3 h-3 mr-1" />
-                                {doc}
-                              </Button>
-                            ))}
                           </div>
                         </div>
-                      </div>
+                      ))}
                     </div>
-                  ))}
+                  )}
                 </div>
 
                 {/* Patient Records */}

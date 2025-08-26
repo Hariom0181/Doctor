@@ -27,6 +27,7 @@ export interface MedicalRecord {
   updatedAt?: string;
 }
 
+
 export interface AddMedicalRecordRequest {
   patientId: string;
   type: string;
@@ -72,6 +73,8 @@ export interface LoginResponse {
   doctor: DoctorProfile;
 }
 
+
+
 class DoctorApiService {
   private getAuthHeaders(): HeadersInit {
     const token = localStorage.getItem('doctorToken'); // Changed to match naming convention
@@ -80,6 +83,8 @@ class DoctorApiService {
       ...(token && { Authorization: `Bearer ${token}` })
     };
   }
+
+  async 
 
   /**
    * Doctor Authentication
@@ -149,6 +154,31 @@ class DoctorApiService {
       return result.data;
     } catch (error) {
       console.error('❌ Error fetching doctor profile:', error);
+      throw error;
+    }
+  }
+  async getRecordsCount(): Promise<number> {
+    try {
+      console.log('📊 Fetching records count from API...');
+      
+      const response = await fetch(`${API_BASE_URL}/doctors/medical-records/count`, {
+        method: 'GET',
+        headers: this.getAuthHeaders()
+      });
+  
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+  
+      const result: ApiResponse<{ count: number }> = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.message);
+      }
+  
+      return result.data.count;
+    } catch (error) {
+      console.error('❌ Error fetching records count:', error);
       throw error;
     }
   }

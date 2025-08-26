@@ -10,8 +10,41 @@ export interface LinkedDoctor {
   linkedDate: string;
   relationshipStatus: string;
   relationshipNotes?: string;
+  
 }
-
+export interface PatientData {
+  id: string;
+  name: string;
+  firstName?: string;
+  lastName?: string;
+  age: number;
+  email: string;
+  phone: string;
+  bloodGroup?: string;
+  address?: string;
+  emergencyContact?: string;
+  profilePicture?: string;
+  dateOfBirth?: string;
+  gender?: string;
+  lastVisit?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+export interface PatientMedicalRecord {
+  id: number;
+  patientId: string;
+  doctorId: number;
+  doctorName?: string;
+  doctorSpecialization?: string;
+  examinationType: string;
+  diagnosis: string;
+  prescription?: string;
+  currentHospital? : string;
+  nextCheckupDate?: string;
+  additionalNotes?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
 export interface AvailableDoctor {
   id: number;
   name: string;
@@ -45,6 +78,7 @@ export interface ApiResponse<T> {
   count?: number;
 }
 
+
 class PatientApiService {
   private getAuthHeaders(): HeadersInit {
     const token = localStorage.getItem('PatientToken');
@@ -54,6 +88,7 @@ class PatientApiService {
     };
   }
 
+  
   async getLinkedDoctors(patientId: string): Promise<LinkedDoctor[]> {
     try {
       // Add timeout to prevent long waits
@@ -88,6 +123,36 @@ class PatientApiService {
     }
   }
 
+
+  
+  async getMedicalRecords(patientId: string): Promise<PatientMedicalRecord[]> {
+    try {
+      console.log('🏥 Fetching patient medical records for:', patientId);
+      
+      const response = await fetch(`${API_BASE_URL}/patients/${patientId}/medical-records`, {
+        method: 'GET',
+        headers: this.getAuthHeaders(),
+      });
+  
+      console.log('📡 Get medical records response status:', response.status);
+  
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+  
+      const result: ApiResponse<PatientMedicalRecord[]> = await response.json();
+      console.log('📄 Medical records result:', result);
+      
+      if (!result.success) {
+        throw new Error(result.message);
+      }
+  
+      return result.data;
+    } catch (error) {
+      console.error('❌ Error fetching medical records:', error);
+      throw error;
+    }
+  }
   async getAvailableDoctors(): Promise<AvailableDoctor[]> {
     //this files is from patientApi.ts
     try {

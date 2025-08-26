@@ -2,7 +2,7 @@ const express = require("express");
 const { body, validationResult } = require("express-validator");
 const router = express.Router();
 const db = require("../config/db");
-const jwt = require("jsonwebtoken"); 
+const jwt = require("jsonwebtoken");
 
 const authenticatePatient = (req, res, next) => {
   const token = req.header('Authorization')?.replace('Bearer ', '');
@@ -12,7 +12,7 @@ const authenticatePatient = (req, res, next) => {
       message: "Access denied. No token provided."
     });
   }
-  
+
   try {
     const jwtSecret = process.env.JWT_SECRET || "your-fallback-secret-key-change-in-production";
     const decoded = jwt.verify(token, jwtSecret);
@@ -36,30 +36,30 @@ router.post(
       .isEmail()
       .normalizeEmail()
       .withMessage("Valid email is required"),
-    
+
     // Phone validation
     body("phone")
       .isMobilePhone("en-IN")
       .withMessage("Valid Indian phone number is required"),
-    
+
     // Date of birth validation
     body("dateOfBirth")
       .isISO8601()
       .toDate()
       .withMessage("Valid date of birth is required (YYYY-MM-DD format)"),
-    
+
     // Gender validation
     body("gender")
       .notEmpty()
       .trim()
       .isIn(['male', 'female', 'other', 'Male', 'Female', 'Other'])
       .withMessage("Gender is required and must be male, female, or other"),
-    
+
     // Pincode validation
     body("pincode")
       .matches(/^\d{6}$/)
       .withMessage("Pincode must be exactly 6 digits"),
-    
+
     // Password validation
     body("password")
       .notEmpty()
@@ -68,7 +68,7 @@ router.post(
       .withMessage("Password must be between 6 and 128 characters long")
       .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
       .withMessage("Password must contain at least one lowercase letter, one uppercase letter, and one number"),
-    
+
     // Confirm password validation - FIXED
     body("confirmPassword")
       .notEmpty()
@@ -79,14 +79,14 @@ router.post(
         }
         return true;
       }),
-    
+
     // Optional: Add validation for required fields
     body("firstName")
       .notEmpty()
       .trim()
       .isLength({ min: 2, max: 50 })
       .withMessage("First name is required and must be between 2-50 characters"),
-    
+
     body("lastName")
       .notEmpty()
       .trim()
@@ -98,10 +98,10 @@ router.post(
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       console.log("Validation errors:", errors.array()); // Debug log
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
         message: "Validation failed",
-        errors: errors.array() 
+        errors: errors.array()
       });
     }
 
@@ -129,9 +129,9 @@ router.post(
     db.query(checkEmailSql, [email], (err, results) => {
       if (err) {
         console.error("Database error during email check:", err);
-        return res.status(500).json({ 
+        return res.status(500).json({
           success: false,
-          message: "Database error" 
+          message: "Database error"
         });
       }
 
@@ -173,13 +173,13 @@ router.post(
         (err, result) => {
           if (err) {
             console.error("Database error during insertion:", err);
-            return res.status(500).json({ 
+            return res.status(500).json({
               success: false,
-              message: "Database error during registration" 
+              message: "Database error during registration"
             });
           }
-          
-          res.status(201).json({ 
+
+          res.status(201).json({
             success: true,
             message: "Patient registered successfully!",
             patientId: result.insertId
@@ -207,18 +207,18 @@ router.post(
       .withMessage("Password is required")
       .isLength({ min: 1 })
       .withMessage("Password cannot be empty"),
-      // Removed strict password format validation for login
-      // Users should be able to login with their existing passwords
+    // Removed strict password format validation for login
+    // Users should be able to login with their existing passwords
   ],
   (req, res) => {
     // Check validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       console.log("Login validation errors:", errors.array()); // Debug log
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
         message: "Validation failed",
-        errors: errors.array() 
+        errors: errors.array()
       });
     }
 
@@ -229,16 +229,16 @@ router.post(
     db.query(sql, [email.toLowerCase()], (err, results) => {
       if (err) {
         console.error("Database error during login:", err);
-        return res.status(500).json({ 
+        return res.status(500).json({
           success: false,
-          message: "Database error during login" 
+          message: "Database error during login"
         });
       }
 
       if (results.length === 0) {
-        return res.status(401).json({ 
+        return res.status(401).json({
           success: false,
-          message: "Invalid email or password" 
+          message: "Invalid email or password"
         });
       }
 
@@ -246,17 +246,17 @@ router.post(
 
       // 2. Compare password (plain-text for now, but should use bcrypt in production)
       if (patient.password !== password) {
-        return res.status(401).json({ 
+        return res.status(401).json({
           success: false,
-          message: "Invalid email or password" 
+          message: "Invalid email or password"
         });
       }
 
       // 3. Generate JWT token
       const jwtSecret = process.env.JWT_SECRET || "your-fallback-secret-key-change-in-production";
       const token = jwt.sign(
-        { 
-          id: patient.id, 
+        {
+          id: patient.id,
           email: patient.email,
           type: 'patient' // Add user type for authorization
         },
@@ -302,7 +302,7 @@ router.get("/list", (req, res) => {
         message: "Database error"
       });
     }
-    
+
     res.json({
       success: true,
       message: "Patients list retrieved",
@@ -326,7 +326,7 @@ router.get("/available-doctors", authenticatePatient, (req, res) => {
     FROM doctors 
     ORDER BY first_name, last_name
   `;
-  
+
   db.query(sql, (err, results) => {
     if (err) {
       console.error("Database error fetching available doctors:", err);
@@ -336,7 +336,7 @@ router.get("/available-doctors", authenticatePatient, (req, res) => {
         details: err.message
       });
     }
-    
+
     const transformedDoctors = results.map(doctor => ({
       id: doctor.id,
       name: `${doctor.first_name} ${doctor.last_name}`,
@@ -344,7 +344,7 @@ router.get("/available-doctors", authenticatePatient, (req, res) => {
       hospital: doctor.current_hospital,
       consultationFee: doctor.consultation_fee
     }));
-    
+
     res.json({
       success: true,
       message: "Available doctors retrieved successfully",
@@ -362,17 +362,17 @@ router.get("/available-doctors", authenticatePatient, (req, res) => {
 router.post("/:patientId/update-doctor", (req, res) => {
   const patientId = req.params.patientId;
   const { doctorId } = req.body;
-  
+
   if (!patientId || !doctorId) {
     return res.status(400).json({
       success: false,
       message: "Patient ID and doctor ID are required"
     });
   }
-  
+
   // First, check if this patient-doctor relationship already exists (active or inactive)
   const checkExistingSql = "SELECT * FROM patient_doctors WHERE patient_id = ? AND doctor_id = ?";
-  
+
   db.query(checkExistingSql, [patientId, doctorId], (checkErr, existingRelation) => {
     if (checkErr) {
       console.error("Error checking existing relationship:", checkErr);
@@ -381,10 +381,10 @@ router.post("/:patientId/update-doctor", (req, res) => {
         message: "Database error checking relationship"
       });
     }
-    
+
     // Deactivate all other doctor relationships for this patient
     const deactivateOthersSql = "UPDATE patient_doctors SET status = 'inactive' WHERE patient_id = ? AND doctor_id != ? AND status = 'active'";
-    
+
     db.query(deactivateOthersSql, [patientId, doctorId], (deactivateErr) => {
       if (deactivateErr) {
         console.error("Error deactivating other relationships:", deactivateErr);
@@ -393,7 +393,7 @@ router.post("/:patientId/update-doctor", (req, res) => {
           message: "Database error updating relationships"
         });
       }
-      
+
       if (existingRelation.length > 0) {
         // Relationship exists - reactivate it
         const reactivateSql = `
@@ -401,7 +401,7 @@ router.post("/:patientId/update-doctor", (req, res) => {
           SET status = 'active', linked_date = NOW(), notes = 'Doctor reactivated by patient selection'
           WHERE patient_id = ? AND doctor_id = ?
         `;
-        
+
         db.query(reactivateSql, [patientId, doctorId], (reactivateErr) => {
           if (reactivateErr) {
             console.error("Error reactivating relationship:", reactivateErr);
@@ -410,7 +410,7 @@ router.post("/:patientId/update-doctor", (req, res) => {
               message: "Database error reactivating relationship"
             });
           }
-          
+
           res.json({
             success: true,
             message: "Doctor relationship reactivated successfully",
@@ -424,7 +424,7 @@ router.post("/:patientId/update-doctor", (req, res) => {
           (patient_id, doctor_id, linked_date, status, notes, created_at) 
           VALUES (?, ?, NOW(), 'active', 'Doctor selected by patient', NOW())
         `;
-        
+
         db.query(insertSql, [patientId, doctorId], (insertErr) => {
           if (insertErr) {
             console.error("Error creating new relationship:", insertErr);
@@ -433,7 +433,7 @@ router.post("/:patientId/update-doctor", (req, res) => {
               message: "Database error creating relationship"
             });
           }
-          
+
           res.json({
             success: true,
             message: "Doctor relationship created successfully",
@@ -457,7 +457,7 @@ router.get("/check-links", (req, res) => {
         details: err.message
       });
     }
-    
+
     res.json({
       success: true,
       message: "Patient-Doctor links check",
@@ -480,7 +480,7 @@ router.get("/check-doctors", (req, res) => {
         details: err.message
       });
     }
-    
+
     res.json({
       success: true,
       message: "Doctors table check",
@@ -498,7 +498,7 @@ router.get(
   async (req, res) => {
     try {
       const patientId = req.params.id;
-      
+
       // Validate patient ID
       if (!patientId || isNaN(patientId)) {
         return res.status(400).json({
@@ -592,9 +592,9 @@ router.get(
 router.get("/health-metrics", authenticatePatient, async (req, res) => {
   try {
     const patientId = req.patient.id; // Get patient ID from token
-    
-    
-    
+
+
+
     // Get health metrics for this patient
     const getMetricsSql = `
       SELECT 
@@ -693,10 +693,194 @@ router.get("/health-metrics", authenticatePatient, async (req, res) => {
     });
   }
 });
+// GET /api/patients/:patientId/medical-records
+// GET /api/patients/:patientId/medical-records
+router.get('/:patientId/medical-records', authenticatePatient, async (req, res) => {
+  try {
+    const { patientId } = req.params;
+    const authenticatedPatientId = req.patient.id; // From token
 
+    // Security check: ensure patient can only access their own records
+    if (patientId != authenticatedPatientId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: You can only view your own medical records'
+      });
+    }
+
+    console.log(`Fetching medical records for authenticated patient: ${patientId}`);
+
+    // Query to get medical records with doctor information
+    const query = `
+      SELECT 
+        mr.id,
+        mr.patient_id,
+        mr.doctor_id,
+        mr.examination_type,
+        mr.diagnosis,
+        mr.prescription,
+        mr.next_checkup_date,
+        mr.additional_notes,
+        mr.created_at,
+        mr.updated_at,
+        CONCAT(d.first_name, ' ', d.last_name) AS doctor_name,
+        d.specialization AS doctor_specialization,
+        d.current_hospital
+      FROM medical_records mr
+      LEFT JOIN doctors d ON mr.doctor_id = d.id
+      WHERE mr.patient_id = ?
+      ORDER BY mr.created_at DESC
+    `;
+
+    // Use db.query() to match your existing pattern
+    db.query(query, [patientId], (err, results) => {
+      if (err) {
+        console.error("Database error during medical records fetch:", err);
+        return res.status(500).json({
+          success: false,
+          message: "Database error during medical records retrieval"
+        });
+      }
+
+      console.log("Raw medical records from database:", results);
+      console.log("Number of medical records:", results.length);
+
+      // If no records found, return empty array but with success
+      if (results.length === 0) {
+        console.log("No medical records found for patient:", patientId);
+        return res.json({
+          success: true,
+          message: "No medical records found for this patient",
+          data: [],
+          patientId: patientId
+        });
+      }
+
+      // Transform the data to match the expected format
+      // Transform the data to match the expected format
+      const transformedRecords = results.map(record => ({
+        id: record.id,
+        patientId: record.patient_id,
+        doctorId: record.doctor_id,
+        doctorName: record.doctor_name,
+        doctorSpecialization: record.doctor_specialization,
+        currentHospital: record.current_hospital, // ✅ Add this line
+        examinationType: record.examination_type,
+        diagnosis: record.diagnosis,
+        prescription: record.prescription,
+        nextCheckupDate: record.next_checkup_date,
+        additionalNotes: record.additional_notes,
+        createdAt: record.created_at,
+        updatedAt: record.updated_at
+      }));
+
+      console.log("Transformed medical records for frontend:", transformedRecords);
+
+      res.json({
+        success: true,
+        message: "Medical records retrieved successfully",
+        data: transformedRecords,
+        count: results.length,
+        patientId: patientId
+      });
+    });
+
+  } catch (error) {
+    console.error("Server error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error"
+    });
+  }
+});
+
+// Optional: GET specific medical record by ID
+router.get('/:patientId/medical-records/:recordId', authenticatePatient, async (req, res) => {
+  try {
+    const { patientId, recordId } = req.params;
+    const authenticatedPatientId = req.patient.id; // From token
+
+    // Security check: ensure patient can only access their own records
+    if (patientId != authenticatedPatientId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: You can only view your own medical records'
+      });
+    }
+
+    console.log(`Fetching medical record ${recordId} for authenticated patient ${patientId}`);
+
+    const query = `
+      SELECT 
+        mr.id,
+        mr.patient_id,
+        mr.doctor_id,
+        mr.examination_type,
+        mr.diagnosis,
+        mr.prescription,
+        mr.next_checkup_date,
+        mr.additional_notes,
+        mr.created_at,
+        mr.updated_at,
+        CONCAT(d.first_name, ' ', d.last_name) AS doctor_name,
+        d.specialization AS doctor_specialization,
+        d.current_hospital
+      FROM medical_records mr
+      LEFT JOIN doctors d ON mr.doctor_id = d.id
+      WHERE mr.patient_id = ? AND mr.id = ?
+    `;
+
+    db.query(query, [patientId, recordId], (err, results) => {
+      if (err) {
+        console.error("Database error during medical record fetch:", err);
+        return res.status(500).json({
+          success: false,
+          message: "Database error during medical record retrieval"
+        });
+      }
+
+      if (results.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Medical record not found'
+        });
+      }
+
+      const record = results[0];
+      const transformedRecord = {
+        id: record.id,
+        patientId: record.patient_id,
+        doctorId: record.doctor_id,
+        doctorName: record.doctor_name,
+        doctorSpecialization: record.doctor_specialization,
+        currentHospital: record.current_hospital,
+        examinationType: record.examination_type,
+        diagnosis: record.diagnosis,
+        prescription: record.prescription,
+        nextCheckupDate: record.next_checkup_date,
+        additionalNotes: record.additional_notes,
+        createdAt: record.created_at,
+        updatedAt: record.updated_at
+      };
+
+      res.json({
+        success: true,
+        message: 'Medical record retrieved successfully',
+        data: transformedRecord
+      });
+    });
+
+  } catch (error) {
+    console.error("Server error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error"
+    });
+  }
+});
 // Add this test route right after the authenticatePatient function
 router.get("/test", (req, res) => {
-  res.json({ 
+  res.json({
     message: "Patient routes are working!",
     timestamp: new Date().toISOString()
   });

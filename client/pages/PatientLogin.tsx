@@ -86,7 +86,7 @@ export default function PatientLogin() {
       });
 
       const data = await response.json();
-      // console.log("Server response:", data);
+      console.log("Server response ----------------------:", data);
 
       if (!response.ok) {
         if (data.errors) {

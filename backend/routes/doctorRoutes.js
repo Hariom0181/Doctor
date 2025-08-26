@@ -1000,6 +1000,7 @@ router.post("/medical-records", authenticateDoctor, (req, res) => {
         message: "Patient ID, examination type, and diagnosis are required"
       });
     }
+    // ----------------------------------------------------------------------------------
 
     const sql = `
       INSERT INTO medical_records (
@@ -1164,6 +1165,104 @@ router.get("/my-medical-records", authenticateDoctor, (req, res) => {
 
   } catch (error) {
     console.error("Unexpected error fetching doctor's medical records:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      details: error.message
+    });
+  }
+});
+// doctorRoute.js
+// Add this route to your doctor routes file for better performance
+
+// GET - Get count of medical records created by current doctor
+router.get("/medical-records/count", authenticateDoctor, (req, res) => {
+  try {
+    console.log("Fetching medical records count for doctor:", req.doctor.id);
+
+    const sql = `
+      SELECT COUNT(*) as total_records
+      FROM medical_records 
+      WHERE doctor_id = ?
+    `;
+
+    db.query(sql, [req.doctor.id], (err, results) => {
+      if (err) {
+        console.error("Database error fetching medical records count:", err);
+        return res.status(500).json({
+          success: false,
+          message: "Database error fetching records count",
+          details: err.message
+        });
+      }
+
+      const count = results[0].total_records;
+      console.log("✅ Records count retrieved:", count);
+      
+      res.json({
+        success: true,
+        message: "Records count retrieved successfully",
+        data: {
+          count: count
+        }
+      });
+    });
+
+  } catch (error) {
+    console.error("Unexpected error fetching records count:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      details: error.message
+    });
+  }
+});
+
+// BONUS: You can also add a route that gets counts for different time periods
+router.get("/dashboard/stats", authenticateDoctor, (req, res) => {
+  try {
+    console.log("Fetching dashboard statistics for doctor:", req.doctor.id);
+
+    // Get various counts in a single query
+    const sql = `
+      SELECT 
+        COUNT(*) as total_records,
+        COUNT(CASE WHEN DATE(created_at) = CURDATE() THEN 1 END) as today_records,
+        COUNT(CASE WHEN created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) THEN 1 END) as week_records,
+        COUNT(CASE WHEN created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 1 END) as month_records,
+        COUNT(DISTINCT patient_id) as unique_patients
+      FROM medical_records 
+      WHERE doctor_id = ?
+    `;
+
+    db.query(sql, [req.doctor.id], (err, results) => {
+      if (err) {
+        console.error("Database error fetching dashboard stats:", err);
+        return res.status(500).json({
+          success: false,
+          message: "Database error fetching dashboard statistics",
+          details: err.message
+        });
+      }
+
+      const stats = results[0];
+      console.log("✅ Dashboard statistics retrieved:", stats);
+      
+      res.json({
+        success: true,
+        message: "Dashboard statistics retrieved successfully",
+        data: {
+          totalRecords: stats.total_records,
+          todayRecords: stats.today_records,
+          weekRecords: stats.week_records,
+          monthRecords: stats.month_records,
+          uniquePatients: stats.unique_patients
+        }
+      });
+    });
+
+  } catch (error) {
+    console.error("Unexpected error fetching dashboard stats:", error);
     res.status(500).json({
       success: false,
       message: "Internal server error",

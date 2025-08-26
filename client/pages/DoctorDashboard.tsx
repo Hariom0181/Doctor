@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { doctorApiService } from '@/services/doctorApi'
+import { doctorApiService, type MedicalRecord } from '@/services/doctorApi'
 import {
   Heart,
   Calendar,
@@ -126,8 +126,165 @@ export default function DoctorDashboard() {
   const [patientsError, setPatientsError] = useState(null);
   const [isAddHealthMetricsOpen, setIsAddHealthMetricsOpen] = useState(false);
   const [isAddingRecord, setIsAddingRecord] = useState(false);
-
+  const [medicalRecords, setMedicalRecords] = useState<MedicalRecord[]>([]);
+  const [isLoadingRecords, setIsLoadingRecords] = useState(true);
+  const [recordsError, setRecordsError] = useState<string | null>(null);
+  const [filteredRecords, setFilteredRecords] = useState<MedicalRecord[]>([]);
+  const [selectedPatientFilter, setSelectedPatientFilter] = useState("all");
+  const [selectedTypeFilter, setSelectedTypeFilter] = useState("all");
+  const [recordsCount, setRecordsCount] = useState<number>(0);
+  const [isLoadingRecordsCount, setIsLoadingRecordsCount] = useState(true);
   // Your existing useState declarations
+
+  useEffect(() => {
+    if (activeTab === "records") {
+      fetchMedicalRecords();
+    }
+  }, [activeTab]);
+  const fetchMedicalRecords = async () => {
+    try {
+      setIsLoadingRecords(true);
+      setRecordsError(null);
+
+      console.log("🏥 Fetching medical records...");
+      const records = await doctorApiService.getMyMedicalRecords();
+
+      console.log("📄 Fetched records:", records);
+      setMedicalRecords(records);
+      setFilteredRecords(records); // Initially show all records
+
+    } catch (error) {
+      console.error("❌ Error fetching medical records:", error);
+      setRecordsError(error.message);
+    } finally {
+      setIsLoadingRecords(false);
+    }
+  };
+
+  useEffect(() => {
+    handleFilterRecords();
+  }, [selectedPatientFilter, selectedTypeFilter, medicalRecords]);
+  // Replace your existing handleFilterRecords function with this:
+  const handleFilterRecords = () => {
+    let filtered = [...medicalRecords];
+
+    // Filter by patient - Fix the data type mismatch
+    if (selectedPatientFilter !== "all") {
+      filtered = filtered.filter(record =>
+        String(record.patientId) === String(selectedPatientFilter)
+      );
+    }
+
+    // Filter by type
+    if (selectedTypeFilter !== "all") {
+      filtered = filtered.filter(record =>
+        record.examinationType.toLowerCase() === selectedTypeFilter.toLowerCase()
+      );
+    }
+
+    setFilteredRecords(filtered);
+  };
+  const formatExaminationType = (type: string) => {
+    switch (type?.toLowerCase()) {
+      case 'general':
+        return 'General Checkup';
+      case 'blood':
+        return 'Blood Test';
+      case 'heart':
+        return 'Heart Screening';
+      default:
+        return type?.charAt(0).toUpperCase() + type?.slice(1) || 'Unknown';
+    }
+  };
+  useEffect(() => {
+    // Load records count when component mounts
+    fetchRecordsCount();
+  }, []);
+  const fetchRecordsCount = async () => {
+    try {
+      setIsLoadingRecordsCount(true);
+      
+      // Use the optimized count endpoint instead of fetching all records
+      const count = await doctorApiService.getRecordsCount();
+      setRecordsCount(count);
+      
+    } catch (error) {
+      console.error('❌ Failed to fetch records count:', error);
+      setRecordsCount(0);
+    } finally {
+      setIsLoadingRecordsCount(false);
+    }
+  };
+  const getCurrentDoctorId = () => {
+    const doctorsData = localStorage.getItem("doctorData");
+    if (doctorsData) {
+      const doctor = JSON.parse(doctorsData);
+      return doctor.id?.toString();
+    }
+    return null;
+  };
+
+  // Add this function to get patient name by ID
+  const getPatientNameById = (patientId: string) => {
+    const patient = linkedPatients.find(p =>
+      String(p.id) === String(patientId)
+    );
+    return patient ? patient.name : `Patient ${patientId}`;
+  };
+
+  const handleAddRecord = async () => {
+    try {
+      // Validation
+      if (!newRecord.patientId || !newRecord.type || !newRecord.diagnosis) {
+        alert("Please fill in all required fields (Patient, Examination Type, and Diagnosis)");
+        return;
+      }
+
+      setIsAddingRecord(true);
+      console.log("Adding medical record:", newRecord);
+
+      // Prepare the data for API
+      const recordData = {
+        patientId: newRecord.patientId,
+        type: newRecord.type,
+        diagnosis: newRecord.diagnosis,
+        prescription: newRecord.prescription || undefined,
+        nextCheckup: newRecord.nextCheckup || undefined,
+        notes: newRecord.notes || undefined
+      };
+
+      // Call the API service
+      const addedRecord = await doctorApiService.addMedicalRecord(recordData);
+
+      console.log("✅ Medical record added successfully:", addedRecord);
+      await fetchRecordsCount();
+      alert(`Medical record added successfully for patient ${newRecord.patientId}!`);
+
+      // Reset the form
+      setNewRecord({
+        patientId: "",
+        type: "",
+        diagnosis: "",
+        prescription: "",
+        nextCheckup: "",
+        notes: ""
+      });
+
+      // Close the dialog
+      setIsAddRecordOpen(false);
+      await fetchMedicalRecords();
+
+      // Optional: Refresh any medical records list if you have one displayed
+      // await fetchMedicalRecords(); // Uncomment if you have this function
+
+    } catch (error) {
+      console.error("❌ Failed to add medical record:", error);
+      alert(`Failed to add medical record: ${error.message}`);
+    } finally {
+      setIsAddingRecord(false);
+    }
+  };
+
 
 
   // ADD THE NEW CODE HERE (all the functions from the artifact)
@@ -161,6 +318,13 @@ export default function DoctorDashboard() {
       hour: '2-digit',
       minute: '2-digit'
     });
+  };
+  // Add this function inside your DoctorDashboard component
+  const generateRecordReference = (record: MedicalRecord) => {
+    const date = new Date(record.createdAt || '');
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    return `HMS${year}${month}${String(record.id).padStart(3, '0')}`;
   };
   // Function to add/update health metrics
   const handleAddHealthMetrics = async () => {
@@ -210,7 +374,6 @@ export default function DoctorDashboard() {
         }
       );
 
-
       const data = await response.json();
 
       if (data.success) {
@@ -252,7 +415,6 @@ export default function DoctorDashboard() {
       setIsAddingMetrics(false);
     }
   };
-
   // Function to get health metrics for a specific patient  
   const fetchPatientHealthMetrics = async (patientId) => {
     try {
@@ -406,56 +568,7 @@ export default function DoctorDashboard() {
 
 
 
-  const handleAddRecord = async () => {
-    try {
-      // Validation
-      if (!newRecord.patientId || !newRecord.type || !newRecord.diagnosis) {
-        alert("Please fill in all required fields (Patient, Examination Type, and Diagnosis)");
-        return;
-      }
 
-      setIsAddingRecord(true);
-      console.log("Adding medical record:", newRecord);
-
-      // Prepare the data for API
-      const recordData = {
-        patientId: newRecord.patientId,
-        type: newRecord.type,
-        diagnosis: newRecord.diagnosis,
-        prescription: newRecord.prescription || undefined,
-        nextCheckup: newRecord.nextCheckup || undefined,
-        notes: newRecord.notes || undefined
-      };
-
-      // Call the API service
-      const addedRecord = await doctorApiService.addMedicalRecord(recordData);
-
-      console.log("✅ Medical record added successfully:", addedRecord);
-      alert(`Medical record added successfully for patient ${newRecord.patientId}!`);
-
-      // Reset the form
-      setNewRecord({
-        patientId: "",
-        type: "",
-        diagnosis: "",
-        prescription: "",
-        nextCheckup: "",
-        notes: ""
-      });
-
-      // Close the dialog
-      setIsAddRecordOpen(false);
-
-      // Optional: Refresh any medical records list if you have one displayed
-      // await fetchMedicalRecords(); // Uncomment if you have this function
-
-    } catch (error) {
-      console.error("❌ Failed to add medical record:", error);
-      alert(`Failed to add medical record: ${error.message}`);
-    } finally {
-      setIsAddingRecord(false);
-    }
-  };
   const handlePrescribeMedication = () => {
     console.log("Prescribing medication:", newMedication);
     // Here you would typically send this to your backend
@@ -674,8 +787,12 @@ export default function DoctorDashboard() {
                         <Input
                           type="date"
                           value={newRecord.nextCheckup}
-                          onChange={(e) => setNewRecord({ ...newRecord, nextCheckup: e.target.value })}
+                          min={new Date().toISOString().split("T")[0]} // today in YYYY-MM-DD format
+                          onChange={(e) =>
+                            setNewRecord({ ...newRecord, nextCheckup: e.target.value })
+                          }
                         />
+
                       </div>
                       <div className="space-y-2">
                         <Label>Additional Notes</Label>
@@ -1014,7 +1131,26 @@ export default function DoctorDashboard() {
               <div className="flex items-center">
                 <FileText className="w-8 h-8 text-info mr-3" />
                 <div>
-                  <p className="text-2xl font-bold text-gray-900">47</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {isLoadingRecordsCount ? (
+                      <div className="flex items-center">
+                        <div className="w-5 h-5 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600 mr-2" />
+                        <span className="text-sm text-gray-500">Loading...</span>
+                      </div>
+                    ) : (
+                      <span className="flex items-center">
+                        {recordsCount}
+                        {/* Optional: Add a refresh button */}
+                        {/* <button
+                          onClick={fetchRecordsCount}
+                          className="ml-2 text-xs text-blue-600 hover:text-blue-800 transition-colors"
+                          title="Refresh count"
+                        >
+                          ↻
+                        </button> */}
+                      </span>
+                    )}
+                  </p>
                   <p className="text-sm text-gray-600">Records Added</p>
                 </div>
               </div>
@@ -1382,7 +1518,7 @@ export default function DoctorDashboard() {
               </Card>
             </div>
           </TabsContent>
-
+          {/* -------------------------------------------------------------------------------------------- */}
           <TabsContent value="records" className="space-y-6">
             <Card>
               <CardHeader>
@@ -1393,7 +1529,7 @@ export default function DoctorDashboard() {
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <div className="flex space-x-4">
-                      <Select>
+                      <Select value={selectedPatientFilter} onValueChange={setSelectedPatientFilter}>
                         <SelectTrigger className="w-48">
                           <SelectValue placeholder="Filter by patient" />
                         </SelectTrigger>
@@ -1406,7 +1542,8 @@ export default function DoctorDashboard() {
                           ))}
                         </SelectContent>
                       </Select>
-                      <Select>
+
+                      <Select value={selectedTypeFilter} onValueChange={setSelectedTypeFilter}>
                         <SelectTrigger className="w-48">
                           <SelectValue placeholder="Filter by type" />
                         </SelectTrigger>
@@ -1418,6 +1555,7 @@ export default function DoctorDashboard() {
                         </SelectContent>
                       </Select>
                     </div>
+
                     <div className="flex space-x-2">
                       <Button
                         variant="outline"
@@ -1428,78 +1566,132 @@ export default function DoctorDashboard() {
                         <Upload className="w-4 h-4 mr-2" />
                         Upload Lab Results
                       </Button>
-                      <Button
-                        onClick={() => setIsAddRecordOpen(true)}
-                      >
+                      <Button onClick={() => setIsAddRecordOpen(true)}>
                         <Plus className="w-4 h-4 mr-2" />
                         New Record
                       </Button>
                     </div>
                   </div>
 
-                  <div className="space-y-4">
-                    <div className="border rounded-lg p-4 bg-white">
-                      <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <h4 className="font-medium">General Checkup - Rajesh Kumar</h4>
-                          <p className="text-sm text-gray-600">January 15, 2024 • HMS2024001</p>
-                          <p className="text-sm text-gray-800 mt-2">
-                            <strong>Diagnosis:</strong> Blood pressure slightly elevated, cholesterol normal
-                          </p>
-                          <p className="text-sm text-gray-600 mt-1">
-                            <strong>Prescription:</strong> Amlodipine 5mg once daily
-                          </p>
-                        </div>
-                        <div className="flex space-x-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              alert("Edit medical record for Rajesh Kumar's General Checkup\nDate: January 15, 2024");
-                            }}
-                          >
-                            <Edit className="w-4 h-4 mr-1" />
-                            Edit
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              alert("Exporting Rajesh Kumar's medical record as PDF...\nDownload will start shortly.");
-                            }}
-                          >
-                            <Download className="w-4 h-4 mr-1" />
-                            Export
-                          </Button>
-                        </div>
-                      </div>
+                  {/* Loading State */}
+                  {isLoadingRecords && (
+                    <div className="text-center py-8">
+                      <p className="text-gray-600">Loading medical records...</p>
                     </div>
+                  )}
 
-                    <div className="border rounded-lg p-4 bg-white">
-                      <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <h4 className="font-medium">Blood Test - Sunita Devi</h4>
-                          <p className="text-sm text-gray-600">January 12, 2024 • HMS2024002</p>
-                          <p className="text-sm text-gray-800 mt-2">
-                            <strong>Diagnosis:</strong> All parameters within normal range
-                          </p>
-                          <p className="text-sm text-gray-600 mt-1">
-                            <strong>Prescription:</strong> Continue current vitamins
-                          </p>
-                        </div>
-                        <div className="flex space-x-2">
-                          <Button size="sm" variant="outline">
-                            <Edit className="w-4 h-4 mr-1" />
-                            Edit
-                          </Button>
-                          <Button size="sm" variant="outline">
-                            <Download className="w-4 h-4 mr-1" />
-                            Export
-                          </Button>
-                        </div>
-                      </div>
+                  {/* Error State */}
+                  {recordsError && (
+                    <div className="text-center py-8">
+                      <p className="text-red-600">Error: {recordsError}</p>
+                      <Button
+                        variant="outline"
+                        onClick={fetchMedicalRecords}
+                        className="mt-2"
+                      >
+                        Retry
+                      </Button>
                     </div>
-                  </div>
+                  )}
+
+                  {/* No Records State */}
+                  {!isLoadingRecords && !recordsError && filteredRecords.length === 0 && (
+                    <div className="text-center py-12">
+                      <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                        <FileText className="w-8 h-8 text-gray-400" />
+                      </div>
+                      <p className="text-gray-600 font-medium">
+                        {medicalRecords.length === 0
+                          ? "No medical records found"
+                          : "No records match the current filters"
+                        }
+                      </p>
+                      <p className="text-sm text-gray-500 mt-1">
+                        {medicalRecords.length === 0
+                          ? "Add your first medical record to get started!"
+                          : "Try adjusting your filter settings."
+                        }
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Records List - Scrollable Container */}
+                  {!isLoadingRecords && !recordsError && filteredRecords.length > 0 && (
+                    <div className="max-h-96 overflow-y-auto space-y-3 pr-2">
+                      {filteredRecords.map((record) => (
+                        <div key={record.id} className="border rounded-lg p-3 bg-white shadow-sm hover:shadow-md transition-shadow">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h4 className="font-medium text-gray-900">
+                                  {formatExaminationType(record.examinationType)}
+                                </h4>
+                                <span className="text-sm text-gray-500">•</span>
+                                <span className="text-sm font-medium text-blue-600">
+                                  {getPatientNameById(record.patientId)}
+                                </span>
+                              </div>
+
+                              <p className="text-xs text-gray-500 mb-2">
+                                {formatDate(record.createdAt)} • {generateRecordReference(record)}
+                              </p>
+
+                              <div className="space-y-1">
+                                <p className="text-sm text-gray-800">
+                                  <span className="font-medium">Diagnosis:</span> {record.diagnosis}
+                                </p>
+
+                                {record.prescription && (
+                                  <p className="text-sm text-gray-600">
+                                    <span className="font-medium">Prescription:</span> {record.prescription}
+                                  </p>
+                                )}
+
+                                {record.nextCheckupDate && (
+                                  <p className="text-xs text-gray-500">
+                                    <span className="font-medium">Next Checkup:</span> {formatDate(record.nextCheckupDate)}
+                                  </p>
+                                )}
+
+                                {record.additionalNotes && (
+                                  <p className="text-xs text-gray-500">
+                                    <span className="font-medium">Notes:</span> {record.additionalNotes}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex flex-col space-y-1 ml-4">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 text-xs"
+                                onClick={() => {
+                                  alert(`Edit medical record ${generateRecordReference(record)}\nFor: ${getPatientNameById(record.patientId)}\nType: ${formatExaminationType(record.examinationType)}`);
+                                  // TODO: Implement edit functionality
+                                }}
+                              >
+                                <Edit className="w-3 h-3 mr-1" />
+                                Edit
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 text-xs"
+                                onClick={() => {
+                                  alert(`Exporting medical record ${generateRecordReference(record)} as PDF...\nDownload will start shortly.`);
+                                  // TODO: Implement export functionality
+                                }}
+                              >
+                                <Download className="w-3 h-3 mr-1" />
+                                Export
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
