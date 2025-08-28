@@ -1,0 +1,25 @@
+Doctor Dashboard 
+
+Work Done 
+1. Navbar Navigation Tab 
+2. Logout Button implementation 
+3. Add medical record Tab
+4. Add Health Metrics button Tab 
+5. Active Patient Card Tab 	
+6. Records Added Tab
+7. Patient Management - patient adding , view , add record 
+8. Medical Record tab - search , scrollbar 
+
+
+Work Remain 
+Welcome card , prescribe medication tab 
+Todays appointments , prescriptions 
+Overview card  	
+Patient Management - Search , Add New Patient , status 
+Appointments tab 
+Medical Records tab - Upload Lab Results , edit export button 
+
+
+
+ERROR 
+Search at the patient management tab contains error 

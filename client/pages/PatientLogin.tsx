@@ -29,12 +29,12 @@ export default function PatientLogin() {
 
   const handleInputChange = (field: keyof LoginFormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    
+
     // Clear error when user starts typing
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: "" }));
     }
-    
+
     // Clear general error message
     if (submitMessage) {
       setSubmitMessage(null);
@@ -86,7 +86,7 @@ export default function PatientLogin() {
       });
 
       const data = await response.json();
-      console.log("Server response ----------------------:", data);
+
 
       if (!response.ok) {
         if (data.errors) {
@@ -97,9 +97,9 @@ export default function PatientLogin() {
           setErrors(serverErrors);
           setSubmitMessage({ type: 'error', message: 'Please fix the validation errors below.' });
         } else {
-          setSubmitMessage({ 
-            type: 'error', 
-            message: data.message || "Login failed. Please check your credentials." 
+          setSubmitMessage({
+            type: 'error',
+            message: data.message || "Login failed. Please check your credentials."
           });
         }
         return;
@@ -120,9 +120,9 @@ export default function PatientLogin() {
 
     } catch (error) {
       console.error("Error during login:", error);
-      setSubmitMessage({ 
-        type: 'error', 
-        message: "Network error. Please check your connection and try again." 
+      setSubmitMessage({
+        type: 'error',
+        message: "Network error. Please check your connection and try again."
       });
     } finally {
       setIsLoading(false);

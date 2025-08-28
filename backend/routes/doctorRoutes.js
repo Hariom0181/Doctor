@@ -461,16 +461,28 @@ router.post(
           // Remove password from response
           const { password: _, ...doctorData } = doctor;
 
+          // Replace this section in your existing doctor login:
+
           res.json({
             success: true,
             message: "Login successful",
-            token: token, // Add this line
+            token: token,
             doctor: {
               id: doctor.id,
-              firstName: doctor.firstName,
-              lastName: doctor.lastName,
+              firstName: doctor.first_name,                    // Map snake_case to camelCase
+              lastName: doctor.last_name,
               email: doctor.email,
               phone: doctor.phone,
+              specialization: doctor.specialization,
+              current_hospital: doctor.current_hospital,
+              licenseNumber: doctor.medical_license_number,   // Map snake_case to camelCase
+              years_of_experience: doctor.years_of_experience,
+              qualifications: doctor.qualifications,
+              consultation_fee: doctor.consultation_fee,
+              available_hours: doctor.available_hours,
+              bio: doctor.bio,
+              profilePicture: doctor.profilePicture,
+              lastLogin: new Date().toISOString().slice(0, 19).replace('T', ' ')
             }
           });
 
@@ -1035,7 +1047,7 @@ router.post("/medical-records", authenticateDoctor, (req, res) => {
       }
 
       console.log("Medical record added successfully, ID:", result.insertId);
-      
+
       res.json({
         success: true,
         message: "Medical record added successfully",
@@ -1198,7 +1210,7 @@ router.get("/medical-records/count", authenticateDoctor, (req, res) => {
 
       const count = results[0].total_records;
       console.log("✅ Records count retrieved:", count);
-      
+
       res.json({
         success: true,
         message: "Records count retrieved successfully",
@@ -1247,7 +1259,7 @@ router.get("/dashboard/stats", authenticateDoctor, (req, res) => {
 
       const stats = results[0];
       console.log("✅ Dashboard statistics retrieved:", stats);
-      
+
       res.json({
         success: true,
         message: "Dashboard statistics retrieved successfully",
@@ -1270,5 +1282,6 @@ router.get("/dashboard/stats", authenticateDoctor, (req, res) => {
     });
   }
 });
+
 
 module.exports = router;

@@ -214,16 +214,16 @@ router.post(
     // Check validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      console.log("Login validation errors:", errors.array()); // Debug log
+      console.log("Login validation errors:", errors.array());
       return res.status(400).json({
         success: false,
         message: "Validation failed",
         errors: errors.array()
       });
     }
-
+  
     const { email, password } = req.body;
-
+  
     // 1. Check if patient exists
     const sql = "SELECT * FROM patients WHERE email = ?";
     db.query(sql, [email.toLowerCase()], (err, results) => {
@@ -234,58 +234,62 @@ router.post(
           message: "Database error during login"
         });
       }
-
+  
       if (results.length === 0) {
         return res.status(401).json({
           success: false,
           message: "Invalid email or password"
         });
       }
-
+  
       const patient = results[0];
-
-      // 2. Compare password (plain-text for now, but should use bcrypt in production)
+  
+      // 2. Compare password
       if (patient.password !== password) {
         return res.status(401).json({
           success: false,
           message: "Invalid email or password"
         });
       }
-
-      // 3. Generate JWT token
-      const jwtSecret = process.env.JWT_SECRET || "your-fallback-secret-key-change-in-production";
-      const token = jwt.sign(
-        {
-          id: patient.id,
-          email: patient.email,
-          type: 'patient' // Add user type for authorization
-        },
-        jwtSecret,
-        { expiresIn: "24h" } // Extended for better UX
-      );
-
-      // 4. Update last login time (optional)
+  
+      // 3. Update last login time FIRST
       const updateLastLoginSql = "UPDATE patients SET lastLogin = NOW() WHERE id = ?";
       db.query(updateLastLoginSql, [patient.id], (updateErr) => {
         if (updateErr) {
           console.error("Error updating last login:", updateErr);
-          // Don't fail the login for this error
+          // Continue anyway - don't fail login for this
         }
-      });
-
-      // 5. Send successful response
-      res.status(200).json({
-        success: true,
-        message: "Login successful",
-        token,
-        patient: {
-          id: patient.id,
-          firstName: patient.firstName,
-          lastName: patient.lastName,
-          email: patient.email,
-          phone: patient.phone,
-          // Don't send sensitive information
-        },
+  
+        // 4. Generate JWT token
+        const jwtSecret = process.env.JWT_SECRET || "your-fallback-secret-key-change-in-production";
+        const token = jwt.sign(
+          {
+            id: patient.id,
+            email: patient.email,
+            type: 'patient'
+          },
+          jwtSecret,
+          { expiresIn: "24h" }
+        );
+  
+        // 5. Get current timestamp for response
+  
+  
+        // 6. Send successful response with current timestamp
+        res.status(200).json({
+          success: true,
+          message: "Login successful",
+          token,
+          patient: {
+            id: patient.id,
+            firstName: patient.firstName,
+            lastName: patient.lastName,
+            email: patient.email,
+            phone: patient.phone,
+            address: patient.address,
+           
+          },
+        });
       });
     });
   }
@@ -879,10 +883,6 @@ router.get('/:patientId/medical-records/:recordId', authenticatePatient, async (
   }
 });
 // Add this test route right after the authenticatePatient function
-router.get("/test", (req, res) => {
-  res.json({
-    message: "Patient routes are working!",
-    timestamp: new Date().toISOString()
-  });
-});
+  
+
 module.exports = router;

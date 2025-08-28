@@ -11,6 +11,8 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Camera, X } from 'lucide-react';
+
 import {
   Heart,
   Calendar,
@@ -35,7 +37,7 @@ import {
   Save,
   Loader2
 } from "lucide-react";
-import { patientApiService, HealthMetric, LinkedDoctor, AvailableDoctor, PatientMedicalRecord } from "@/services/patientApi";
+import { patientApiService, HealthMetric, LinkedDoctor, AvailableDoctor, PatientMedicalRecord, PatientProfile } from "@/services/patientApi";
 
 // ------------------------------
 // Hardcoded initial data (unchanged)
@@ -146,7 +148,9 @@ export default function PatientDashboard() {
   // Replace these via backend responses when ready
   // ------------------------------
   const [activeTab, setActiveTab] = useState("overview"); // <-- Replace with backend: default tab if needed
-  const [patientData, setPatientData] = useState(INITIAL_PATIENT_DATA); // <-- Replace with backend: patient data
+  // const [patientData, setPatientData] = useState(INITIAL_PATIENT_DATA); // <-- Replace with backend: patient data
+  const [patientData, setPatientData] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [healthMetrics, setHealthMetrics] = useState<any[]>([]);
   // <-- Replace with backend: health metrics
   const [recentRecords, setRecentRecords] = useState([]);
@@ -166,6 +170,46 @@ export default function PatientDashboard() {
   const [medicalRecords, setMedicalRecords] = useState<PatientMedicalRecord[]>([]);
   const [isLoadingMedicalRecords, setIsLoadingMedicalRecords] = useState(false);
   const [medicalRecordsError, setMedicalRecordsError] = useState<string | null>(null);
+  // Add this state for image handling
+  const [showImageUpload, setShowImageUpload] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  
+  useEffect(() => {
+    const loadPatientData = () => {
+      try {
+        const storedPatientData = localStorage.getItem('patientData');
+        if (storedPatientData) {
+          const parsedData = JSON.parse(storedPatientData);
+
+
+
+          // Transform the data to match your UI needs
+          setPatientData({
+            id: parsedData.id,
+            name: `${parsedData.firstName} ${parsedData.lastName}`,
+            firstName: parsedData.firstName,
+            lastName: parsedData.lastName,
+            email: parsedData.email,
+            phone: parsedData.phone,
+            address: parsedData.address,
+            profilePicture: parsedData.profileImage
+          });
+        } else {
+          console.warn('No patient data found in localStorage');
+          // Optionally redirect to login
+          // window.location.href = '/login';
+        }
+      } catch (error) {
+        console.error('Error parsing patient data from localStorage:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadPatientData();
+  }, []);
+
+
   useEffect(() => {
     fetchMetrics();
   }, []);
@@ -216,6 +260,13 @@ export default function PatientDashboard() {
     }
   };
 
+  const generatePatientId = (id) => {
+    return `HMS${new Date().getFullYear()}${String(id).padStart(4, '0')}`;
+  };
+
+
+
+
 
   // Backend integration for linked doctors
   // ------------------------------
@@ -249,7 +300,7 @@ export default function PatientDashboard() {
       fetchMedicalRecords();
     }
   }, [activeTab]);
-  
+
   // Also fetch immediately on component mount
   useEffect(() => {
     fetchMedicalRecords();
@@ -456,18 +507,61 @@ export default function PatientDashboard() {
               </div>
             </Link>
             <nav className="hidden md:flex items-center space-x-6">
-              <button className="text-gray-700 hover:text-primary font-medium">Dashboard</button>
-              <button className="text-gray-700 hover:text-primary font-medium">Appointments</button>
-              <button className="text-gray-700 hover:text-primary font-medium">Records</button>
-              <button className="text-gray-700 hover:text-primary font-medium">Medications</button>
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  setActiveTab("overview");
+                }}
+                className={`font-medium transition-colors ${activeTab === "overview" ? "text-primary" : "text-gray-700 hover:text-primary"}`}
+              >
+                Dashboard
+              </button>
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  console.log("Clicking Records button");
+                  setActiveTab("records");
+                }}
+                className={`font-medium transition-colors ${activeTab === "records" ? "text-primary" : "text-gray-700 hover:text-primary"}`}
+              >
+                Records
+              </button>
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  console.log("Clicking Appointments button");
+                  setActiveTab("appointments");
+                }}
+                className={`font-medium transition-colors ${activeTab === "appointments" ? "text-primary" : "text-gray-700 hover:text-primary"}`}
+              >
+                Appointments
+              </button>
+
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  setActiveTab("medications")
+                }}
+                className={`font-medium transition-colors ${activeTab === "records" ? "text-primary" : "text-gray-700 hover:text-primary"}`}
+              >
+                Medications
+              </button>
               <div className="flex items-center space-x-3 ml-6 border-l pl-6">
-                <Button variant="ghost" size="sm">
+                {/* <Button variant="ghost" size="sm">
                   <Bell className="w-4 h-4" />
                 </Button>
                 <Button variant="ghost" size="sm">
                   <Settings className="w-4 h-4" />
-                </Button>
-                <Button variant="outline" size="sm">
+                </Button> */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (confirm("Are you sure you want to logout?")) {
+                      window.location.href = "/patient/login";
+                    }
+                  }}
+                >
                   <LogOut className="w-4 h-4 mr-2" />
                   Logout
                 </Button>
@@ -479,26 +573,77 @@ export default function PatientDashboard() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Welcome Section */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Avatar className="w-16 h-16">
-                <AvatarImage src={patientData.profilePicture} alt={patientData.name} />
-                <AvatarFallback>{patientData.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
-              </Avatar>
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">Welcome back, {patientData.name}</h1>
-                <p className="text-gray-600">Patient ID: {patientData.id} • Last visit: January 15, 2024</p>
+        {loading ? (
+          <div className="mb-8 animate-pulse">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="w-16 h-16 bg-gray-300 rounded-full"></div>
+                <div>
+                  <div className="h-8 bg-gray-300 rounded w-64 mb-2"></div>
+                  <div className="h-4 bg-gray-300 rounded w-48"></div>
+                </div>
               </div>
+              <div className="h-10 bg-gray-300 rounded w-32"></div>
             </div>
-            <Button onClick={() => {
-              alert("Book Appointment\n\nSelect your preferred:\n• Date & Time\n• Doctor specialization\n• Appointment type\n\nYour appointment request will be sent to the healthcare center for confirmation.");
-            }}>
-              <Plus className="w-4 h-4 mr-2" />
-              Book Appointment
-            </Button>
           </div>
-        </div>
+
+
+        ) : !patientData ? (
+          <div className="mb-8 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-red-600">Unable to load patient data. Please log in again.</p>
+          </div>
+        ) : (
+          <div className="mb-8">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+
+
+                <Avatar className="w-16 h-16">
+                  {patientData.profilePicture && patientData.profilePicture !== "/api/placeholder/64/64" ? (
+                    <>
+                      <AvatarImage
+                        src={patientData.profilePicture}
+                        alt={patientData.name}
+                        className="object-cover"
+                      />
+                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all rounded-full flex items-center justify-center">
+                        <Camera className="w-4 h-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                    </>
+                  ) : (
+                    <div className="w-full h-full bg-gray-100 border-2 border-dashed border-gray-300 rounded-full flex flex-col items-center justify-center group-hover:border-blue-400 group-hover:bg-blue-50 transition-all">
+                      <Camera className="w-6 h-6 text-gray-400 group-hover:text-blue-500 mb-1" />
+                      <span className="text-xs text-gray-500 group-hover:text-blue-600 font-medium">Add Photo</span>
+                    </div>
+                  )}
+
+                  <AvatarFallback className="bg-blue-100 text-blue-800">
+                    {patientData.firstName.charAt(0)}{patientData.lastName.charAt(0)}
+                  </AvatarFallback>
+                </Avatar>
+
+
+
+                <div>
+                  <h1 className="text-3xl font-bold text-gray-900">
+                    Welcome back, {patientData.name}
+                  </h1>
+                  <p className="text-gray-600">
+                    Patient ID: {generatePatientId(patientData.id)}
+                  </p>
+                </div>
+              </div>
+              <Button
+                onClick={() => {
+                  alert("Book Appointment\n\nSelect your preferred:\n• Date & Time\n• Doctor specialization\n• Appointment type\n\nYour appointment request will be sent to the healthcare center for confirmation.");
+                }}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Book Appointment
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Quick Health Status */}
         {/* Fixed Health Metrics Display */}
@@ -1216,7 +1361,7 @@ export default function PatientDashboard() {
                   <CardDescription>Your basic details and contact information</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="flex items-center space-x-4 mb-6">
+                  {/* <div className="flex items-center space-x-4 mb-6">
                     <Avatar className="w-20 h-20">
                       <AvatarImage src={patientData.profilePicture} alt={patientData.name} />
                       <AvatarFallback>{patientData.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
@@ -1248,7 +1393,7 @@ export default function PatientDashboard() {
                       <p className="text-sm font-medium text-gray-600">Blood Group</p>
                       <p className="text-sm">{patientData.bloodGroup}</p>
                     </div>
-                  </div>
+                  </div> */}
                   <Button className="w-full">Edit Profile</Button>
                 </CardContent>
               </Card>
@@ -1262,11 +1407,11 @@ export default function PatientDashboard() {
                   <div className="space-y-3">
                     <div>
                       <p className="text-sm font-medium text-gray-600">Address</p>
-                      <p className="text-sm">{patientData.address}</p>
+                      <p className="text-sm">{/*patientData.address*/}</p>
                     </div>
                     <div>
                       <p className="text-sm font-medium text-gray-600">Emergency Contact</p>
-                      <p className="text-sm">{patientData.emergencyContact}</p>
+                      <p className="text-sm">{/*patientData.emergencyContact*/}</p>
                     </div>
                   </div>
 

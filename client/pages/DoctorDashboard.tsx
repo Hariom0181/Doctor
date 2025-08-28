@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { doctorApiService, type MedicalRecord } from '@/services/doctorApi'
+import { Camera, X } from 'lucide-react';
 import {
   Heart,
   Calendar,
@@ -134,8 +135,44 @@ export default function DoctorDashboard() {
   const [selectedTypeFilter, setSelectedTypeFilter] = useState("all");
   const [recordsCount, setRecordsCount] = useState<number>(0);
   const [isLoadingRecordsCount, setIsLoadingRecordsCount] = useState(true);
-  // Your existing useState declarations
+  const [doctorData, setDoctorData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  
 
+  // Your existing useState declarations
+  useEffect(() => {
+    const loadDoctorData = () => {
+      try {
+        const storedDoctorData = localStorage.getItem('doctorData');
+        if (storedDoctorData) {
+          const parsedData = JSON.parse(storedDoctorData);
+
+          console.log("Loading doctor data:", parsedData);
+
+          setDoctorData({
+            id: parsedData.id,
+            name: `${parsedData.firstName} ${parsedData.lastName}`,
+            firstName: parsedData.firstName,
+            lastName: parsedData.lastName,
+            email: parsedData.email,
+            phone: parsedData.phone,
+            specialization: parsedData.specialization,
+            currentHospital: parsedData.current_hospital,
+            licenseNumber: parsedData.licenseNumber,
+            profilePicture: parsedData.profilePicture || "/api/placeholder/64/64",
+          });
+        } else {
+          console.warn('No Doctor data found in localStorage');
+        }
+      } catch (e) {
+        console.error('Error parsing Doctor data from localStorage:', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadDoctorData();
+  }, []);
   useEffect(() => {
     if (activeTab === "records") {
       fetchMedicalRecords();
@@ -203,11 +240,11 @@ export default function DoctorDashboard() {
   const fetchRecordsCount = async () => {
     try {
       setIsLoadingRecordsCount(true);
-      
+
       // Use the optimized count endpoint instead of fetching all records
       const count = await doctorApiService.getRecordsCount();
       setRecordsCount(count);
-      
+
     } catch (error) {
       console.error('❌ Failed to fetch records count:', error);
       setRecordsCount(0);
@@ -326,6 +363,8 @@ export default function DoctorDashboard() {
     const month = String(date.getMonth() + 1).padStart(2, '0');
     return `HMS${year}${month}${String(record.id).padStart(3, '0')}`;
   };
+
+  
   // Function to add/update health metrics
   const handleAddHealthMetrics = async () => {
     if (!newHealthMetrics.patientId || !newHealthMetrics.metricType) {
@@ -584,10 +623,15 @@ export default function DoctorDashboard() {
     setIsPrescriptionOpen(false);
   };
 
-  const filteredPatients = linkedPatients.filter(patient =>
-    patient.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    patient.id.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredPatients = linkedPatients.filter(patient => {
+    if (!searchQuery.trim()) return true; // Show all if no search query
+    
+    const query = searchQuery.toLowerCase();
+    return patient.name.toLowerCase().includes(query) ||
+           patient.id.toString().includes(query) || // Convert ID to string first
+           (patient.condition && patient.condition.toLowerCase().includes(query)) ||
+           (patient.bloodGroup && patient.bloodGroup.toLowerCase().includes(query));
+  });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
@@ -599,16 +643,19 @@ export default function DoctorDashboard() {
               <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
                 <Heart className="w-6 h-6 text-primary-foreground" />
               </div>
+
               <div>
                 <h1 className="text-xl font-bold text-gray-900">HealthTrack</h1>
                 <p className="text-sm text-gray-600">Doctor Portal</p>
               </div>
+
+
             </Link>
             <nav className="hidden md:flex items-center space-x-6">
               <button
                 onClick={(e) => {
                   e.preventDefault();
-                  console.log("Clicking Dashboard button");
+                  // console.log("Clicking Dashboard button");
                   setActiveTab("overview");
                 }}
                 className={`font-medium transition-colors ${activeTab === "overview" ? "text-primary" : "text-gray-700 hover:text-primary"}`}
@@ -646,7 +693,7 @@ export default function DoctorDashboard() {
                 Records
               </button>
               <div className="flex items-center space-x-3 ml-6 border-l pl-6">
-                <div className="relative">
+                {/* <div className="relative">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -664,14 +711,14 @@ export default function DoctorDashboard() {
                       </span>
                     )}
                   </Button>
-                </div>
-                <Button
+                </div> */}
+                {/* <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => alert("Settings panel would open here")}
                 >
                   <Settings className="w-4 h-4" />
-                </Button>
+                </Button> */}
                 <Button
                   variant="outline"
                   size="sm"
@@ -692,24 +739,85 @@ export default function DoctorDashboard() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Welcome Section */}
+
+        {loading ? (
+          <div className="mb-8 animate-pulse">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="w-16 h-16 bg-gray-300 rounded-full"></div>
+                <div>
+                  <div className="h-8 bg-gray-300 rounded w-64 mb-2"></div>
+                  <div className="h-4 bg-gray-300 rounded w-48"></div>
+                </div>
+              </div>
+              <div className="h-10 bg-gray-300 rounded w-32"></div>
+            </div>
+          </div>
+        ) : !doctorData ? (
+          <div className="mb-8 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <span className="text-red-600">Unable to load doctor data. Please log in again.</span>
+          </div>
+        ) : (
+          <div className="mb-8">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+
+
+
+
+                <Avatar className="w-16 h-16">
+                <AvatarImage
+                    src={doctorData.profilePicture}
+                    alt={doctorData.name}
+                  />
+                  <AvatarFallback>
+                    {doctorData.firstName?.charAt(0) || 'D'}{doctorData.lastName?.charAt(0) || 'U'}
+                  </AvatarFallback>
+                </Avatar>
+
+
+
+
+                <div>
+                  <h1 className="text-3xl font-bold text-gray-900">
+                    Welcome back, Dr. {doctorData.firstName} {doctorData.lastName}
+                  </h1>
+                  {/* FIXED: Changed from <p> to <div> to avoid nesting issues */}
+                  <div className="text-gray-600">
+                    {doctorData.specialization} • {doctorData.currentHospital}
+                  </div>
+                  {doctorData.licenseNumber && (
+                    <div className="text-gray-500 text-sm">
+                      License: {doctorData.licenseNumber}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <Button
+                onClick={() => {
+                  alert("Schedule Appointment\n\nManage your appointment schedule:\n• View upcoming appointments\n• Set availability\n• Block time slots\n\nPatient booking requests will appear for confirmation.");
+                }}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Manage Schedule
+              </Button>
+            </div>
+          </div>
+        )}
+
+
+
+
+
         <div className="mb-8">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Avatar className="w-16 h-16">
-                <AvatarFallback className="bg-primary text-primary-foreground">
-                  {doctorData.name.split(' ').map(n => n[0]).join('')}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">Welcome, {doctorData.name}</h1>
-                <p className="text-gray-600">{doctorData.specialization} • {doctorData.hospital}</p>
-                <p className="text-gray-500 text-sm">License: {doctorData.licenseNumber}</p>
-              </div>
-            </div>
+
+
+
+
+
             <div className="flex space-x-3">
               <Dialog open={isAddRecordOpen} onOpenChange={setIsAddRecordOpen}>
-
-
                 <DialogTrigger asChild>
                   <Button onClick={(e) => {
                     e.preventDefault();
@@ -1358,12 +1466,22 @@ export default function DoctorDashboard() {
                     <div className="space-y-4">
                       {filteredPatients.length === 0 ? (
                         <div className="text-center py-8 text-gray-500">
-                          <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                          <p>No patients found</p>
-                          <p className="text-sm">
-                            {searchQuery ? 'Try adjusting your search terms' : 'No patients are currently linked to your account'}
-                          </p>
+                        <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                        <p>No patients found</p>
+                        <div className="text-sm">
+                          {searchQuery ? 'Try adjusting your search terms' : 'No patients are currently linked to your account'}
                         </div>
+                        {searchQuery && (
+                          <Button
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => setSearchQuery('')}
+                            className="mt-2"
+                          >
+                            Clear search
+                          </Button>
+                        )}
+                      </div>
                       ) : (
                         filteredPatients.map((patient) => (
                           <div key={patient.id} className="border rounded-lg p-4 bg-white">
@@ -1374,9 +1492,10 @@ export default function DoctorDashboard() {
                                 </Avatar>
                                 <div>
                                   <h4 className="font-medium">{patient.name}</h4>
-                                  <p className="text-sm text-gray-600">ID: {patient.id} • Age: {patient.age}</p>
-                                  <p className="text-sm text-gray-600">Blood Group: {patient.bloodGroup} • Last Visit: {formatDate(patient.lastVisit)}</p>
-                                  <p className="text-sm text-gray-600">Condition: {patient.condition}</p>
+                                  {/* ENSURE THESE ARE <div> NOT <p> */}
+                                  <div className="text-sm text-gray-600">ID: {patient.id} • Age: {patient.age}</div>
+                                  <div className="text-sm text-gray-600">Blood Group: {patient.bloodGroup} • Last Visit: {formatDate(patient.lastVisit)}</div>
+                                  <div className="text-sm text-gray-600">Condition: {patient.condition}</div>
                                 </div>
                               </div>
                               <div className="flex items-center space-x-3">

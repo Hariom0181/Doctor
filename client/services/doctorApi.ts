@@ -37,6 +37,7 @@ export interface AddMedicalRecordRequest {
   notes?: string;
 }
 
+
 export interface DoctorProfile {
   id: number;
   firstName: string;

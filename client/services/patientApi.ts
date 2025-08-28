@@ -12,23 +12,27 @@ export interface LinkedDoctor {
   relationshipNotes?: string;
   
 }
-export interface PatientData {
-  id: string;
-  name: string;
-  firstName?: string;
-  lastName?: string;
-  age: number;
+// patientApi.ts (or a shared types file)
+export interface PatientProfile {
+  id: number;
+  firstName: string;
+  lastName: string;
   email: string;
-  phone: string;
-  bloodGroup?: string;
-  address?: string;
-  emergencyContact?: string;
-  profilePicture?: string;
+  phone?: string;
   dateOfBirth?: string;
   gender?: string;
-  lastVisit?: string;
-  createdAt?: string;
-  updatedAt?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  emergencyContact?: string;
+  emergencyPhone?: string;
+  profilePicture?: string;
+  bloodGroup?: string;
+  allergies?: string;
+  medicalHistory?: string;
+  lastVisitDate?: string;
+  createdAt: string;
 }
 export interface PatientMedicalRecord {
   id: number;
@@ -122,7 +126,7 @@ class PatientApiService {
       throw error;
     }
   }
-
+  
 
   
   async getMedicalRecords(patientId: string): Promise<PatientMedicalRecord[]> {

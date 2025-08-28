@@ -1,0 +1,26 @@
+Patient dashboard 
+Works Done 
+1. Welcome Card 
+2. Health metrics card 
+3. MY doctor card 
+4. Overview Recent medical records 
+5. Medical record tab doctor record 
+6. Profile Tab - choose a doctor 
+
+
+
+Works Remain 
+1. Navbar navigations 
+2. removing bell icon , setting icon 
+3. adding logout functionality 
+4. + Book Appointments
+5. implementations of call and book (appointments) on my doctor card 
+6. Overview Recent medical records Scrollbar , View All records 
+7. Overview Upcoming Appointments card
+8. active medication card 
+9. Medical record tab doctor record remove Medical report 
+10.Medical record - My health data and Document - 
+11.Medical record - My health data and Document - Upload Doc , scrollbar
+12. Appointments Tab 
+13. Medications Tab 
+14. Profile Tab 
