@@ -795,7 +795,7 @@ export default function PatientDashboard() {
                   </CardTitle>
                   <CardDescription>Your latest health checkups and diagnoses</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="max-h-60 overflow-y-auto">
                   {isLoadingRecentRecords ? (
                     <div className="text-center py-4">Loading recent records...</div>
                   ) : recentRecords && recentRecords.length > 0 ? (
@@ -843,7 +843,7 @@ export default function PatientDashboard() {
                   </CardTitle>
                   <CardDescription>Your scheduled medical appointments</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="max-h-60 overflow-y-auto">
                   {upcomingAppointments.map((appointment) => (
                     <div key={appointment.id} className="border rounded-lg p-4 bg-white">
                       <div className="flex items-center justify-between">
@@ -879,7 +879,7 @@ export default function PatientDashboard() {
                 </CardTitle>
                 <CardDescription>Current medications and reminders</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="max-h-60 overflow-y-auto">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {medications.map((med, index) => (
                     <div key={index} className="border rounded-lg p-4 bg-white">
@@ -1259,7 +1259,7 @@ export default function PatientDashboard() {
                   <CardTitle>Upcoming Appointments</CardTitle>
                   <CardDescription>Your scheduled visits</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="max-h-60 overflow-y-auto">
                   {upcomingAppointments.map((appointment) => (
                     <div key={appointment.id} className="border rounded-lg p-4 bg-white">
                       <div className="flex items-center justify-between mb-3">
@@ -1326,7 +1326,7 @@ export default function PatientDashboard() {
                 <CardTitle>Current Medications</CardTitle>
                 <CardDescription>Manage your active prescriptions</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="max-h-60 overflow-y-auto">
                 {medications.map((med, index) => (
                   <div key={index} className="border rounded-lg p-4 bg-white">
                     <div className="flex items-start justify-between mb-3">

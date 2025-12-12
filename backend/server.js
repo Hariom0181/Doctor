@@ -6,6 +6,8 @@ const dotenv = require('dotenv');
 
 const patientRoutes = require("./routes/patientRoutes");
 const doctorRoutes = require("./routes/doctorRoutes");
+const dashboardRoutes = require("./routes/dashboardRoutes");
+
 
 dotenv.config();
 const app = express();
@@ -19,7 +21,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // Routes
 app.use("/api/patients", patientRoutes);
 app.use("/api/doctors", doctorRoutes);
-
+app.use("/api/dashboard", dashboardRoutes); 
 
 // Start Server
 const PORT = 5000;
