@@ -73,7 +73,7 @@ CREATE TABLE patients (
   agreeTerms TINYINT(1) DEFAULT 0,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   lastLogin TIMESTAMP NOT NULL DEFAULT '0000-00-00 00:00:00',
-  profile_img LONGBLOB DEFAULT NULL,
+  profile_img varchar(255) DEFAULT NULL,
   PRIMARY KEY (id),
   UNIQUE KEY email (email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

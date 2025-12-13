@@ -60,7 +60,7 @@ export default function Index() {
   const [selectedPatient, setSelectedPatient] = useState<PatientData | null>(null);
   const [patientRecords, setPatientRecords] = useState<HealthRecord[]>([]);
   const [searchResults, setSearchResults] = useState<PatientData[]>([]);
-  
+
   // Dashboard stats
   const [stats, setStats] = useState<DashboardStats>({
     totalPatients: 0,
@@ -69,11 +69,11 @@ export default function Index() {
     moneySaved: 0,
     avoidedCheckups: 0
   });
-  
+
   // Activities and analytics
   const [recentActivities, setRecentActivities] = useState<Activity[]>([]);
   const [diagnosisAnalytics, setDiagnosisAnalytics] = useState<DiagnosisAnalytic[]>([]);
-  
+
   // Loading and error states
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -162,12 +162,12 @@ export default function Index() {
 
     setLoading(true);
     setError(null);
-    
+
     try {
       const response = await dashboardApi.searchPatients(searchQuery);
       if (response.success) {
         setSearchResults(response.data);
-        
+
         // If only one result, automatically select it
         if (response.data.length === 1) {
           handleSelectPatient(response.data[0].id);
@@ -185,7 +185,7 @@ export default function Index() {
   const handleSelectPatient = async (patientId: number) => {
     setLoading(true);
     setError(null);
-    
+
     try {
       const response = await dashboardApi.getPatientDetails(patientId.toString());
       if (response.success) {
@@ -226,7 +226,7 @@ export default function Index() {
     if (diffHours < 24) return `${diffHours} hours ago`;
     return `${diffDays} days ago`;
   };
-  
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
@@ -271,7 +271,7 @@ export default function Index() {
             Automatic Health Monitoring System
           </h1>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Empowering rural and suburban communities with digital health record management. 
+            Empowering rural and suburban communities with digital health record management.
             Reduce repetitive checkups, save money, and maintain comprehensive diagnosis reports automatically.
           </p>
         </div>
@@ -289,7 +289,7 @@ export default function Index() {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center">
@@ -301,7 +301,7 @@ export default function Index() {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center">
@@ -313,7 +313,7 @@ export default function Index() {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center">
@@ -379,7 +379,7 @@ export default function Index() {
                     <h4 className="font-medium mb-3">Search ({searchResults.length})</h4>
                     <div className="space-y-2">
                       {searchResults.map((patient) => (
-                        <div  
+                        <div
                           key={patient.id}
                           className="bg-white border rounded-lg p-3 cursor-pointer hover:border-primary transition-colors"
                           onClick={() => handleSelectPatient(patient.id)}
@@ -408,7 +408,7 @@ export default function Index() {
                           {selectedPatient.firstName} {selectedPatient.lastName}
                         </h3>
                         <p className="text-gray-600">
-                          DOB: {new Date(selectedPatient.dateOfBirth).toLocaleDateString()} | 
+                          DOB: {new Date(selectedPatient.dateOfBirth).toLocaleDateString()} |
                           Blood Group: {selectedPatient.bloodGroup || "N/A"}
                         </p>
                         <p className="text-gray-600 flex items-center mt-1">
@@ -436,7 +436,7 @@ export default function Index() {
                       <h4 className="font-medium">
                         Medical Records ({patientRecords.length})
                       </h4>
-                      
+
                       {patientRecords.length === 0 ? (
                         <p className="text-gray-500 text-sm">No medical records found</p>
                       ) : (
@@ -447,8 +447,8 @@ export default function Index() {
                                 <div className="flex items-center space-x-2 mb-2">
                                   <h5 className="font-medium">{record.examination_type}</h5>
                                   <Badge className={getStatusColor(record.diagnosis)}>
-                                    {record.diagnosis.length > 30 
-                                      ? "Review Required" 
+                                    {record.diagnosis.length > 30
+                                      ? "Review Required"
                                       : "Recorded"}
                                   </Badge>
                                 </div>
@@ -555,47 +555,66 @@ export default function Index() {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                  {/* Diagnosis Analytics */}
                   <div className="space-y-4">
                     <h4 className="font-medium">Common Diagnoses (This Month)</h4>
+
                     {diagnosisAnalytics.length === 0 ? (
                       <p className="text-gray-500 text-sm">No data available</p>
                     ) : (
-                      diagnosisAnalytics.map((item, index) => (
-                        <div key={index} className="space-y-2">
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm">{item.examination_type}</span>
-                            <span className="text-sm font-medium">{item.percentage.toFixed(1)}%</span>
+                      diagnosisAnalytics.map((item, index) => {
+                        const percentage = Number(item.percentage) || 0;
+
+                        return (
+                          <div key={index} className="space-y-2">
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm">
+                                {item.examination_type}
+                              </span>
+                              <span className="text-sm font-medium">
+                                {percentage.toFixed(1)}%
+                              </span>
+                            </div>
+
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div
+                                className="bg-primary h-2 rounded-full"
+                                style={{ width: `${percentage}%` }}
+                              />
+                            </div>
                           </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div 
-                              className="bg-primary h-2 rounded-full" 
-                              style={{width: `${item.percentage}%`}}
-                            ></div>
-                          </div>
-                        </div>
-                      ))
+                        );
+                      })
                     )}
                   </div>
-                  
+
+                  {/* Cost Savings */}
                   <div className="space-y-4">
                     <h4 className="font-medium">Cost Savings Impact</h4>
+
                     <div className="bg-green-50 p-4 rounded-lg">
                       <p className="text-2xl font-bold text-green-700">
-                        ₹{stats.moneySaved.toLocaleString('en-IN')}
+                        ₹{Number(stats.moneySaved || 0).toLocaleString("en-IN")}
                       </p>
                       <p className="text-sm text-green-600">
                         Total money saved by avoiding duplicate tests
                       </p>
                     </div>
+
                     <div className="bg-blue-50 p-4 rounded-lg">
-                      <p className="text-2xl font-bold text-blue-700">{stats.avoidedCheckups}</p>
+                      <p className="text-2xl font-bold text-blue-700">
+                        {Number(stats.avoidedCheckups || 0)}
+                      </p>
                       <p className="text-sm text-blue-600">
                         Unnecessary checkups prevented
                       </p>
                     </div>
                   </div>
+
                 </div>
               </CardContent>
+
             </Card>
           </TabsContent>
         </Tabs>
