@@ -26,6 +26,129 @@ const authenticatePatient = (req, res, next) => {
     });
   }
 };
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
+
+// Configure multer for profile image upload
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadDir = path.join(__dirname, "../uploads/patients_profile");
+    
+    // Create directory if it doesn't exist
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    // Create unique filename: patient_[id]_[timestamp].[ext]
+    const uniqueName = `patient_${req.params.patientId}_${Date.now()}${path.extname(file.originalname)}`;
+    cb(null, uniqueName);
+  }
+});
+
+// File filter - only allow images
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = /jpeg|jpg|png|gif|webp/;
+  const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+  const mimetype = allowedTypes.test(file.mimetype);
+
+  if (mimetype && extname) {
+    return cb(null, true);
+  } else {
+    cb(new Error("Only image files (JPEG, JPG, PNG, GIF, WEBP) are allowed!"));
+  }
+};
+
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: fileFilter
+});
+
+router.post("/:patientId/upload-profile", upload.single("profileImage"), async (req, res) => {
+  try {
+    const patientId = req.params.patientId;
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "No file uploaded"
+      });
+    }
+
+    // Get the file path to store in database
+    const profileImagePath = `/uploads/patients_profile/${req.file.filename}`;
+
+    // Delete old profile image if exists
+    const getOldImageSql = "SELECT profile_img FROM patients WHERE id = ?";
+    db.query(getOldImageSql, [patientId], (err, results) => {
+      if (err) {
+        console.error("Error checking old image:", err);
+      } else if (results.length > 0 && results[0].profile_img) {
+        const oldImagePath = path.join(__dirname, "..", results[0].profile_img);
+        if (fs.existsSync(oldImagePath)) {
+          fs.unlinkSync(oldImagePath);
+        }
+      }
+    });
+
+    // Update database with new image path
+    const updateSql = "UPDATE patients SET profile_img = ? WHERE id = ?";
+    db.query(updateSql, [profileImagePath, patientId], (err, result) => {
+      if (err) {
+        console.error("Error updating profile image:", err);
+        return res.status(500).json({
+          success: false,
+          message: "Error updating profile image in database"
+        });
+      }
+
+      res.json({
+        success: true,
+        message: "Profile image uploaded successfully",
+        profileImagePath: profileImagePath
+      });
+    });
+
+  } catch (error) {
+    console.error("Upload error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Error uploading profile image"
+    });
+  }
+});
+
+// Get profile image endpoint
+router.get("/:patientId/profile-image", (req, res) => {
+  const patientId = req.params.patientId;
+
+  const sql = "SELECT profile_img FROM patients WHERE id = ?";
+  db.query(sql, [patientId], (err, results) => {
+    if (err) {
+      console.error("Error fetching profile image:", err);
+      return res.status(500).json({
+        success: false,
+        message: "Error fetching profile image"
+      });
+    }
+
+    if (results.length === 0 || !results[0].profile_img) {
+      return res.status(404).json({
+        success: false,
+        message: "No profile image found"
+      });
+    }
+
+    res.json({
+      success: true,
+      profileImagePath: results[0].profile_img
+    });
+  });
+});
 
 // Patient Registration API
 router.post(

@@ -343,7 +343,7 @@ export default function Index() {
                   Search for existing patients to view their health history and avoid duplicate diagnoses
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="max-h-60 overflow-y-auto">
                 <div className="flex space-x-2">
                   <Input
                     placeholder="Enter patient name, ID, phone, or email..."
@@ -357,12 +357,12 @@ export default function Index() {
                     <Search className="w-4 h-4 mr-2" />
                     {loading ? "Searching..." : "Search"}
                   </Button>
-                  <Link to="/patient/register">
+                  {/* <Link to="/patient/register">
                     <Button variant="outline">
                       <Plus className="w-4 h-4 mr-2" />
                       New Patient
                     </Button>
-                  </Link>
+                  </Link> */}
                 </div>
 
                 {/* Error Message */}
@@ -376,10 +376,10 @@ export default function Index() {
                 {/* Search Results List */}
                 {searchResults.length > 0 && (
                   <div className="border rounded-lg p-4 bg-gray-50">
-                    <h4 className="font-medium mb-3">Search Results ({searchResults.length})</h4>
+                    <h4 className="font-medium mb-3">Search ({searchResults.length})</h4>
                     <div className="space-y-2">
                       {searchResults.map((patient) => (
-                        <div
+                        <div  
                           key={patient.id}
                           className="bg-white border rounded-lg p-3 cursor-pointer hover:border-primary transition-colors"
                           onClick={() => handleSelectPatient(patient.id)}
@@ -426,10 +426,10 @@ export default function Index() {
                           </p>
                         )}
                       </div>
-                      <Button variant="outline" size="sm">
+                      {/* <Button variant="outline" size="sm">
                         <Download className="w-4 h-4 mr-2" />
                         Export Records
-                      </Button>
+                      </Button> */}
                     </div>
 
                     <div className="space-y-3">

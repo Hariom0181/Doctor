@@ -137,30 +137,54 @@ export default function DoctorDashboard() {
   const [isLoadingRecordsCount, setIsLoadingRecordsCount] = useState(true);
   const [doctorData, setDoctorData] = useState(null);
   const [loading, setLoading] = useState(true);
-  
+
+  const [showImageUpload, setShowImageUpload] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+  const [imageUploadError, setImageUploadError] = useState<string | null>(null);
+
 
   // Your existing useState declarations
   useEffect(() => {
-    const loadDoctorData = () => {
+    const loadDoctorData = async () => {
       try {
         const storedDoctorData = localStorage.getItem('doctorData');
         if (storedDoctorData) {
           const parsedData = JSON.parse(storedDoctorData);
 
-          console.log("Loading doctor data:", parsedData);
+          // console.log("Loading doctor data:", parsedData);
 
-          setDoctorData({
+          // setDoctorData({
+          //   id: parsedData.id,
+          //   name: `${parsedData.firstName} ${parsedData.lastName}`,
+          //   firstName: parsedData.firstName,
+          //   lastName: parsedData.lastName,
+          //   email: parsedData.email,
+          //   phone: parsedData.phone,
+          //   specialization: parsedData.specialization,
+          //   currentHospital: parsedData.current_hospital,
+          //   licenseNumber: parsedData.licenseNumber,
+          //   profilePicture: parsedData.profilePicture
+          // });
+          const transformedData = {
             id: parsedData.id,
-            name: `${parsedData.firstName} ${parsedData.lastName}`,
+            name: `${parsedData.firstName} ${parsedData.lastName} `,
             firstName: parsedData.firstName,
             lastName: parsedData.lastName,
             email: parsedData.email,
             phone: parsedData.phone,
             specialization: parsedData.specialization,
-            currentHospital: parsedData.current_hospital,
+            cuurentHospital: parsedData.current_hospital,
             licenseNumber: parsedData.licenseNumber,
-            profilePicture: parsedData.profilePicture || "/api/placeholder/64/64",
-          });
+            profilePicture: parsedData.profilePicture
+          }
+
+          setDoctorData(transformedData);
+
+          if (parsedData.id) {
+            await loadProfileImage(parsedData.id);
+          }
+
         } else {
           console.warn('No Doctor data found in localStorage');
         }
@@ -173,6 +197,10 @@ export default function DoctorDashboard() {
 
     loadDoctorData();
   }, []);
+
+
+
+
   useEffect(() => {
     if (activeTab === "records") {
       fetchMedicalRecords();
@@ -364,7 +392,7 @@ export default function DoctorDashboard() {
     return `HMS${year}${month}${String(record.id).padStart(3, '0')}`;
   };
 
-  
+
   // Function to add/update health metrics
   const handleAddHealthMetrics = async () => {
     if (!newHealthMetrics.patientId || !newHealthMetrics.metricType) {
@@ -601,6 +629,66 @@ export default function DoctorDashboard() {
   };
 
 
+  // doctor profile image 
+  const loadProfileImage = async (doctorID: number) => {
+    try {
+      const imageUrl = await doctorApiService.getDoctorProfileImage(doctorID);
+      if (imageUrl) {
+        setProfileImageUrl(imageUrl);
+      }
+    } catch (error) {
+      console.error('Error loading profile image:', error);
+    }
+  };
+
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      setImageUploadError('Please upload a valid image file (JPEG, PNG, GIF, or WebP)');
+      return;
+    }
+
+    // Validate file size (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setImageUploadError('Image size must be less than 5MB');
+      return;
+    }
+
+    setUploadingImage(true);
+    setImageUploadError(null);
+
+    try {
+      const result = await doctorApiService.uploadDoctorProfileImage(doctorData.id, file);
+
+      if (result.success) {
+        // Update profile image URL
+        const newImageUrl = `http://localhost:5000${result.profileImagePath}`;
+        setProfileImageUrl(newImageUrl);
+
+        // Update patient data
+        setDoctorData({
+          ...doctorData,
+          profilePicture: newImageUrl
+        });
+
+        console.log('✅ Profile image uploaded successfully');
+      }
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      setImageUploadError(error.message || 'Failed to upload image');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+
+
+
+
 
 
   // Validate required fields based on metric type
@@ -625,12 +713,12 @@ export default function DoctorDashboard() {
 
   const filteredPatients = linkedPatients.filter(patient => {
     if (!searchQuery.trim()) return true; // Show all if no search query
-    
+
     const query = searchQuery.toLowerCase();
     return patient.name.toLowerCase().includes(query) ||
-           patient.id.toString().includes(query) || // Convert ID to string first
-           (patient.condition && patient.condition.toLowerCase().includes(query)) ||
-           (patient.bloodGroup && patient.bloodGroup.toLowerCase().includes(query));
+      patient.id.toString().includes(query) || // Convert ID to string first
+      (patient.condition && patient.condition.toLowerCase().includes(query)) ||
+      (patient.bloodGroup && patient.bloodGroup.toLowerCase().includes(query));
   });
 
   return (
@@ -760,20 +848,63 @@ export default function DoctorDashboard() {
         ) : (
           <div className="mb-8">
             <div className="flex items-center justify-between">
+
+
+
               <div className="flex items-center space-x-4">
 
 
 
-
-                <Avatar className="w-16 h-16">
-                <AvatarImage
-                    src={doctorData.profilePicture}
-                    alt={doctorData.name}
+                <div className="relative inline-block group">
+                  {/* Hidden file input */}
+                  <input
+                    type="file"
+                    id="profile-upload"
+                    className="hidden"
+                    accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                    onChange={handleImageUpload}
+                    disabled={uploadingImage}
                   />
-                  <AvatarFallback>
-                    {doctorData.firstName?.charAt(0) || 'D'}{doctorData.lastName?.charAt(0) || 'U'}
-                  </AvatarFallback>
-                </Avatar>
+
+                  {/* Avatar with upload label */}
+                  <label
+                    htmlFor="profile-upload"
+                    className="cursor-pointer block"
+                  >
+                    <Avatar className="w-20 h-20 border-4 border-white shadow-lg">
+                      {profileImageUrl ? (
+                        <AvatarImage
+                          src={profileImageUrl}
+                          alt={`${doctorData.firstName} ${doctorData.lastName}`}
+                          className="object-cover"
+                        />
+                      ) : (
+                        <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-600 text-white text-2xl font-semibold">
+                          {doctorData.firstName.charAt(0)}{doctorData.lastName.charAt(0)}
+                        </AvatarFallback>
+                      )}
+                    </Avatar>
+
+                    {/* Camera overlay on hover */}
+                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-60 rounded-full flex items-center justify-center transition-all duration-200">
+                      <Camera className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+
+                    {/* Upload progress indicator */}
+                    {uploadingImage && (
+                      <div className="absolute inset-0 bg-black bg-opacity-70 rounded-full flex items-center justify-center">
+                        <Loader2 className="w-6 h-6 text-white animate-spin" />
+                      </div>
+                    )}
+                  </label>
+
+                  {/* Add Photo text when no image */}
+                  {!profileImageUrl && !uploadingImage && (
+                    <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white text-xs px-2 py-1 rounded-full whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
+                      Add Photo
+                    </div>
+                  )}
+                </div>
 
 
 
@@ -841,6 +972,7 @@ export default function DoctorDashboard() {
 
 
                   <div className="space-y-4">
+
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>Patient</Label>
@@ -873,6 +1005,8 @@ export default function DoctorDashboard() {
                         </Select>
                       </div>
                     </div>
+
+                    
                     <div className="space-y-2">
                       <Label>Diagnosis</Label>
                       <Textarea
@@ -935,6 +1069,11 @@ export default function DoctorDashboard() {
 
                 </DialogContent>
               </Dialog>
+
+
+
+
+
               <Dialog open={isPrescriptionOpen} onOpenChange={setIsPrescriptionOpen}>
                 <DialogTrigger asChild>
                   <Button variant="outline" onClick={(e) => {
@@ -1466,22 +1605,22 @@ export default function DoctorDashboard() {
                     <div className="space-y-4">
                       {filteredPatients.length === 0 ? (
                         <div className="text-center py-8 text-gray-500">
-                        <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                        <p>No patients found</p>
-                        <div className="text-sm">
-                          {searchQuery ? 'Try adjusting your search terms' : 'No patients are currently linked to your account'}
+                          <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                          <p>No patients found</p>
+                          <div className="text-sm">
+                            {searchQuery ? 'Try adjusting your search terms' : 'No patients are currently linked to your account'}
+                          </div>
+                          {searchQuery && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setSearchQuery('')}
+                              className="mt-2"
+                            >
+                              Clear search
+                            </Button>
+                          )}
                         </div>
-                        {searchQuery && (
-                          <Button
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => setSearchQuery('')}
-                            className="mt-2"
-                          >
-                            Clear search
-                          </Button>
-                        )}
-                      </div>
                       ) : (
                         filteredPatients.map((patient) => (
                           <div key={patient.id} className="border rounded-lg p-4 bg-white">

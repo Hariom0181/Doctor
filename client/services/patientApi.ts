@@ -131,7 +131,7 @@ class PatientApiService {
   
   async getMedicalRecords(patientId: string): Promise<PatientMedicalRecord[]> {
     try {
-      console.log('🏥 Fetching patient medical records for:', patientId);
+      // console.log('🏥 Fetching patient medical records for:', patientId);
       
       const response = await fetch(`${API_BASE_URL}/patients/${patientId}/medical-records`, {
         method: 'GET',
@@ -145,7 +145,7 @@ class PatientApiService {
       }
   
       const result: ApiResponse<PatientMedicalRecord[]> = await response.json();
-      console.log('📄 Medical records result:', result);
+      // console.log('📄 Medical records result:', result);
       
       if (!result.success) {
         throw new Error(result.message);
@@ -180,7 +180,7 @@ class PatientApiService {
       }
 
       const result: ApiResponse<AvailableDoctor[]> = await response.json();
-      console.log('📄 API Response data:', result);
+      // console.log('📄 API Response data:', result);
       
       if (!result.success) {
         throw new Error(result.message);
@@ -237,6 +237,69 @@ class PatientApiService {
     } catch (error) {
       console.error('Error fetching health metrics:', error);
       throw error;
+    }
+  }
+  // Add these methods inside the PatientApiService class (after getHealthMetrics method)
+
+  async uploadProfileImage(patientId: number, imageFile: File): Promise<{ success: boolean; profileImagePath: string }> {
+    try {
+      const formData = new FormData();
+      formData.append('profileImage', imageFile);
+
+      const token = localStorage.getItem('PatientToken');
+      
+      const response = await fetch(`${API_BASE_URL}/patients/${patientId}/upload-profile`, {
+        method: 'POST',
+        headers: {
+          ...(token && { Authorization: `Bearer ${token}` })
+          // Don't set Content-Type for FormData - browser will set it automatically with boundary
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to upload image');
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.message);
+      }
+
+      return {
+        success: result.success,
+        profileImagePath: result.profileImagePath
+      };
+    } catch (error) {
+      console.error('Error uploading profile image:', error);
+      throw error;
+    }
+  }
+
+  async getProfileImage(patientId: number): Promise<string | null> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/patients/${patientId}/profile-image`);
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          return null; // No profile image found
+        }
+        throw new Error('Failed to fetch profile image');
+      }
+
+      const result = await response.json();
+      
+      if (result.success && result.profileImagePath) {
+        // Return full URL to the image
+        return `http://localhost:5000${result.profileImagePath}`;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error fetching profile image:', error);
+      return null;
     }
   }
 

@@ -173,18 +173,18 @@ export default function PatientDashboard() {
   // Add this state for image handling
   const [showImageUpload, setShowImageUpload] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
-  
+  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+  const [imageUploadError, setImageUploadError] = useState<string | null>(null);
+
   useEffect(() => {
-    const loadPatientData = () => {
+    const loadPatientData = async () => {
       try {
         const storedPatientData = localStorage.getItem('patientData');
         if (storedPatientData) {
           const parsedData = JSON.parse(storedPatientData);
 
-
-
           // Transform the data to match your UI needs
-          setPatientData({
+          const transformedData = {
             id: parsedData.id,
             name: `${parsedData.firstName} ${parsedData.lastName}`,
             firstName: parsedData.firstName,
@@ -193,7 +193,14 @@ export default function PatientDashboard() {
             phone: parsedData.phone,
             address: parsedData.address,
             profilePicture: parsedData.profileImage
-          });
+          };
+
+          setPatientData(transformedData);
+
+          // Load profile image after setting patient data
+          if (parsedData.id) {
+            await loadProfileImage(parsedData.id);
+          }
         } else {
           console.warn('No patient data found in localStorage');
           // Optionally redirect to login
@@ -265,7 +272,62 @@ export default function PatientDashboard() {
   };
 
 
+  // Load profile image function
+  const loadProfileImage = async (patientId: number) => {
+    try {
+      const imageUrl = await patientApiService.getProfileImage(patientId);
+      if (imageUrl) {
+        setProfileImageUrl(imageUrl);
+      }
+    } catch (error) {
+      console.error('Error loading profile image:', error);
+    }
+  };
 
+  // Handle image upload
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      setImageUploadError('Please upload a valid image file (JPEG, PNG, GIF, or WebP)');
+      return;
+    }
+
+    // Validate file size (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setImageUploadError('Image size must be less than 5MB');
+      return;
+    }
+
+    setUploadingImage(true);
+    setImageUploadError(null);
+
+    try {
+      const result = await patientApiService.uploadProfileImage(patientData.id, file);
+
+      if (result.success) {
+        // Update profile image URL
+        const newImageUrl = `http://localhost:5000${result.profileImagePath}`;
+        setProfileImageUrl(newImageUrl);
+
+        // Update patient data
+        setPatientData({
+          ...patientData,
+          profilePicture: newImageUrl
+        });
+
+        console.log('✅ Profile image uploaded successfully');
+      }
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      setImageUploadError(error.message || 'Failed to upload image');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
 
 
   // Backend integration for linked doctors
@@ -320,7 +382,7 @@ export default function PatientDashboard() {
         throw new Error('Patient ID not found');
       }
 
-      console.log('🏥 Fetching medical records for patient:', patientId);
+      // console.log('🏥 Fetching medical records for patient:', patientId);
       const records = await patientApiService.getMedicalRecords(patientId);
 
       console.log('📄 Fetched medical records:', records);
@@ -595,52 +657,137 @@ export default function PatientDashboard() {
         ) : (
           <div className="mb-8">
             <div className="flex items-center justify-between">
+
+
+
               <div className="flex items-center space-x-4">
+                {/* Profile Image Section with Upload */}
+                <div className="relative inline-block group">
+                  {/* Hidden file input */}
+                  <input
+                    type="file"
+                    id="profile-upload"
+                    className="hidden"
+                    accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                    onChange={handleImageUpload}
+                    disabled={uploadingImage}
+                  />
 
+                  {/* Avatar with upload label */}
+                  <label
+                    htmlFor="profile-upload"
+                    className="cursor-pointer block"
+                  >
+                    <Avatar className="w-20 h-20 border-4 border-white shadow-lg">
+                      {profileImageUrl ? (
+                        <AvatarImage
+                          src={profileImageUrl}
+                          alt={`${patientData.firstName} ${patientData.lastName}`}
+                          className="object-cover"
+                        />
+                      ) : (
+                        <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-600 text-white text-2xl font-semibold">
+                          {patientData.firstName.charAt(0)}{patientData.lastName.charAt(0)}
+                        </AvatarFallback>
+                      )}
+                    </Avatar>
 
-                <Avatar className="w-16 h-16">
-                  {patientData.profilePicture && patientData.profilePicture !== "/api/placeholder/64/64" ? (
-                    <>
-                      <AvatarImage
-                        src={patientData.profilePicture}
-                        alt={patientData.name}
-                        className="object-cover"
-                      />
-                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all rounded-full flex items-center justify-center">
-                        <Camera className="w-4 h-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                    {/* Camera overlay on hover */}
+                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-60 rounded-full flex items-center justify-center transition-all duration-200">
+                      <Camera className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+
+                    {/* Upload progress indicator */}
+                    {uploadingImage && (
+                      <div className="absolute inset-0 bg-black bg-opacity-70 rounded-full flex items-center justify-center">
+                        <Loader2 className="w-6 h-6 text-white animate-spin" />
                       </div>
-                    </>
-                  ) : (
-                    <div className="w-full h-full bg-gray-100 border-2 border-dashed border-gray-300 rounded-full flex flex-col items-center justify-center group-hover:border-blue-400 group-hover:bg-blue-50 transition-all">
-                      <Camera className="w-6 h-6 text-gray-400 group-hover:text-blue-500 mb-1" />
-                      <span className="text-xs text-gray-500 group-hover:text-blue-600 font-medium">Add Photo</span>
+                    )}
+                  </label>
+
+                  {/* Add Photo text when no image */}
+                  {!profileImageUrl && !uploadingImage && (
+                    <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white text-xs px-2 py-1 rounded-full whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
+                      Add Photo
                     </div>
                   )}
+                </div>
 
-                  <AvatarFallback className="bg-blue-100 text-blue-800">
-                    {patientData.firstName.charAt(0)}{patientData.lastName.charAt(0)}
-                  </AvatarFallback>
-                </Avatar>
-
-
-
+                {/* Patient Info */}
                 <div>
                   <h1 className="text-3xl font-bold text-gray-900">
-                    Welcome back, {patientData.name}
+                    Welcome, {patientData.name}
                   </h1>
                   <p className="text-gray-600">
                     Patient ID: {generatePatientId(patientData.id)}
                   </p>
+
+                  {/* Error message below patient ID */}
+                  {imageUploadError && (
+                    <p className="text-sm text-red-600 flex items-center mt-1">
+                      <AlertCircle className="w-4 h-4 mr-1" />
+                      {imageUploadError}
+                    </p>
+                  )}
                 </div>
               </div>
-              <Button
+
+
+
+              {/* <Button
                 onClick={() => {
                   alert("Book Appointment\n\nSelect your preferred:\n• Date & Time\n• Doctor specialization\n• Appointment type\n\nYour appointment request will be sent to the healthcare center for confirmation.");
                 }}
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Book Appointment
-              </Button>
+              </Button> */}
+              <div className="flex space-x-3">
+
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button onClick={(e) => {
+                      e.preventDefault();
+                      //futher code 
+                    }}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Book Appointments
+                    </Button>
+                  </DialogTrigger>
+
+                  <DialogContent className="max-w-2xl">
+
+                    <DialogHeader>
+                      <DialogTitle>Add New Medical Record</DialogTitle>
+                      <DialogDescription>
+                        Create a new medical record for a patient
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      
+
+                    </div>
+
+                  </DialogContent>
+
+
+
+
+                </Dialog>
+
+
+
+
+
+
+
+
+
+
+              </div>
+
+
+
             </div>
           </div>
         )}
@@ -1059,9 +1206,9 @@ export default function PatientDashboard() {
                         </form>
                       </DialogContent>
                     </Dialog>
-
+                    {/* This dialogue is used for enabling the patients to add their own health data */}
                     {/* Add Health Data Dialog - Simplified for space */}
-                    <Dialog>
+                    {/* <Dialog>
                       <DialogTrigger asChild>
                         <Button size="sm">
                           <Plus className="w-4 h-4 mr-2" />
@@ -1126,7 +1273,7 @@ export default function PatientDashboard() {
                           </div>
                         </form>
                       </DialogContent>
-                    </Dialog>
+                    </Dialog> */}
                   </div>
                 </div>
               </CardHeader>
@@ -1291,6 +1438,8 @@ export default function PatientDashboard() {
                 </CardContent>
               </Card>
 
+
+
               <Card>
                 <CardHeader>
                   <CardTitle>Book New Appointment</CardTitle>
@@ -1317,6 +1466,9 @@ export default function PatientDashboard() {
                   </div>
                 </CardContent>
               </Card>
+
+
+
             </div>
           </TabsContent>
 

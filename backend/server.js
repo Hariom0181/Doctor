@@ -17,6 +17,8 @@ app.use(cors());
 app.use(bodyParser.json());
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads/patients_profile', express.static(path.join(__dirname, 'uploads/patients_profile')));
+app.use('/uploads/doctors_profile', express.static(path.join(__dirname, 'uploads/doctors_profile')));
 
 // Routes
 app.use("/api/patients", patientRoutes);

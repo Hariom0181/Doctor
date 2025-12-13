@@ -120,6 +120,65 @@ class DoctorApiService {
       throw error;
     }
   }
+  async uploadDoctorProfileImage(doctorId: number, imageFile: File): Promise<{ success: boolean; profileImagePath: string }> {
+    try {
+      const formData = new FormData();
+      formData.append('profileImage', imageFile);
+  
+      const token = localStorage.getItem('DoctorToken'); // Note: DoctorToken not PatientToken
+      
+      const response = await fetch(`${API_BASE_URL}/doctors/${doctorId}/upload-profile`, {
+        method: 'POST',
+        headers: {
+          ...(token && { Authorization: `Bearer ${token}` })
+        },
+        body: formData
+      });
+  
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to upload image');
+      }
+  
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.message);
+      }
+  
+      return {
+        success: result.success,
+        profileImagePath: result.profileImagePath
+      };
+    } catch (error) {
+      console.error('Error uploading profile image:', error);
+      throw error;
+    }
+  }
+  
+  async getDoctorProfileImage(doctorId: number): Promise<string | null> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/doctors/${doctorId}/profile-image`);
+  
+      if (!response.ok) {
+        if (response.status === 404) {
+          return null;
+        }
+        throw new Error('Failed to fetch profile image');
+      }
+  
+      const result = await response.json();
+      
+      if (result.success && result.profileImagePath) {
+        return `http://localhost:5000${result.profileImagePath}`;
+      }
+  
+      return null;
+    } catch (error) {
+      console.error('Error fetching profile image:', error);
+      return null;
+    }
+  }
 
   async logout(): Promise<void> {
     try {
