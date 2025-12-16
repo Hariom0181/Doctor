@@ -157,6 +157,10 @@ export default function PatientDashboard() {
   const [isLoadingRecentRecords, setIsLoadingRecentRecords] = useState(false);
 
   const [upcomingAppointments, setUpcomingAppointments] = useState(INITIAL_UPCOMING_APPOINTMENTS); // <-- Replace with backend: appointments
+  const [appointments, setAppointments] = useState<any[]>([]);
+  const [isLoadingAppointments, setIsLoadingAppointments] = useState(false);
+  const [isAppointmentDialogOpen, setIsAppointmentDialogOpen] = useState(false);
+  const [bookingAppointment, setBookingAppointment] = useState(false);
   const [medications, setMedications] = useState(INITIAL_MEDICATIONS); // <-- Replace with backend: medications
   const [doctorsList, setDoctorsList] = useState(INITIAL_DOCTORS_LIST);
   const [selectedDoctor, setSelectedDoctor] = useState("");
@@ -175,6 +179,15 @@ export default function PatientDashboard() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
   const [imageUploadError, setImageUploadError] = useState<string | null>(null);
+
+  const [appointmentForm, setAppointmentForm] = useState({
+    doctorId: '',
+    appointmentDate: '',
+    appointmentTime: '',
+    appointmentType: '',
+    reason: '',
+    notes: ''
+  });
 
   useEffect(() => {
     const loadPatientData = async () => {
@@ -200,6 +213,7 @@ export default function PatientDashboard() {
           // Load profile image after setting patient data
           if (parsedData.id) {
             await loadProfileImage(parsedData.id);
+            await loadAppointments();
           }
         } else {
           console.warn('No patient data found in localStorage');
@@ -281,6 +295,79 @@ export default function PatientDashboard() {
       }
     } catch (error) {
       console.error('Error loading profile image:', error);
+    }
+  };
+  const openAppointmentDialog = (appointmentType: string) => {
+    setAppointmentForm({
+      ...appointmentForm,
+      appointmentType: appointmentType
+    });
+    setIsAppointmentDialogOpen(true);
+  };
+
+  const handleAppointmentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!patientData?.id) {
+      alert('Patient data not found. Please log in again.');
+      return;
+    }
+
+    if (!appointmentForm.doctorId) {
+      alert('Please select a doctor');
+      return;
+    }
+
+    setBookingAppointment(true);
+
+    try {
+      const result = await patientApiService.bookAppointment({
+        patientId: patientData.id,
+        doctorId: parseInt(appointmentForm.doctorId),
+        appointmentDate: appointmentForm.appointmentDate,
+        appointmentTime: appointmentForm.appointmentTime,
+        appointmentType: appointmentForm.appointmentType,
+        reason: appointmentForm.reason,
+        notes: appointmentForm.notes
+      });
+
+      if (result.success) {
+        alert('✅ Appointment booked successfully! You will receive confirmation soon.');
+
+        // Reset form
+        setAppointmentForm({
+          doctorId: '',
+          appointmentDate: '',
+          appointmentTime: '',
+          appointmentType: '',
+          reason: '',
+          notes: ''
+        });
+        // Close dialog
+        setIsAppointmentDialogOpen(false);
+
+        // Reload appointments
+        loadAppointments();
+      }
+    } catch (error) {
+      console.error('Error booking appointment:', error);
+      alert('❌ Failed to book appointment. Please try again.');
+    } finally {
+      setBookingAppointment(false);
+    }
+  };
+
+  const loadAppointments = async () => {
+    if (!patientData?.id) return;
+
+    setIsLoadingAppointments(true);
+    try {
+      const appointmentsData = await patientApiService.getPatientAppointments(patientData.id);
+      setAppointments(appointmentsData);
+    } catch (error) {
+      console.error('Error loading appointments:', error);
+    } finally {
+      setIsLoadingAppointments(false);
     }
   };
 
@@ -744,46 +831,176 @@ export default function PatientDashboard() {
               </Button> */}
               <div className="flex space-x-3">
 
-                <Dialog>
+                <Dialog open={isAppointmentDialogOpen} onOpenChange={setIsAppointmentDialogOpen}>
                   <DialogTrigger asChild>
-                    <Button onClick={(e) => {
-                      e.preventDefault();
-                      //futher code 
-                    }}>
+                    <Button onClick={() => setIsAppointmentDialogOpen(true)}>
                       <Plus className="w-4 h-4 mr-2" />
-                      Book Appointments
+                      Book Appointment
                     </Button>
                   </DialogTrigger>
 
-                  <DialogContent className="max-w-2xl">
-
+                  <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
-                      <DialogTitle>Add New Medical Record</DialogTitle>
+                      <DialogTitle>Book New Appointment</DialogTitle>
                       <DialogDescription>
-                        Create a new medical record for a patient
+                        Schedule an appointment with your doctor
                       </DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-4">
-                      
 
-                    </div>
+                    <form onSubmit={handleAppointmentSubmit} className="space-y-6">
+                      {/* Doctor Selection */}
+                      <div className="space-y-2">
+                        <Label htmlFor="appointment-doctor">
+                          Select Doctor <span className="text-red-500">*</span>
+                        </Label>
+                        <Select
+                          value={appointmentForm.doctorId}
+                          onValueChange={(value) => setAppointmentForm({ ...appointmentForm, doctorId: value })}
+                          required
+                        >
+                          <SelectTrigger id="appointment-doctor">
+                            <SelectValue placeholder="Choose a doctor" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {linkedDoctors.length > 0 ? (
+                              linkedDoctors.map((doctor) => (
+                                <SelectItem key={doctor.id} value={doctor.id.toString()}>
+                                  {doctor.name} - {doctor.specialization}
+                                </SelectItem>
+                              ))
+                            ) : (
+                              <SelectItem value="none" disabled>
+                                No linked doctors. Please link a doctor first.
+                              </SelectItem>
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
 
+                      {/* Appointment Type */}
+                      <div className="space-y-2">
+                        <Label htmlFor="appointment-type">
+                          Appointment Type <span className="text-red-500">*</span>
+                        </Label>
+                        <Select
+                          value={appointmentForm.appointmentType}
+                          onValueChange={(value) => setAppointmentForm({ ...appointmentForm, appointmentType: value })}
+                          required
+                        >
+                          <SelectTrigger id="appointment-type">
+                            <SelectValue placeholder="Select appointment type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="General Checkup">🩺 General Checkup</SelectItem>
+                            <SelectItem value="Follow-up Visit">📋 Follow-up Visit</SelectItem>
+                            <SelectItem value="Specialist Consultation">👨‍⚕️ Specialist Consultation</SelectItem>
+                            <SelectItem value="Lab Tests">🧪 Lab Tests</SelectItem>
+                            <SelectItem value="Vaccination">💉 Vaccination</SelectItem>
+                            <SelectItem value="Emergency">🚨 Emergency</SelectItem>
+                            <SelectItem value="Other">📄 Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Date and Time */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="appointment-date">
+                            Appointment Date <span className="text-red-500">*</span>
+                          </Label>
+                          <Input
+                            id="appointment-date"
+                            type="date"
+                            min={new Date().toISOString().split('T')[0]}
+                            value={appointmentForm.appointmentDate}
+                            onChange={(e) => setAppointmentForm({ ...appointmentForm, appointmentDate: e.target.value })}
+                            required
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="appointment-time">
+                            Preferred Time <span className="text-red-500">*</span>
+                          </Label>
+                          <Input
+                            id="appointment-time"
+                            type="time"
+                            value={appointmentForm.appointmentTime}
+                            onChange={(e) => setAppointmentForm({ ...appointmentForm, appointmentTime: e.target.value })}
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      {/* Reason */}
+                      <div className="space-y-2">
+                        <Label htmlFor="appointment-reason">
+                          Reason for Visit <span className="text-red-500">*</span>
+                        </Label>
+                        <Textarea
+                          id="appointment-reason"
+                          placeholder="Describe your symptoms or reason for the appointment..."
+                          value={appointmentForm.reason}
+                          onChange={(e) => setAppointmentForm({ ...appointmentForm, reason: e.target.value })}
+                          className="min-h-[100px]"
+                          required
+                        />
+                      </div>
+
+                      {/* Additional Notes */}
+                      <div className="space-y-2">
+                        <Label htmlFor="appointment-notes">
+                          Additional Notes (Optional)
+                        </Label>
+                        <Textarea
+                          id="appointment-notes"
+                          placeholder="Any other information the doctor should know..."
+                          value={appointmentForm.notes}
+                          onChange={(e) => setAppointmentForm({ ...appointmentForm, notes: e.target.value })}
+                          className="min-h-[80px]"
+                        />
+                      </div>
+
+                      {/* Submit Buttons */}
+                      <div className="flex gap-3 pt-4">
+                        <Button
+                          type="submit"
+                          className="flex-1"
+                          disabled={bookingAppointment}
+                        >
+                          {bookingAppointment ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Booking...
+                            </>
+                          ) : (
+                            <>
+                              <Calendar className="w-4 h-4 mr-2" />
+                              Book Appointment
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="flex-1"
+                          onClick={() => {
+                            setAppointmentForm({
+                              doctorId: '',
+                              appointmentDate: '',
+                              appointmentTime: '',
+                              appointmentType: '',
+                              reason: '',
+                              notes: ''
+                            });
+                          }}
+                        >
+                          Reset
+                        </Button>
+                      </div>
+                    </form>
                   </DialogContent>
-
-
-
-
                 </Dialog>
-
-
-
-
-
-
-
-
-
-
               </div>
 
 
@@ -1447,19 +1664,35 @@ export default function PatientDashboard() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-4">
-                    <Button className="w-full justify-start" variant="outline">
+                    <Button
+                      className="w-full justify-start"
+                      variant="outline"
+                      onClick={() => openAppointmentDialog('General Checkup')}
+                    >
                       <Calendar className="w-4 h-4 mr-2" />
                       General Checkup
                     </Button>
-                    <Button className="w-full justify-start" variant="outline">
+                    <Button
+                      className="w-full justify-start"
+                      variant="outline"
+                      onClick={() => openAppointmentDialog('Lab Tests')}
+                    >
                       <TestTube className="w-4 h-4 mr-2" />
                       Lab Tests
                     </Button>
-                    <Button className="w-full justify-start" variant="outline">
+                    <Button
+                      className="w-full justify-start"
+                      variant="outline"
+                      onClick={() => openAppointmentDialog('Specialist Consultation')}
+                    >
                       <Heart className="w-4 h-4 mr-2" />
                       Specialist Consultation
                     </Button>
-                    <Button className="w-full justify-start" variant="outline">
+                    <Button
+                      className="w-full justify-start"
+                      variant="outline"
+                      onClick={() => openAppointmentDialog('Follow-up Visit')}
+                    >
                       <Clipboard className="w-4 h-4 mr-2" />
                       Follow-up Visit
                     </Button>

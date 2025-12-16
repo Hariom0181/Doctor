@@ -741,8 +741,8 @@ router.get("/health-metrics", authenticatePatient, async (req, res) => {
         });
       }
 
-      console.log("Raw metrics from database:", metricsResults);
-      console.log("Number of raw metrics:", metricsResults.length);
+      // console.log("Raw metrics from database:", metricsResults);
+      // console.log("Number of raw metrics:", metricsResults.length);
 
       // If no metrics found, return empty array but with success
       if (metricsResults.length === 0) {
@@ -835,7 +835,7 @@ router.get('/:patientId/medical-records', authenticatePatient, async (req, res) 
       });
     }
 
-    console.log(`Fetching medical records for authenticated patient: ${patientId}`);
+    // console.log(`Fetching medical records for authenticated patient: ${patientId}`);
 
     // Query to get medical records with doctor information
     const query = `

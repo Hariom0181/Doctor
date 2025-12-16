@@ -7,7 +7,7 @@ const dotenv = require('dotenv');
 const patientRoutes = require("./routes/patientRoutes");
 const doctorRoutes = require("./routes/doctorRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
-
+const appointmentRoutes = require("./routes/appointmentRoutes");
 
 dotenv.config();
 const app = express();
@@ -19,6 +19,8 @@ app.use(bodyParser.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/uploads/patients_profile', express.static(path.join(__dirname, 'uploads/patients_profile')));
 app.use('/uploads/doctors_profile', express.static(path.join(__dirname, 'uploads/doctors_profile')));
+app.use("/api/appointments", appointmentRoutes);
+
 
 // Routes
 app.use("/api/patients", patientRoutes);

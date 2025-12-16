@@ -49,6 +49,19 @@ export interface PatientMedicalRecord {
   createdAt: string;
   updatedAt?: string;
 }
+export interface Appointment {
+  id: number;
+  appointment_date: string;
+  appointment_time: string;
+  appointment_type: string;
+  status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
+  reason?: string;
+  notes?: string;
+  doctor_name: string;
+  specialization: string;
+  current_hospital: string;
+  created_at: string;
+}
 export interface AvailableDoctor {
   id: number;
   name: string;
@@ -315,6 +328,87 @@ class PatientApiService {
     });
 
     return Array.from(latestMetrics.values());
+  }
+
+  // booking appointments
+  async bookAppointment(appointmentData: {
+    patientId: number;
+    doctorId: number;
+    appointmentDate: string;
+    appointmentTime: string;
+    appointmentType: string;
+    reason?: string;
+    notes?: string;
+  }): Promise<{ success: boolean; appointmentId: number }> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/appointments/create`, {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify(appointmentData)
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to book appointment');
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.message);
+      }
+
+      return {
+        success: result.success,
+        appointmentId: result.appointmentId
+      };
+    } catch (error) {
+      console.error('Error booking appointment:', error);
+      throw error;
+    }
+  }
+
+  async getPatientAppointments(patientId: number): Promise<any[]> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/appointments/patient/${patientId}`, {
+        method: 'GET',
+        headers: this.getAuthHeaders()
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch appointments');
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.message);
+      }
+
+      return result.data;
+    } catch (error) {
+      console.error('Error fetching appointments:', error);
+      throw error;
+    }
+  }
+
+  async cancelAppointment(appointmentId: number): Promise<boolean> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/appointments/${appointmentId}`, {
+        method: 'DELETE',
+        headers: this.getAuthHeaders()
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to cancel appointment');
+      }
+
+      const result = await response.json();
+      return result.success;
+    } catch (error) {
+      console.error('Error cancelling appointment:', error);
+      throw error;
+    }
   }
 }
 
