@@ -156,7 +156,7 @@ export default function PatientDashboard() {
   const [recentRecords, setRecentRecords] = useState([]);
   const [isLoadingRecentRecords, setIsLoadingRecentRecords] = useState(false);
 
-  const [upcomingAppointments, setUpcomingAppointments] = useState(INITIAL_UPCOMING_APPOINTMENTS); // <-- Replace with backend: appointments
+  const [upcomingAppointments, setUpcomingAppointments] = useState([]);// <-- Replace with backend: appointments
   const [appointments, setAppointments] = useState<any[]>([]);
   const [isLoadingAppointments, setIsLoadingAppointments] = useState(false);
   const [isAppointmentDialogOpen, setIsAppointmentDialogOpen] = useState(false);
@@ -363,11 +363,70 @@ export default function PatientDashboard() {
     setIsLoadingAppointments(true);
     try {
       const appointmentsData = await patientApiService.getPatientAppointments(patientData.id);
-      setAppointments(appointmentsData);
+
+      // Filter only future appointments (today and onwards)
+      const now = new Date();
+      now.setHours(0, 0, 0, 0); // Start of today
+
+      const upcoming = appointmentsData.filter(apt => {
+        const aptDate = new Date(apt.appointment_date);
+        return aptDate >= now && apt.status !== 'cancelled' && apt.status !== 'completed';
+      });
+
+      setUpcomingAppointments(upcoming);
+      setAppointments(appointmentsData); // Keep all for history
     } catch (error) {
       console.error('Error loading appointments:', error);
     } finally {
       setIsLoadingAppointments(false);
+    }
+  };
+  const handleCancelAppointment = async (appointmentId: number) => {
+    const confirmCancel = window.confirm('Are you sure you want to cancel this appointment?');
+
+    if (!confirmCancel) return;
+
+    try {
+      const success = await patientApiService.cancelAppointment(appointmentId);
+
+      if (success) {
+        alert('✅ Appointment cancelled successfully');
+        await loadAppointments(); // Reload appointments
+      } else {
+        alert('❌ Failed to cancel appointment');
+      }
+    } catch (error) {
+      console.error('Error cancelling appointment:', error);
+      alert('❌ Error cancelling appointment');
+    }
+  };
+  const getAppointmentStatusBadge = (status: string) => {
+    switch (status) {
+      case 'confirmed':
+        return 'default'; // Blue
+      case 'pending':
+        return 'secondary'; // Gray
+      case 'completed':
+        return 'outline'; // Outline
+      case 'cancelled':
+        return 'destructive'; // Red
+      default:
+        return 'secondary';
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return '⏳ Pending';
+      case 'confirmed':
+        return '✅ Confirmed';
+      case 'completed':
+        return '✔️ Completed';
+      case 'cancelled':
+        return '❌ Cancelled';
+      default:
+        return status;
     }
   };
 
@@ -1192,46 +1251,76 @@ export default function PatientDashboard() {
                   ) : (
                     <div className="text-center py-4 text-gray-500">No recent records available</div>
                   )}
-                  <Button variant="outline" className="w-full">
+                  {/* <Button variant="outline" className="w-full">
                     View All Records
-                  </Button>
+                  </Button> */}
                 </CardContent>
               </Card>
 
               {/* Upcoming Appointments */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Calendar className="w-5 h-5 mr-2" />
-                    Upcoming Appointments
-                  </CardTitle>
-                  <CardDescription>Your scheduled medical appointments</CardDescription>
-                </CardHeader>
-                <CardContent className="max-h-60 overflow-y-auto">
-                  {upcomingAppointments.map((appointment) => (
-                    <div key={appointment.id} className="border rounded-lg p-4 bg-white">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h4 className="font-medium">{appointment.type}</h4>
-                          <p className="text-sm text-gray-600">{appointment.doctor}</p>
-                          <p className="text-sm text-gray-600">{appointment.hospital}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm font-medium">{new Date(appointment.date).toLocaleDateString()}</p>
-                          <p className="text-sm text-gray-500">{appointment.time}</p>
-                          <Badge variant={appointment.status === "confirmed" ? "default" : "secondary"}>
-                            {appointment.status}
-                          </Badge>
+              <CardContent className="max-h-60 overflow-y-auto">
+                {isLoadingAppointments ? (
+                  <div className="text-center py-6">
+                    <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
+                    <p className="text-xs text-gray-500 mt-2">Loading appointments...</p>
+                  </div>
+                ) : upcomingAppointments.length === 0 ? (
+                  <div className="text-center py-6">
+                    <Calendar className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                    <p className="text-sm text-gray-600 mb-3">No upcoming appointments</p>
+                    <Button
+                      size="sm"
+                      onClick={() => setIsAppointmentDialogOpen(true)}
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Book Appointment
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {upcomingAppointments.slice(0, 3).map((appointment) => (
+                      <div key={appointment.id} className="border rounded-lg p-4 bg-white hover:shadow-sm transition-shadow">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <h4 className="font-medium">{appointment.appointment_type}</h4>
+                            <p className="text-sm text-gray-600">{appointment.doctor_name}</p>
+                            <p className="text-sm text-gray-600">{appointment.current_hospital}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-medium">
+                              {new Date(appointment.appointment_date).toLocaleDateString('en-IN', {
+                                month: 'short',
+                                day: 'numeric'
+                              })}
+                            </p>
+                            <p className="text-sm text-gray-500">{appointment.appointment_time}</p>
+                            <Badge
+                              variant={getAppointmentStatusBadge(appointment.status)}
+                              className="mt-1"
+                            >
+                              {getStatusLabel(appointment.status)}
+                            </Badge>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                  <Button className="w-full">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Book New Appointment
-                  </Button>
-                </CardContent>
-              </Card>
+                    ))}
+
+                    {upcomingAppointments.length > 3 && (
+                      <p className="text-xs text-center text-gray-500 pt-2">
+                        +{upcomingAppointments.length - 3} more appointments
+                      </p>
+                    )}
+
+                    <Button
+                      className="w-full mt-3"
+                      variant="outline"
+                      onClick={() => setActiveTab('appointments')}
+                    >
+                      View All Appointments
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
             </div>
 
             {/* Active Medications */}
@@ -1624,34 +1713,90 @@ export default function PatientDashboard() {
                   <CardDescription>Your scheduled visits</CardDescription>
                 </CardHeader>
                 <CardContent className="max-h-60 overflow-y-auto">
-                  {upcomingAppointments.map((appointment) => (
-                    <div key={appointment.id} className="border rounded-lg p-4 bg-white">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex-1">
-                          <h4 className="font-medium">{appointment.type}</h4>
-                          <p className="text-sm text-gray-600 flex items-center mt-1">
-                            <Stethoscope className="w-4 h-4 mr-1" />
-                            {appointment.doctor}
-                          </p>
-                          <p className="text-sm text-gray-600 flex items-center mt-1">
-                            <MapPin className="w-4 h-4 mr-1" />
-                            {appointment.hospital}
-                          </p>
-                          <p className="text-sm text-gray-600 flex items-center mt-1">
-                            <Clock className="w-4 h-4 mr-1" />
-                            {new Date(appointment.date).toLocaleDateString()} at {appointment.time}
-                          </p>
-                        </div>
-                        <Badge variant={appointment.status === "confirmed" ? "default" : "secondary"}>
-                          {appointment.status}
-                        </Badge>
-                      </div>
-                      <div className="flex space-x-2">
-                        <Button variant="outline" size="sm">Reschedule</Button>
-                        <Button variant="outline" size="sm">Cancel</Button>
-                      </div>
+                  {isLoadingAppointments ? (
+                    <div className="text-center py-8">
+                      <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2 text-primary" />
+                      <p className="text-sm text-gray-600">Loading appointments...</p>
                     </div>
-                  ))}
+                  ) : upcomingAppointments.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                      <h3 className="font-medium text-gray-800 mb-2">No Upcoming Appointments</h3>
+                      <p className="text-sm text-gray-600 mb-4">You don't have any scheduled appointments.</p>
+                      <Button
+                        size="sm"
+                        onClick={() => setIsAppointmentDialogOpen(true)}
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Book Appointment
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {upcomingAppointments.map((appointment) => (
+                        <div key={appointment.id} className="border rounded-lg p-4 bg-white hover:shadow-md transition-shadow">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex-1">
+                              <div className="flex items-center space-x-2 mb-2">
+                                <h4 className="font-medium">{appointment.appointment_type}</h4>
+                                <Badge variant={getAppointmentStatusBadge(appointment.status)}>
+                                  {getStatusLabel(appointment.status)}
+                                </Badge>
+                              </div>
+                              <p className="text-sm text-gray-600 flex items-center mt-1">
+                                <Stethoscope className="w-4 h-4 mr-1" />
+                                {appointment.doctor_name}
+                              </p>
+                              <p className="text-sm text-gray-600 flex items-center mt-1">
+                                <MapPin className="w-4 h-4 mr-1" />
+                                {appointment.current_hospital}
+                              </p>
+                              <p className="text-sm text-gray-600 flex items-center mt-1">
+                                <Clock className="w-4 h-4 mr-1" />
+                                {new Date(appointment.appointment_date).toLocaleDateString('en-IN', {
+                                  weekday: 'short',
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric'
+                                })} at {appointment.appointment_time}
+                              </p>
+                              {appointment.reason && (
+                                <p className="text-xs text-gray-500 mt-2 italic">
+                                  Reason: {appointment.reason}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex space-x-2">
+                            {appointment.status === 'pending' || appointment.status === 'confirmed' ? (
+                              <>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  disabled
+                                  className="opacity-50 cursor-not-allowed"
+                                >
+                                  Reschedule
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleCancelAppointment(appointment.id)}
+                                >
+                                  Cancel
+                                </Button>
+                              </>
+                            ) : (
+                              <p className="text-xs text-gray-500">
+                                {appointment.status === 'cancelled' && 'This appointment was cancelled'}
+                                {appointment.status === 'completed' && 'This appointment is completed'}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 

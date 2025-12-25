@@ -410,6 +410,89 @@ class PatientApiService {
       throw error;
     }
   }
+  async uploadPatientDocument(formData: FormData): Promise<{ success: boolean; documentId: number; filePath: string }> {
+    try {
+      const token = localStorage.getItem('PatientToken');
+      
+      const response = await fetch(`${API_BASE_URL}/documents/upload`, {
+        method: 'POST',
+        headers: {
+          ...(token && { Authorization: `Bearer ${token}` })
+          // Don't set Content-Type for FormData
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to upload document');
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.message);
+      }
+
+      return {
+        success: result.success,
+        documentId: result.documentId,
+        filePath: result.filePath
+      };
+    } catch (error) {
+      console.error('Error uploading document:', error);
+      throw error;
+    }
+  }
+
+  async getPatientDocuments(patientId: number): Promise<any[]> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/documents/patient/${patientId}`, {
+        method: 'GET',
+        headers: this.getAuthHeaders()
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch documents');
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.message);
+      }
+
+      return result.data;
+    } catch (error) {
+      console.error('Error fetching documents:', error);
+      throw error;
+    }
+  }
+
+  async deletePatientDocument(documentId: number): Promise<boolean> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/documents/${documentId}`, {
+        method: 'DELETE',
+        headers: this.getAuthHeaders()
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete document');
+      }
+
+      const result = await response.json();
+      return result.success;
+    } catch (error) {
+      console.error('Error deleting document:', error);
+      throw error;
+    }
+  }
+
+
+
+
+
+
 }
 
 export const patientApiService = new PatientApiService();
