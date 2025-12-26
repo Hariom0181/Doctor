@@ -12,6 +12,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Camera, X } from 'lucide-react';
+import {
+
+  // ... existing imports ...
+  ChevronDown,  // ✅ ADD THIS
+  ChevronUp,    // ✅ ADD THIS
+  // ... rest of imports
+} from "lucide-react";
 
 import {
   Heart,
@@ -180,6 +187,22 @@ export default function PatientDashboard() {
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
   const [imageUploadError, setImageUploadError] = useState<string | null>(null);
 
+  // Patient documents state
+  const [patientDocuments, setPatientDocuments] = useState<any[]>([]);
+  const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
+  const [uploadingDocument, setUploadingDocument] = useState(false);
+  const [showAllDoctorRecords, setShowAllDoctorRecords] = useState(false);
+
+  // Document upload form
+  const [documentForm, setDocumentForm] = useState({
+    documentType: '',
+    documentDate: '',
+    hospitalName: '',
+    notes: ''
+  });
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+
   const [appointmentForm, setAppointmentForm] = useState({
     doctorId: '',
     appointmentDate: '',
@@ -188,6 +211,10 @@ export default function PatientDashboard() {
     reason: '',
     notes: ''
   });
+
+
+
+
 
   useEffect(() => {
     const loadPatientData = async () => {
@@ -214,6 +241,7 @@ export default function PatientDashboard() {
           if (parsedData.id) {
             await loadProfileImage(parsedData.id);
             await loadAppointments();
+            await loadPatientDocuments(); 
           }
         } else {
           console.warn('No patient data found in localStorage');
@@ -284,6 +312,156 @@ export default function PatientDashboard() {
   const generatePatientId = (id) => {
     return `HMS${new Date().getFullYear()}${String(id).padStart(4, '0')}`;
   };
+
+  // const fetchPatientDocuments = async () => {
+  //   try {
+  //     setIsLoadingDocuments(true);
+  //     setDocumentsError(null);
+
+  //     if (!patientId) {
+  //       throw new Error("Patient ID not found");
+  //     }
+
+  //     const docs = await patientsApi.getPatientDocuments(patientId);
+  //     setPatientDocuments(docs);
+  //   } catch (err: any) {
+  //     setDocumentsError(err.message || "Failed to load documents");
+  //   } finally {
+  //     setIsLoadingDocuments(false);
+  //   }
+  // };
+  // useEffect(() => {
+  //   fetchPatientDocuments();
+  // }, [patientId]);
+
+
+  // Load patient documents
+  const loadPatientDocuments = async () => {
+    if (!patientData?.id) return;
+
+    setIsLoadingDocuments(true);
+    try {
+      const docs = await patientApiService.getPatientDocuments(patientData.id);
+      setPatientDocuments(docs);
+    } catch (error) {
+      console.error('Error loading documents:', error);
+    } finally {
+      setIsLoadingDocuments(false);
+    }
+  };
+
+  // Handle file selection
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+    if (!validTypes.includes(file.type)) {
+      alert('Please upload PDF or image files only (JPEG, PNG, GIF)');
+      return;
+    }
+
+    // Validate file size (10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      alert('File size must be less than 10MB');
+      return;
+    }
+
+    setSelectedFile(file);
+  };
+
+  // Handle document upload
+  const handleDocumentUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!patientData?.id) {
+      alert('Patient data not found');
+      return;
+    }
+
+    if (!selectedFile) {
+      alert('Please select a file to upload');
+      return;
+    }
+
+    if (!documentForm.documentType || !documentForm.documentDate) {
+      alert('Please fill in document type and date');
+      return;
+    }
+
+    setUploadingDocument(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('document', selectedFile);
+      formData.append('patientId', patientData.id.toString());
+      formData.append('documentType', documentForm.documentType);
+      formData.append('documentDate', documentForm.documentDate);
+      formData.append('hospitalName', documentForm.hospitalName);
+      formData.append('notes', documentForm.notes);
+
+      const result = await patientApiService.uploadPatientDocument(formData);
+
+      if (result.success) {
+        alert('✅ Document uploaded successfully!');
+
+        // Reset form
+        setDocumentForm({
+          documentType: '',
+          documentDate: '',
+          hospitalName: '',
+          notes: ''
+        });
+        setSelectedFile(null);
+
+        // Reset file input
+        const fileInput = document.getElementById('document-upload') as HTMLInputElement;
+        if (fileInput) fileInput.value = '';
+
+        // Reload documents
+        await loadPatientDocuments();
+      }
+    } catch (error) {
+      console.error('Error uploading document:', error);
+      alert('❌ Failed to upload document');
+    } finally {
+      setUploadingDocument(false);
+    }
+  };
+
+  // Handle document delete
+  const handleDeleteDocument = async (documentId: number, documentName: string) => {
+    const confirmDelete = window.confirm(`Are you sure you want to delete "${documentName}"?`);
+
+    if (!confirmDelete) return;
+
+    try {
+      const success = await patientApiService.deletePatientDocument(documentId);
+
+      if (success) {
+        alert('✅ Document deleted successfully');
+        await loadPatientDocuments();
+      }
+    } catch (error) {
+      console.error('Error deleting document:', error);
+      alert('❌ Failed to delete document');
+    }
+  };
+
+  // Format document type for display
+  const formatDocumentType = (type: string) => {
+    const types: { [key: string]: string } = {
+      'lab_report': '🧪 Lab Report',
+      'xray': '📷 X-Ray/Scan',
+      'prescription': '💊 Prescription',
+      'discharge_summary': '📋 Discharge Summary',
+      'vaccination': '💉 Vaccination Record',
+      'other': '📄 Other Document'
+    };
+    return types[type] || type;
+  };
+
 
 
   // Load profile image function
@@ -1512,74 +1690,6 @@ export default function PatientDashboard() {
                         </form>
                       </DialogContent>
                     </Dialog>
-                    {/* This dialogue is used for enabling the patients to add their own health data */}
-                    {/* Add Health Data Dialog - Simplified for space */}
-                    {/* <Dialog>
-                      <DialogTrigger asChild>
-                        <Button size="sm">
-                          <Plus className="w-4 h-4 mr-2" />
-                          Add Health Data
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-                        <DialogHeader className="space-y-3 pb-6">
-                          <DialogTitle className="text-xl font-semibold">Add Health Measurements</DialogTitle>
-                          <DialogDescription>Record your vital signs and health measurements</DialogDescription>
-                        </DialogHeader>
-                        <form className="space-y-6">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-3">
-                              <Label>Date</Label>
-                              <Input type="date" defaultValue={new Date().toISOString().split('T')[0]} />
-                            </div>
-                            <div className="space-y-3">
-                              <Label>Time</Label>
-                              <Input type="time" />
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-3">
-                              <Label>Blood Pressure</Label>
-                              <div className="flex items-center space-x-2">
-                                <Input placeholder="120" type="number" />
-                                <span>/</span>
-                                <Input placeholder="80" type="number" />
-                                <span className="text-sm text-gray-500">mmHg</span>
-                              </div>
-                            </div>
-                            <div className="space-y-3">
-                              <Label>Blood Sugar (mg/dL)</Label>
-                              <Input placeholder="95" type="number" />
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-3">
-                              <Label>Weight (kg)</Label>
-                              <Input placeholder="70" type="number" />
-                            </div>
-                            <div className="space-y-3">
-                              <Label>Heart Rate (bpm)</Label>
-                              <Input placeholder="72" type="number" />
-                            </div>
-                          </div>
-
-                          <div className="space-y-3">
-                            <Label>Notes/Symptoms</Label>
-                            <Textarea placeholder="How are you feeling? Any symptoms or notes..." />
-                          </div>
-
-                          <div className="flex gap-3 pt-4">
-                            <Button type="submit" className="flex-1">
-                              <Save className="w-4 h-4 mr-2" />
-                              Save Health Data
-                            </Button>
-                            <Button type="button" variant="outline" className="flex-1">Cancel</Button>
-                          </div>
-                        </form>
-                      </DialogContent>
-                    </Dialog> */}
                   </div>
                 </div>
               </CardHeader>
@@ -1624,81 +1734,280 @@ export default function PatientDashboard() {
                   )}
 
                   {/* Medical Records List */}
+                  {/* Medical Records List */}
                   {!isLoadingMedicalRecords && !medicalRecordsError && medicalRecords.length > 0 && (
-                    <div className="max-h-96 overflow-y-auto space-y-4">
-                      {medicalRecords.map((record) => (
-                        <div key={record.id} className="border rounded-lg p-6 bg-white hover:shadow-md transition-shadow">
-                          <div className="flex items-start justify-between mb-4">
-                            <div className="flex-1">
-                              <div className="flex items-center space-x-3 mb-3">
-                                <h4 className="font-semibold text-lg">{formatExaminationType(record.examinationType)}</h4>
-                                <Badge className={getStatusColor(getRecordStatus(record))}>
-                                  {getRecordStatus(record)}
-                                </Badge>
-                                <Badge variant="secondary" className="bg-blue-100 text-blue-800">Doctor Added</Badge>
-                              </div>
-
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600 mb-4">
-                                <div className="space-y-1">
-                                  <p><span className="font-medium">Doctor:</span> {record.doctorName || `Dr. ${record.doctorId}`}</p>
-                                  <p><span className="font-medium">Specialization:</span> {record.doctorSpecialization || 'General Medicine'}</p>
+                    <div className="space-y-4">
+                      <div className="max-h-96 overflow-y-auto space-y-4">
+                        {(showAllDoctorRecords ? medicalRecords : medicalRecords.slice(0, 3)).map((record) => (
+                          <div key={record.id} className="border rounded-lg p-6 bg-white hover:shadow-md transition-shadow">
+                            <div className="flex items-start justify-between mb-4">
+                              <div className="flex-1">
+                                <div className="flex items-center space-x-3 mb-3">
+                                  <h4 className="font-semibold text-lg">{formatExaminationType(record.examinationType)}</h4>
+                                  <Badge className={getStatusColor(getRecordStatus(record))}>
+                                    {getRecordStatus(record)}
+                                  </Badge>
+                                  <Badge variant="secondary" className="bg-blue-100 text-blue-800">Doctor Added</Badge>
                                 </div>
-                                <div className="space-y-1">
-                                  <p><span className="font-medium">Date:</span> {new Date(record.createdAt).toLocaleDateString()}</p>
-                                  {record.nextCheckupDate && (
-                                    <p><span className="font-medium">Next Checkup:</span> {new Date(record.nextCheckupDate).toLocaleDateString()}</p>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600 mb-4">
+                                  <div className="space-y-1">
+                                    <p><span className="font-medium">Doctor:</span> {record.doctorName || `Dr. ${record.doctorId}`}</p>
+                                    <p><span className="font-medium">Specialization:</span> {record.doctorSpecialization || 'General Medicine'}</p>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <p><span className="font-medium">Date:</span> {new Date(record.createdAt).toLocaleDateString()}</p>
+                                    {record.nextCheckupDate && (
+                                      <p><span className="font-medium">Next Checkup:</span> {new Date(record.nextCheckupDate).toLocaleDateString()}</p>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                                  <p className="text-sm"><span className="font-medium">Diagnosis:</span> {record.diagnosis}</p>
+                                  {record.prescription && (
+                                    <p className="text-sm mt-2"><span className="font-medium">Prescription:</span> {record.prescription}</p>
+                                  )}
+                                  {record.additionalNotes && (
+                                    <p className="text-sm mt-2"><span className="font-medium">Notes:</span> {record.additionalNotes}</p>
                                   )}
                                 </div>
+
+                                <div className="flex flex-wrap gap-2">
+                                  <Button variant="outline" size="sm">
+                                    <Download className="w-3 h-3 mr-1" />
+                                    Medical Report
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* View All / Show Less Button */}
+                      {medicalRecords.length > 3 && (
+                        <div className="text-center pt-4">
+                          <Button
+                            variant="outline"
+                            onClick={() => setShowAllDoctorRecords(!showAllDoctorRecords)}
+                          >
+                            {showAllDoctorRecords ? (
+                              <>
+                                Show Less
+                                <ChevronUp className="w-4 h-4 ml-2" />
+                              </>
+                            ) : (
+                              <>
+                                View All {medicalRecords.length} Records
+                                <ChevronDown className="w-4 h-4 ml-2" />
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+
+                </div>
+
+                {/* Patient Records */}
+                {/* Patient Records */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">
+                    📤 My Health Documents
+                  </h3>
+
+                  {/* Upload Form */}
+                  <Card className="bg-blue-50/50 border-blue-200">
+                    <CardHeader>
+                      <CardTitle className="text-lg">Upload Your Medical Document</CardTitle>
+                      <CardDescription>
+                        Upload lab reports, X-rays, prescriptions, or other medical documents
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <form onSubmit={handleDocumentUpload} className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Document Type */}
+                          <div className="space-y-2">
+                            <Label htmlFor="doc-type">
+                              Document Type <span className="text-red-500">*</span>
+                            </Label>
+                            <Select
+                              value={documentForm.documentType}
+                              onValueChange={(value) => setDocumentForm({ ...documentForm, documentType: value })}
+                              required
+                            >
+                              <SelectTrigger id="doc-type">
+                                <SelectValue placeholder="Select type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="lab_report">🧪 Lab Report</SelectItem>
+                                <SelectItem value="xray">📷 X-Ray/Scan</SelectItem>
+                                <SelectItem value="prescription">💊 Prescription</SelectItem>
+                                <SelectItem value="discharge_summary">📋 Discharge Summary</SelectItem>
+                                <SelectItem value="vaccination">💉 Vaccination Record</SelectItem>
+                                <SelectItem value="other">📄 Other Document</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          {/* Document Date */}
+                          <div className="space-y-2">
+                            <Label htmlFor="doc-date">
+                              Document Date <span className="text-red-500">*</span>
+                            </Label>
+                            <Input
+                              id="doc-date"
+                              type="date"
+                              value={documentForm.documentDate}
+                              onChange={(e) => setDocumentForm({ ...documentForm, documentDate: e.target.value })}
+                              max={new Date().toISOString().split('T')[0]}
+                              required
+                            />
+                          </div>
+                        </div>
+
+                        {/* Hospital Name */}
+                        <div className="space-y-2">
+                          <Label htmlFor="hospital">Hospital/Clinic Name (Optional)</Label>
+                          <Input
+                            id="hospital"
+                            placeholder="Enter hospital or clinic name"
+                            value={documentForm.hospitalName}
+                            onChange={(e) => setDocumentForm({ ...documentForm, hospitalName: e.target.value })}
+                          />
+                        </div>
+
+                        {/* File Upload */}
+                        <div className="space-y-2">
+                          <Label htmlFor="document-upload">
+                            Upload File <span className="text-red-500">*</span>
+                          </Label>
+                          <div className="flex items-center space-x-2">
+                            <Input
+                              id="document-upload"
+                              type="file"
+                              accept=".pdf,.jpg,.jpeg,.png,.gif"
+                              onChange={handleFileSelect}
+                              required
+                              className="flex-1"
+                            />
+                            {selectedFile && (
+                              <Badge variant="secondary">
+                                {selectedFile.name}
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-500">
+                            Supported: PDF, JPG, PNG, GIF (Max 10MB)
+                          </p>
+                        </div>
+
+                        {/* Notes */}
+                        <div className="space-y-2">
+                          <Label htmlFor="doc-notes">Additional Notes (Optional)</Label>
+                          <Textarea
+                            id="doc-notes"
+                            placeholder="Add any relevant notes..."
+                            value={documentForm.notes}
+                            onChange={(e) => setDocumentForm({ ...documentForm, notes: e.target.value })}
+                            rows={3}
+                          />
+                        </div>
+
+                        {/* Submit Button */}
+                        <Button
+                          type="submit"
+                          className="w-full"
+                          disabled={uploadingDocument}
+                        >
+                          {uploadingDocument ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Uploading...
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="w-4 h-4 mr-2" />
+                              Upload Document
+                            </>
+                          )}
+                        </Button>
+                      </form>
+                    </CardContent>
+                  </Card>
+
+                  {/* Uploaded Documents List */}
+                  <div className="space-y-3">
+                    <h4 className="font-medium text-gray-700">Your Uploaded Documents ({patientDocuments.length})</h4>
+
+                    {isLoadingDocuments ? (
+                      <div className="text-center py-6">
+                        <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
+                        <p className="text-sm text-gray-500 mt-2">Loading documents...</p>
+                      </div>
+                    ) : patientDocuments.length === 0 ? (
+                      <div className="text-center py-8 border-2 border-dashed rounded-lg">
+                        <FileText className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                        <p className="text-gray-500">No documents uploaded yet</p>
+                        <p className="text-sm text-gray-400">Upload your first medical document above</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3 max-h-96 overflow-y-auto">
+                        {patientDocuments.map((doc) => (
+                          <div key={doc.id} className="border border-green-200 rounded-lg p-4 bg-green-50/50 hover:shadow-md transition-shadow">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center space-x-2 mb-2">
+                                  <h4 className="font-semibold">{formatDocumentType(doc.document_type)}</h4>
+                                  <Badge className="bg-green-100 text-green-800">Self-Uploaded</Badge>
+                                </div>
+                                <p className="text-sm text-gray-600 mb-1">
+                                  <strong>File:</strong> {doc.document_name}
+                                </p>
+                                <p className="text-sm text-gray-600 mb-1">
+                                  <strong>Date:</strong> {new Date(doc.document_date).toLocaleDateString()}
+                                </p>
+                                {doc.hospital_name && (
+                                  <p className="text-sm text-gray-600 mb-1">
+                                    <strong>Hospital:</strong> {doc.hospital_name}
+                                  </p>
+                                )}
+                                {doc.notes && (
+                                  <p className="text-sm text-gray-500 mt-2 italic">{doc.notes}</p>
+                                )}
+                                <p className="text-xs text-gray-400 mt-2">
+                                  Uploaded: {new Date(doc.uploaded_at).toLocaleDateString()}
+                                </p>
                               </div>
 
-                              <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                                <p className="text-sm"><span className="font-medium">Diagnosis:</span> {record.diagnosis}</p>
-                                {record.prescription && (
-                                  <p className="text-sm mt-2"><span className="font-medium">Prescription:</span> {record.prescription}</p>
-                                )}
-                                {record.additionalNotes && (
-                                  <p className="text-sm mt-2"><span className="font-medium">Notes:</span> {record.additionalNotes}</p>
-                                )}
-                              </div>
-
-                              <div className="flex flex-wrap gap-2">
-                                <Button variant="outline" size="sm">
+                              <div className="flex flex-col space-y-2 ml-4">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => window.open(`http://localhost:5000${doc.file_path}`, '_blank')}
+                                >
                                   <Download className="w-3 h-3 mr-1" />
-                                  Medical Report
+                                  View
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleDeleteDocument(doc.id, doc.document_name)}
+                                  className="text-red-600 hover:bg-red-50"
+                                >
+                                  <X className="w-3 h-3 mr-1" />
+                                  Delete
                                 </Button>
                               </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Patient Records */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">
-                    📤 My Health Data & Documents
-                  </h3>
-
-                  <div className="border border-green-200 rounded-lg p-6 bg-green-50/50">
-                    <div className="flex items-center space-x-3 mb-3">
-                      <h4 className="font-semibold">Blood Sugar Self-Monitoring</h4>
-                      <Badge className="bg-green-100 text-green-800">Self-Reported</Badge>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4 text-sm text-gray-600 mb-3">
-                      <p><span className="font-medium">Date:</span> Jan 18, 2024 8:00 AM</p>
-                      <p><span className="font-medium">Blood Sugar:</span> 105 mg/dL</p>
-                    </div>
-                    <div className="bg-white rounded-lg p-3">
-                      <p className="text-sm">Fasting measurement at home. Feeling normal.</p>
-                    </div>
-                  </div>
-
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-                    <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">Add Your Health Information</h3>
-                    <p className="text-gray-600 mb-4">Upload documents or track your health measurements</p>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               </CardContent>
