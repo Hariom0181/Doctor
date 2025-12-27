@@ -392,6 +392,35 @@ class PatientApiService {
     }
   }
 
+  async getPatientPrescriptions(patientId: number, status?: string): Promise<any[]> {
+    try {
+      let url = `${API_BASE_URL}/prescriptions/patient/${patientId}`;
+      if (status) {
+        url += `?status=${status}`;
+      }
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: this.getAuthHeaders()
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch prescriptions');
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.message);
+      }
+
+      return result.data;
+    } catch (error) {
+      console.error('Error fetching prescriptions:', error);
+      throw error;
+    }
+  }
+
   async cancelAppointment(appointmentId: number): Promise<boolean> {
     try {
       const response = await fetch(`${API_BASE_URL}/appointments/${appointmentId}`, {

@@ -30,6 +30,7 @@ import {
   Download,
   Plus,
   AlertCircle,
+  RefreshCw,
   TrendingUp,
   Clock,
   User,
@@ -168,7 +169,7 @@ export default function PatientDashboard() {
   const [isLoadingAppointments, setIsLoadingAppointments] = useState(false);
   const [isAppointmentDialogOpen, setIsAppointmentDialogOpen] = useState(false);
   const [bookingAppointment, setBookingAppointment] = useState(false);
-  const [medications, setMedications] = useState(INITIAL_MEDICATIONS); // <-- Replace with backend: medications
+  // <-- Replace with backend: medications
   const [doctorsList, setDoctorsList] = useState(INITIAL_DOCTORS_LIST);
   const [selectedDoctor, setSelectedDoctor] = useState("");
 
@@ -192,6 +193,10 @@ export default function PatientDashboard() {
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
   const [uploadingDocument, setUploadingDocument] = useState(false);
   const [showAllDoctorRecords, setShowAllDoctorRecords] = useState(false);
+
+  // Prescriptions/Medications state
+  const [prescriptions, setPrescriptions] = useState<any[]>([]);
+  const [isLoadingPrescriptions, setIsLoadingPrescriptions] = useState(false);
 
   // Document upload form
   const [documentForm, setDocumentForm] = useState({
@@ -222,8 +227,7 @@ export default function PatientDashboard() {
         const storedPatientData = localStorage.getItem('patientData');
         if (storedPatientData) {
           const parsedData = JSON.parse(storedPatientData);
-
-          // Transform the data to match your UI needs
+  
           const transformedData = {
             id: parsedData.id,
             name: `${parsedData.firstName} ${parsedData.lastName}`,
@@ -234,30 +238,73 @@ export default function PatientDashboard() {
             address: parsedData.address,
             profilePicture: parsedData.profileImage
           };
-
+  
+          // ✅ FIX: Set patient data FIRST
           setPatientData(transformedData);
-
-          // Load profile image after setting patient data
+  
+          // ✅ FIX: Pass ID directly to functions instead of relying on state
           if (parsedData.id) {
             await loadProfileImage(parsedData.id);
-            await loadAppointments();
-            await loadPatientDocuments(); 
+            await loadAppointmentsById(parsedData.id);  // ✅ Pass ID
+            await loadPatientDocumentsById(parsedData.id);  // ✅ Pass ID
+            await loadPrescriptionsById(parsedData.id);  // ✅ Pass ID
+            // Add other functions if needed
           }
         } else {
           console.warn('No patient data found in localStorage');
-          // Optionally redirect to login
-          // window.location.href = '/login';
         }
       } catch (error) {
-        console.error('Error parsing patient data from localStorage:', error);
+        console.error('Error parsing patient data:', error);
       } finally {
         setLoading(false);
       }
     };
-
+  
     loadPatientData();
   }, []);
 
+  // ✅ FIXED: Use separate state to track if data is loaded
+// // useEffect(() => {
+// //   if (!patientData?.id) return;
+
+// //   const refreshInterval = setInterval(async () => {
+// //     console.log('🔄 Auto-refreshing patient data...');
+// //     try {
+// //       await loadAppointments();
+// //       await loadPrescriptions();
+// //       console.log('✅ Refresh complete');
+// //     } catch (error) {
+// //       console.error('❌ Refresh failed:', error);
+// //     }
+// //   }, 30000);
+
+// //   return () => {
+// //     console.log('🧹 Cleaning up refresh interval');
+// //     clearInterval(refreshInterval);
+// //   };
+// }, []); // ✅ EMPTY DEPENDENCY - only run once
+
+  // ✅ ADD THIS - Refresh when tab becomes visible
+  useEffect(() => {
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible' && patientData?.id) {
+        // console.log('👁️ Tab visible - refreshing data...');
+        try {
+          await loadAppointments();
+          await loadPrescriptions();
+          console.log('✅ Visibility refresh complete');
+        } catch (error) {
+          console.error('❌ Visibility refresh failed:', error);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []); // ✅ EMPTY DEPENDENCY
 
   useEffect(() => {
     fetchMetrics();
@@ -295,12 +342,12 @@ export default function PatientDashboard() {
       }
 
       const result = await response.json();
-      console.log("Full API response:", result); // This will show us what we're getting
+      // console.log("Full API response:", result); // This will show us what we're getting
 
       if (result.success) {
         setHealthMetrics(result.data);
-        console.log("Health metrics loaded:", result.data);
-        console.log("Number of metrics:", result.data.length);
+        // console.log("Health metrics loaded:", result.data);
+        // console.log("Number of metrics:", result.data.length);
       } else {
         console.error("Failed to fetch health metrics:", result.message);
       }
@@ -334,21 +381,74 @@ export default function PatientDashboard() {
   //   fetchPatientDocuments();
   // }, [patientId]);
 
+  // load presciptions 
+  // Load patient prescriptions
+  const loadPrescriptions = async (patientId?: number) => {
+    // console.log('=== LOAD PRESCRIPTIONS START ===');
+    
+    // Use passed ID or state ID
+    const id = patientId || patientData?.id;
+    
+    if (!id) {
+      console.log('⚠️ No patient ID, skipping prescription load');
+      return;
+    }
+    
+    console.log('📥 Loading prescriptions for patient:', id);
+    setIsLoadingPrescriptions(true);
+    
+    try {
+      const data = await patientApiService.getPatientPrescriptions(id, 'active');
+      // console.log('✅ Prescriptions loaded:', data);
+      setPrescriptions(data);
+    } catch (error) {
+      console.error('❌ Error loading prescriptions:', error);
+    } finally {
+      setIsLoadingPrescriptions(false);
+    }
+    // console.log('=== LOAD PRESCRIPTIONS END ===');
+  };
+  
+  // Create helper function for initial load
+  const loadPrescriptionsById = (patientId: number) => loadPrescriptions(patientId);
+
+  // Format frequency for display
+  const formatFrequency = (freq: string) => {
+    const frequencies: { [key: string]: string } = {
+      'once': 'Once daily',
+      'twice': 'Twice daily',
+      'thrice': 'Three times daily',
+      'four_times': 'Four times daily',
+      'weekly': 'Once weekly',
+      'as_needed': 'As needed'
+    };
+    return frequencies[freq] || freq;
+  };
+
 
   // Load patient documents
-  const loadPatientDocuments = async () => {
-    if (!patientData?.id) return;
-
+  const loadPatientDocuments = async (patientId?: number) => {
+    // Use passed ID or state ID
+    const id = patientId || patientData?.id;
+    
+    if (!id) return;
+    
+    // console.log('📄 Loading patient documents for:', id);
     setIsLoadingDocuments(true);
+    
     try {
-      const docs = await patientApiService.getPatientDocuments(patientData.id);
+      const docs = await patientApiService.getPatientDocuments(id);
+      // console.log('📄 Documents loaded:', docs);
       setPatientDocuments(docs);
     } catch (error) {
-      console.error('Error loading documents:', error);
+      console.error('❌ Error loading documents:', error);
     } finally {
       setIsLoadingDocuments(false);
     }
   };
+  
+  // Create helper function for initial load
+  const loadPatientDocumentsById = (patientId: number) => loadPatientDocuments(patientId);
 
   // Handle file selection
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -535,30 +635,46 @@ export default function PatientDashboard() {
     }
   };
 
-  const loadAppointments = async () => {
-    if (!patientData?.id) return;
-
+  const loadAppointments = async (patientId?: number) => {
+    // console.log('=== LOAD APPOINTMENTS START ===');
+    
+    // Use passed ID or state ID
+    const id = patientId || patientData?.id;
+    
+    if (!id) {
+      console.log('❌ No patient ID');
+      return;
+    }
+  
+    // console.log('📅 Loading appointments for patient:', id);
     setIsLoadingAppointments(true);
+    
     try {
-      const appointmentsData = await patientApiService.getPatientAppointments(patientData.id);
-
-      // Filter only future appointments (today and onwards)
+      const appointmentsData = await patientApiService.getPatientAppointments(id);
+      // console.log('📊 All appointments from API:', appointmentsData);
+      
       const now = new Date();
-      now.setHours(0, 0, 0, 0); // Start of today
-
+      now.setHours(0, 0, 0, 0);
+      
       const upcoming = appointmentsData.filter(apt => {
         const aptDate = new Date(apt.appointment_date);
         return aptDate >= now && apt.status !== 'cancelled' && apt.status !== 'completed';
       });
-
+      
+      // console.log('✅ Upcoming appointments:', upcoming);
       setUpcomingAppointments(upcoming);
-      setAppointments(appointmentsData); // Keep all for history
+      setAppointments(appointmentsData);
     } catch (error) {
-      console.error('Error loading appointments:', error);
+      console.error('❌ Error loading appointments:', error);
     } finally {
       setIsLoadingAppointments(false);
     }
+    // console.log('=== LOAD APPOINTMENTS END ===');
   };
+  
+  // Create helper function for initial load
+  const loadAppointmentsById = (patientId: number) => loadAppointments(patientId);
+
   const handleCancelAppointment = async (appointmentId: number) => {
     const confirmCancel = window.confirm('Are you sure you want to cancel this appointment?');
 
@@ -709,7 +825,7 @@ export default function PatientDashboard() {
       // console.log('🏥 Fetching medical records for patient:', patientId);
       const records = await patientApiService.getMedicalRecords(patientId);
 
-      console.log('📄 Fetched medical records:', records);
+      // console.log('📄 Fetched medical records:', records);
       setMedicalRecords(records);
 
       // Update recentRecords state - Fixed mapping
@@ -746,7 +862,7 @@ export default function PatientDashboard() {
           throw new Error('No patient logged in');
         }
 
-        console.log('Using current patient ID:', patientId);
+        // console.log('Using current patient ID:', patientId);
 
         const doctors = await patientApiService.getLinkedDoctors(patientId);
         setLinkedDoctors(doctors);
@@ -779,7 +895,7 @@ export default function PatientDashboard() {
 
       try {
         const doctors = await patientApiService.getAvailableDoctors();
-        console.log('✅ Available doctors fetched:', doctors);
+        // console.log('✅ Available doctors fetched:', doctors);
         setAvailableDoctors(doctors);
 
         // Update the doctors list for the profile section dropdown
@@ -789,9 +905,9 @@ export default function PatientDashboard() {
             name: doctor.name,
             specialization: doctor.specialization
           }));
-          console.log('🔄 Transforming doctors for dropdown:', transformedDoctors);
+          // console.log('🔄 Transforming doctors for dropdown:', transformedDoctors);
           setDoctorsList(transformedDoctors);
-          console.log('🔄 Updated doctorsList state with:', transformedDoctors.length, 'doctors');
+          // console.log('🔄 Updated doctorsList state with:', transformedDoctors.length, 'doctors');
 
           // Force a re-render by updating a timestamp
           // console.log('🔄 Doctors list updated, should re-render dropdown');
@@ -801,7 +917,7 @@ export default function PatientDashboard() {
       } catch (error) {
         console.error('❌ Failed to fetch available doctors:', error);
         // Keep the hardcoded doctors list as fallback
-        console.log('🔄 Using fallback doctors list');
+        // console.log('🔄 Using fallback doctors list');
       } finally {
         setIsLoadingAvailableDoctors(false);
       }
@@ -860,7 +976,7 @@ export default function PatientDashboard() {
         return;
       }
 
-      console.log('Updating doctor for patient:', patientId, 'to doctor:', doctorId);
+      // console.log('Updating doctor for patient:', patientId, 'to doctor:', doctorId);
 
       // Update the doctor relationship for the current patient
       await patientApiService.updateDoctorRelationship(patientId, doctorId);
@@ -905,7 +1021,7 @@ export default function PatientDashboard() {
               <button
                 onClick={(e) => {
                   e.preventDefault();
-                  console.log("Clicking Records button");
+                  // console.log("Clicking Records button");
                   setActiveTab("records");
                 }}
                 className={`font-medium transition-colors ${activeTab === "records" ? "text-primary" : "text-gray-700 hover:text-primary"}`}
@@ -915,7 +1031,7 @@ export default function PatientDashboard() {
               <button
                 onClick={(e) => {
                   e.preventDefault();
-                  console.log("Clicking Appointments button");
+                  // console.log("Clicking Appointments button");
                   setActiveTab("appointments");
                 }}
                 className={`font-medium transition-colors ${activeTab === "appointments" ? "text-primary" : "text-gray-700 hover:text-primary"}`}
@@ -1511,23 +1627,51 @@ export default function PatientDashboard() {
                 <CardDescription>Current medications and reminders</CardDescription>
               </CardHeader>
               <CardContent className="max-h-60 overflow-y-auto">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {medications.map((med, index) => (
-                    <div key={index} className="border rounded-lg p-4 bg-white">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <h4 className="font-medium">{med.name}</h4>
-                          <p className="text-sm text-gray-600">{med.frequency} • {med.duration}</p>
-                          <p className="text-sm text-gray-500">Prescribed by {med.prescribed}</p>
-                          <p className="text-sm text-gray-500">Started: {new Date(med.startDate).toLocaleDateString()}</p>
+                {isLoadingPrescriptions ? (
+                  <div className="text-center py-6">
+                    <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
+                    <p className="text-xs text-gray-500 mt-2">Loading medications...</p>
+                  </div>
+                ) : prescriptions.length === 0 ? (
+                  <div className="text-center py-6">
+                    <Pill className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                    <p className="text-sm text-gray-600">No active medications</p>
+                    <p className="text-xs text-gray-500">Your prescribed medications will appear here</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {prescriptions.slice(0, 4).map((med) => (
+                      <div key={med.id} className="border rounded-lg p-4 bg-white hover:shadow-sm transition-shadow">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1">
+                            <h4 className="font-medium text-base">{med.medication_name}</h4>
+                            <p className="text-sm text-gray-600">{med.dosage}</p>
+                          </div>
+                          <Badge className="bg-green-100 text-green-800">
+                            Active
+                          </Badge>
                         </div>
-                        <Badge className="bg-success text-success-foreground">
-                          {med.status}
-                        </Badge>
+                        <div className="text-sm text-gray-600 space-y-1">
+                          <p><strong>Frequency:</strong> {formatFrequency(med.frequency)}</p>
+                          <p><strong>Duration:</strong> {med.duration}</p>
+                          <p className="text-xs text-gray-500 mt-2">
+                            Prescribed by {med.doctor_name}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
+
+                {prescriptions.length > 4 && (
+                  <Button
+                    variant="outline"
+                    className="w-full mt-4"
+                    onClick={() => setActiveTab('medications')}
+                  >
+                    View All Medications ({prescriptions.length})
+                  </Button>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -2165,29 +2309,107 @@ export default function PatientDashboard() {
                 <CardTitle>Current Medications</CardTitle>
                 <CardDescription>Manage your active prescriptions</CardDescription>
               </CardHeader>
-              <CardContent className="max-h-60 overflow-y-auto">
-                {medications.map((med, index) => (
-                  <div key={index} className="border rounded-lg p-4 bg-white">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1">
-                        <h4 className="font-medium text-lg">{med.name}</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-600 mt-2">
-                          <p><strong>Frequency:</strong> {med.frequency}</p>
-                          <p><strong>Duration:</strong> {med.duration}</p>
-                          <p><strong>Prescribed by:</strong> {med.prescribed}</p>
-                          <p><strong>Started:</strong> {new Date(med.startDate).toLocaleDateString()}</p>
+              <CardContent>
+                {isLoadingPrescriptions ? (
+                  <div className="text-center py-8">
+                    <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary mb-2" />
+                    <p className="text-gray-600">Loading your medications...</p>
+                  </div>
+                ) : prescriptions.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Pill className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                    <h3 className="font-medium text-gray-800 mb-2">No Active Medications</h3>
+                    <p className="text-sm text-gray-600">
+                      Your prescribed medications will appear here when doctors add them
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {prescriptions.map((med) => (
+                      <div key={med.id} className="border rounded-lg p-6 bg-white hover:shadow-md transition-shadow">
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-3 mb-3">
+                              <h4 className="font-semibold text-xl">{med.medication_name}</h4>
+                              <Badge className="bg-green-100 text-green-800">
+                                {med.status === 'active' ? 'Active' : med.status}
+                              </Badge>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                              <div className="space-y-2">
+                                <div className="flex items-start">
+                                  <span className="font-medium text-gray-700 w-24">Dosage:</span>
+                                  <span className="text-gray-900">{med.dosage}</span>
+                                </div>
+                                <div className="flex items-start">
+                                  <span className="font-medium text-gray-700 w-24">Frequency:</span>
+                                  <span className="text-gray-900">{formatFrequency(med.frequency)}</span>
+                                </div>
+                                <div className="flex items-start">
+                                  <span className="font-medium text-gray-700 w-24">Duration:</span>
+                                  <span className="text-gray-900">{med.duration}</span>
+                                </div>
+                              </div>
+
+                              <div className="space-y-2">
+                                <div className="flex items-start">
+                                  <span className="font-medium text-gray-700 w-32">Start Date:</span>
+                                  <span className="text-gray-900">
+                                    {new Date(med.start_date).toLocaleDateString('en-IN', {
+                                      year: 'numeric',
+                                      month: 'long',
+                                      day: 'numeric'
+                                    })}
+                                  </span>
+                                </div>
+                                {med.end_date && (
+                                  <div className="flex items-start">
+                                    <span className="font-medium text-gray-700 w-32">End Date:</span>
+                                    <span className="text-gray-900">
+                                      {new Date(med.end_date).toLocaleDateString('en-IN', {
+                                        year: 'numeric',
+                                        month: 'long',
+                                        day: 'numeric'
+                                      })}
+                                    </span>
+                                  </div>
+                                )}
+                                <div className="flex items-start">
+                                  <span className="font-medium text-gray-700 w-32">Prescribed by:</span>
+                                  <span className="text-gray-900">{med.doctor_name}</span>
+                                </div>
+                                <div className="flex items-start">
+                                  <span className="font-medium text-gray-700 w-32">Specialization:</span>
+                                  <span className="text-gray-600 text-sm">{med.specialization}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {med.instructions && (
+                              <div className="bg-blue-50 border-l-4 border-blue-400 p-4 rounded">
+                                <p className="font-medium text-blue-900 mb-1">📋 Instructions:</p>
+                                <p className="text-sm text-blue-800">{med.instructions}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="pt-4 border-t">
+                          <p className="text-xs text-gray-500">
+                            Prescribed on: {new Date(med.created_at).toLocaleDateString('en-IN', {
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </p>
                         </div>
                       </div>
-                      <Badge className="bg-success text-success-foreground">
-                        {med.status}
-                      </Badge>
-                    </div>
-                    <div className="flex space-x-2">
-                      <Button variant="outline" size="sm">Set Reminder</Button>
-                      <Button variant="outline" size="sm">Mark as Taken</Button>
-                    </div>
+                    ))}
                   </div>
-                ))}
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -2292,7 +2514,7 @@ export default function PatientDashboard() {
                             </>
                           ) : (
                             <>
-                              {console.log('⚠️ No doctors in doctorsList state, length:', doctorsList.length)}
+                              {/* {console.log('⚠️ No doctors in doctorsList state, length:', doctorsList.length)} */}
                               <SelectItem value="" disabled>No doctors available</SelectItem>
                             </>
                           )}

@@ -42,6 +42,7 @@ import {
   RefreshCw
 } from "lucide-react";
 
+
 // Sample doctor data
 const doctorData = {
   name: "Dr. Priya Sharma",
@@ -118,7 +119,7 @@ export default function DoctorDashboard() {
   const [selectedPatient, setSelectedPatient] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddRecordOpen, setIsAddRecordOpen] = useState(false);
-  const [isPrescriptionOpen, setIsPrescriptionOpen] = useState(false);
+
   const [isAddPatientOpen, setIsAddPatientOpen] = useState(false);
   const [isPatientViewOpen, setIsPatientViewOpen] = useState(false);
   const [notifications, setNotifications] = useState(3);
@@ -142,6 +143,9 @@ export default function DoctorDashboard() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
   const [imageUploadError, setImageUploadError] = useState<string | null>(null);
+  const [isPrescriptionOpen, setIsPrescriptionOpen] = useState(false);
+  const [prescribingMedication, setPrescribingMedication] = useState(false);
+  const [totalPrescriptions, setTotalPrescriptions] = useState(0);
 
 
   // Your existing useState declarations
@@ -151,21 +155,6 @@ export default function DoctorDashboard() {
         const storedDoctorData = localStorage.getItem('doctorData');
         if (storedDoctorData) {
           const parsedData = JSON.parse(storedDoctorData);
-
-          // console.log("Loading doctor data:", parsedData);
-
-          // setDoctorData({
-          //   id: parsedData.id,
-          //   name: `${parsedData.firstName} ${parsedData.lastName}`,
-          //   firstName: parsedData.firstName,
-          //   lastName: parsedData.lastName,
-          //   email: parsedData.email,
-          //   phone: parsedData.phone,
-          //   specialization: parsedData.specialization,
-          //   currentHospital: parsedData.current_hospital,
-          //   licenseNumber: parsedData.licenseNumber,
-          //   profilePicture: parsedData.profilePicture
-          // });
           const transformedData = {
             id: parsedData.id,
             name: `${parsedData.firstName} ${parsedData.lastName} `,
@@ -183,6 +172,9 @@ export default function DoctorDashboard() {
 
           if (parsedData.id) {
             await loadProfileImage(parsedData.id);
+            await loadPrescriptionCount();
+
+
           }
 
         } else {
@@ -214,7 +206,7 @@ export default function DoctorDashboard() {
       console.log("🏥 Fetching medical records...");
       const records = await doctorApiService.getMyMedicalRecords();
 
-      console.log("📄 Fetched records:", records);
+      // console.log("📄 Fetched records:", records);
       setMedicalRecords(records);
       setFilteredRecords(records); // Initially show all records
 
@@ -261,6 +253,91 @@ export default function DoctorDashboard() {
         return type?.charAt(0).toUpperCase() + type?.slice(1) || 'Unknown';
     }
   };
+
+  const [newMedication, setNewMedication] = useState({
+    patientId: '',
+    medicationName: '',
+    dosage: '',
+    frequency: '',
+    duration: '',
+    instructions: '',
+    startDate: new Date().toISOString().split('T')[0]
+  });
+
+  // Load prescription count
+  const loadPrescriptionCount = async () => {
+    if (!doctorData?.id) return;
+
+    try {
+      const prescriptions = await doctorApiService.getDoctorPrescriptions(doctorData.id);
+      setTotalPrescriptions(prescriptions.length);
+    } catch (error) {
+      console.error('Error loading prescription count:', error);
+    }
+  };
+
+  // Handle prescription submission
+  const handlePrescribeMedication = async () => {
+    if (!doctorData?.id) {
+      alert('Doctor data not found');
+      return;
+    }
+
+    // Validation
+    if (!newMedication.patientId) {
+      alert('Please select a patient');
+      return;
+    }
+
+    if (!newMedication.medicationName || !newMedication.dosage || !newMedication.frequency || !newMedication.duration) {
+      alert('Please fill all required fields');
+      return;
+    }
+
+    setPrescribingMedication(true);
+
+    try {
+      const result = await doctorApiService.prescribeMedication({
+        patientId: parseInt(newMedication.patientId),
+        doctorId: doctorData.id,
+        medicationName: newMedication.medicationName,
+        dosage: newMedication.dosage,
+        frequency: newMedication.frequency,
+        duration: newMedication.duration,
+        instructions: newMedication.instructions,
+        startDate: newMedication.startDate
+      });
+
+      if (result.success) {
+        alert('✅ Prescription created successfully!');
+
+        // Reset form
+        setNewMedication({
+          patientId: '',
+          medicationName: '',
+          dosage: '',
+          frequency: '',
+          duration: '',
+          instructions: '',
+          startDate: new Date().toISOString().split('T')[0]
+        });
+
+        // Close dialog
+        setIsPrescriptionOpen(false);
+
+        // Reload prescription count
+        await loadPrescriptionCount();
+      }
+    } catch (error) {
+      console.error('Error prescribing medication:', error);
+      alert('❌ Failed to create prescription');
+    } finally {
+      setPrescribingMedication(false);
+    }
+  };
+
+
+
   useEffect(() => {
     // Load records count when component mounts
     fetchRecordsCount();
@@ -306,7 +383,7 @@ export default function DoctorDashboard() {
       }
 
       setIsAddingRecord(true);
-      console.log("Adding medical record:", newRecord);
+      // console.log("Adding medical record:", newRecord);
 
       // Prepare the data for API
       const recordData = {
@@ -321,7 +398,7 @@ export default function DoctorDashboard() {
       // Call the API service
       const addedRecord = await doctorApiService.addMedicalRecord(recordData);
 
-      console.log("✅ Medical record added successfully:", addedRecord);
+      // console.log("✅ Medical record added successfully:", addedRecord);
       await fetchRecordsCount();
       alert(`Medical record added successfully for patient ${newRecord.patientId}!`);
 
@@ -578,14 +655,7 @@ export default function DoctorDashboard() {
     notes: ""
   });
 
-  const [newMedication, setNewMedication] = useState({
-    patientId: "",
-    medicationName: "",
-    dosage: "",
-    frequency: "",
-    duration: "",
-    instructions: ""
-  });
+
 
 
 
@@ -675,7 +745,7 @@ export default function DoctorDashboard() {
           profilePicture: newImageUrl
         });
 
-        console.log('✅ Profile image uploaded successfully');
+        // console.log('✅ Profile image uploaded successfully');
       }
     } catch (error) {
       console.error('Error uploading image:', error);
@@ -696,20 +766,20 @@ export default function DoctorDashboard() {
 
 
 
-  const handlePrescribeMedication = () => {
-    console.log("Prescribing medication:", newMedication);
-    // Here you would typically send this to your backend
-    alert(`Medication prescribed successfully for patient ${newMedication.patientId}!`);
-    setNewMedication({
-      patientId: "",
-      medicationName: "",
-      dosage: "",
-      frequency: "",
-      duration: "",
-      instructions: ""
-    });
-    setIsPrescriptionOpen(false);
-  };
+  // const handlePrescribeMedication = () => {
+  //   console.log("Prescribing medication:", newMedication);
+  //   // Here you would typically send this to your backend
+  //   alert(`Medication prescribed successfully for patient ${newMedication.patientId}!`);
+  //   setNewMedication({
+  //     patientId: "",
+  //     medicationName: "",
+  //     dosage: "",
+  //     frequency: "",
+  //     duration: "",
+  //     instructions: ""
+  //   });
+  //   setIsPrescriptionOpen(false);
+  // };
 
   const filteredPatients = linkedPatients.filter(patient => {
     if (!searchQuery.trim()) return true; // Show all if no search query
@@ -753,7 +823,7 @@ export default function DoctorDashboard() {
               <button
                 onClick={(e) => {
                   e.preventDefault();
-                  console.log("Clicking Patients button");
+                  // console.log("Clicking Patients button");
                   setActiveTab("patients");
                 }}
                 className={`font-medium transition-colors ${activeTab === "patients" ? "text-primary" : "text-gray-700 hover:text-primary"}`}
@@ -763,7 +833,7 @@ export default function DoctorDashboard() {
               <button
                 onClick={(e) => {
                   e.preventDefault();
-                  console.log("Clicking Appointments button");
+                  // console.log("Clicking Appointments button");
                   setActiveTab("appointments");
                 }}
                 className={`font-medium transition-colors ${activeTab === "appointments" ? "text-primary" : "text-gray-700 hover:text-primary"}`}
@@ -773,7 +843,7 @@ export default function DoctorDashboard() {
               <button
                 onClick={(e) => {
                   e.preventDefault();
-                  console.log("Clicking Records button");
+                  // console.log("Clicking Records button");
                   setActiveTab("records");
                 }}
                 className={`font-medium transition-colors ${activeTab === "records" ? "text-primary" : "text-gray-700 hover:text-primary"}`}
@@ -1006,7 +1076,7 @@ export default function DoctorDashboard() {
                       </div>
                     </div>
 
-                    
+
                     <div className="space-y-2">
                       <Label>Diagnosis</Label>
                       <Textarea
@@ -1076,104 +1146,194 @@ export default function DoctorDashboard() {
 
               <Dialog open={isPrescriptionOpen} onOpenChange={setIsPrescriptionOpen}>
                 <DialogTrigger asChild>
-                  <Button variant="outline" onClick={(e) => {
-                    e.preventDefault();
-                    console.log("Prescribe Medication clicked");
-                    alert("Prescribe Medication clicked!");
-                    setIsPrescriptionOpen(true);
-                  }}>
+                  <Button variant="outline">
                     <Pill className="w-4 h-4 mr-2" />
                     Prescribe Medication
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-2xl">
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>Prescribe Medication</DialogTitle>
                     <DialogDescription>
                       Add a new medication prescription for a patient
                     </DialogDescription>
                   </DialogHeader>
-                  <div className="space-y-4">
+                  <form onSubmit={(e) => { e.preventDefault(); handlePrescribeMedication(); }} className="space-y-4">
+                    {/* Patient Selection */}
                     <div className="space-y-2">
-                      <Label>Patient</Label>
-                      <Select value={newMedication.patientId} onValueChange={(value) => setNewMedication({ ...newMedication, patientId: value })}>
-                        <SelectTrigger>
+                      <Label htmlFor="patient-select">
+                        Patient <span className="text-red-500">*</span>
+                      </Label>
+                      <Select
+                        value={newMedication.patientId}
+                        onValueChange={(value) => setNewMedication({ ...newMedication, patientId: value })}
+                        required
+                      >
+                        <SelectTrigger id="patient-select">
                           <SelectValue placeholder="Select patient" />
                         </SelectTrigger>
                         <SelectContent>
-                          {linkedPatients.map(patient => (
-                            <SelectItem key={patient.id} value={patient.id}>
-                              {patient.name} ({patient.id})
+                          {linkedPatients.length === 0 ? (
+                            <SelectItem value="none" disabled>
+                              No linked patients
                             </SelectItem>
-                          ))}
+                          ) : (
+                            linkedPatients.map(patient => (
+                              <SelectItem key={patient.id} value={patient.id.toString()}>
+                                {patient.name} (ID: {patient.id})
+                              </SelectItem>
+                            ))
+                          )}
                         </SelectContent>
                       </Select>
                     </div>
+
+                    {/* Medication Name & Dosage */}
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label>Medication Name</Label>
+                        <Label htmlFor="med-name">
+                          Medication Name <span className="text-red-500">*</span>
+                        </Label>
                         <Input
-                          placeholder="e.g., Amlodipine 5mg"
+                          id="med-name"
+                          placeholder="e.g., Amlodipine"
                           value={newMedication.medicationName}
                           onChange={(e) => setNewMedication({ ...newMedication, medicationName: e.target.value })}
+                          required
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>Dosage</Label>
+                        <Label htmlFor="dosage">
+                          Dosage <span className="text-red-500">*</span>
+                        </Label>
                         <Input
+                          id="dosage"
                           placeholder="e.g., 5mg"
                           value={newMedication.dosage}
                           onChange={(e) => setNewMedication({ ...newMedication, dosage: e.target.value })}
+                          required
                         />
                       </div>
                     </div>
+
+                    {/* Frequency & Duration */}
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label>Frequency</Label>
-                        <Select value={newMedication.frequency} onValueChange={(value) => setNewMedication({ ...newMedication, frequency: value })}>
-                          <SelectTrigger>
+                        <Label htmlFor="frequency">
+                          Frequency <span className="text-red-500">*</span>
+                        </Label>
+                        <Select
+                          value={newMedication.frequency}
+                          onValueChange={(value) => setNewMedication({ ...newMedication, frequency: value })}
+                          required
+                        >
+                          <SelectTrigger id="frequency">
                             <SelectValue placeholder="Select frequency" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="once">Once daily</SelectItem>
                             <SelectItem value="twice">Twice daily</SelectItem>
                             <SelectItem value="thrice">Three times daily</SelectItem>
-                            <SelectItem value="weekly">Weekly</SelectItem>
-                            <SelectItem value="asneeded">As needed</SelectItem>
+                            <SelectItem value="four_times">Four times daily</SelectItem>
+                            <SelectItem value="weekly">Once weekly</SelectItem>
+                            <SelectItem value="as_needed">As needed</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                       <div className="space-y-2">
-                        <Label>Duration</Label>
+                        <Label htmlFor="duration">
+                          Duration <span className="text-red-500">*</span>
+                        </Label>
                         <Input
-                          placeholder="e.g., 30 days"
+                          id="duration"
+                          placeholder="e.g., 30 days or 2 weeks"
                           value={newMedication.duration}
                           onChange={(e) => setNewMedication({ ...newMedication, duration: e.target.value })}
+                          required
                         />
                       </div>
                     </div>
+
+                    {/* Start Date */}
                     <div className="space-y-2">
-                      <Label>Instructions</Label>
-                      <Textarea
-                        placeholder="Special instructions for the patient..."
-                        value={newMedication.instructions}
-                        onChange={(e) => setNewMedication({ ...newMedication, instructions: e.target.value })}
+                      <Label htmlFor="start-date">
+                        Start Date <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        id="start-date"
+                        type="date"
+                        value={newMedication.startDate}
+                        onChange={(e) => setNewMedication({ ...newMedication, startDate: e.target.value })}
+                        required
                       />
                     </div>
-                    <Button onClick={handlePrescribeMedication} className="w-full">
-                      <Save className="w-4 h-4 mr-2" />
-                      Prescribe Medication
-                    </Button>
-                  </div>
+
+                    {/* Instructions */}
+                    <div className="space-y-2">
+                      <Label htmlFor="instructions">
+                        Instructions for Patient
+                      </Label>
+                      <Textarea
+                        id="instructions"
+                        placeholder="e.g., Take with food. Avoid alcohol. Do not drive after taking this medication..."
+                        value={newMedication.instructions}
+                        onChange={(e) => setNewMedication({ ...newMedication, instructions: e.target.value })}
+                        rows={4}
+                      />
+                    </div>
+
+                    {/* Submit Button */}
+                    <div className="flex gap-3 pt-4">
+                      <Button
+                        type="submit"
+                        className="flex-1"
+                        disabled={prescribingMedication}
+                      >
+                        {prescribingMedication ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Prescribing...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="w-4 h-4 mr-2" />
+                            Prescribe Medication
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => {
+                          setNewMedication({
+                            patientId: '',
+                            medicationName: '',
+                            dosage: '',
+                            frequency: '',
+                            duration: '',
+                            instructions: '',
+                            startDate: new Date().toISOString().split('T')[0]
+                          });
+                          setIsPrescriptionOpen(false);
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </form>
                 </DialogContent>
               </Dialog>
+
+
+
 
 
               <Dialog open={isAddHealthMetricsOpen} onOpenChange={setIsAddHealthMetricsOpen}>
                 <DialogTrigger asChild>
                   <Button variant="outline" onClick={(e) => {
                     e.preventDefault();
-                    console.log("Add Health Metrics clicked");
+                    // console.log("Add Health Metrics clicked");
                     setIsAddHealthMetricsOpen(true);
                   }}>
                     <Activity className="w-4 h-4 mr-2" />
@@ -1409,8 +1569,8 @@ export default function DoctorDashboard() {
               <div className="flex items-center">
                 <Pill className="w-8 h-8 text-success mr-3" />
                 <div>
-                  <p className="text-2xl font-bold text-gray-900">23</p>
-                  <p className="text-sm text-gray-600">Prescriptions</p>
+                  <p className="text-2xl font-bold text-gray-900">{totalPrescriptions}</p>
+                  <p className="text-sm text-gray-600">Total Prescriptions</p>
                 </div>
               </div>
             </CardContent>

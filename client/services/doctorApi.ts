@@ -471,6 +471,119 @@ class DoctorApiService {
     const doctorData = this.getStoredDoctorData();
     return doctorData?.id || null;
   }
+  async prescribeMedication(prescriptionData: {
+    patientId: number;
+    doctorId: number;
+    medicationName: string;
+    dosage: string;
+    frequency: string;
+    duration: string;
+    instructions?: string;
+    startDate: string;
+    endDate?: string;
+  }): Promise<{ success: boolean; prescriptionId: number }> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/prescriptions/create`, {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify(prescriptionData)
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to create prescription');
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.message);
+      }
+
+      return {
+        success: result.success,
+        prescriptionId: result.prescriptionId
+      };
+    } catch (error) {
+      console.error('Error creating prescription:', error);
+      throw error;
+    }
+  }
+
+  async getDoctorPrescriptions(doctorId: number): Promise<any[]> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/prescriptions/doctor/${doctorId}`, {
+        method: 'GET',
+        headers: this.getAuthHeaders()
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch prescriptions');
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.message);
+      }
+
+      return result.data;
+    } catch (error) {
+      console.error('Error fetching prescriptions:', error);
+      throw error;
+    }
+  }
+
+  async updatePrescriptionStatus(prescriptionId: number, status: string): Promise<boolean> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/prescriptions/${prescriptionId}/status`, {
+        method: 'PATCH',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify({ status })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update prescription');
+      }
+
+      const result = await response.json();
+      return result.success;
+    } catch (error) {
+      console.error('Error updating prescription:', error);
+      throw error;
+    }
+  }
+
+  async getPatientPrescriptions(patientId: number, doctorId: number): Promise<any[]> {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/prescriptions/patient/${patientId}/doctor/${doctorId}`,
+        {
+          method: 'GET',
+          headers: this.getAuthHeaders()
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch patient prescriptions');
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.message);
+      }
+
+      return result.data;
+    } catch (error) {
+      console.error('Error fetching patient prescriptions:', error);
+      throw error;
+    }
+  }
+
+
+
+
 }
 
 export const doctorApiService = new DoctorApiService();

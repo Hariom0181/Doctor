@@ -1,0 +1,4 @@
+PROBLEMS 
+Not fetching the medical records 
+not showing the appointments 
+prescribtion is adding but not reflecting at the patients dashboard 

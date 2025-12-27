@@ -9,6 +9,9 @@ const doctorRoutes = require("./routes/doctorRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 const appointmentRoutes = require("./routes/appointmentRoutes");
 const documentRoutes = require("./routes/documentRoutes");
+const prescriptionRoutes = require("./routes/prescriptionRoutes");
+
+
 
 dotenv.config();
 const app = express();
@@ -23,12 +26,15 @@ app.use('/uploads/doctors_profile', express.static(path.join(__dirname, 'uploads
 app.use("/api/appointments", appointmentRoutes);
 app.use("/api/documents", documentRoutes);
 app.use('/uploads/patient_documents', express.static(path.join(__dirname, 'uploads/patient_documents')));
+app.use("/api/documents", documentRoutes);
 
 
 // Routes
 app.use("/api/patients", patientRoutes);
 app.use("/api/doctors", doctorRoutes);
 app.use("/api/dashboard", dashboardRoutes); 
+app.use("/api/prescriptions", prescriptionRoutes);
+
 
 // Start Server
 const PORT = 5000;

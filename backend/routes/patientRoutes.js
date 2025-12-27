@@ -901,7 +901,7 @@ router.get('/:patientId/medical-records', authenticatePatient, async (req, res) 
         updatedAt: record.updated_at
       }));
 
-      console.log("Transformed medical records for frontend:", transformedRecords);
+      // console.log("Transformed medical records for frontend:", transformedRecords);
 
       res.json({
         success: true,
