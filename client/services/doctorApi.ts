@@ -155,6 +155,149 @@ class DoctorApiService {
       throw error;
     }
   }
+
+  
+  async getTodayAppointments(doctorId: number): Promise<any[]> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/appointments/doctor/${doctorId}/today`, {
+        method: 'GET',
+        headers: this.getAuthHeaders()
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch today\'s appointments');
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.message);
+      }
+
+      return result.data;
+    } catch (error) {
+      console.error('Error fetching today\'s appointments:', error);
+      throw error;
+    }
+  }
+
+  async getPendingAppointments(doctorId: number): Promise<any[]> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/appointments/doctor/${doctorId}/pending`, {
+        method: 'GET',
+        headers: this.getAuthHeaders()
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch pending appointments');
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.message);
+      }
+
+      return result.data;
+    } catch (error) {
+      console.error('Error fetching pending appointments:', error);
+      throw error;
+    }
+  }
+
+  async getAllDoctorAppointments(doctorId: number, status?: string, date?: string): Promise<any[]> {
+    try {
+      let url = `${API_BASE_URL}/appointments/doctor/${doctorId}/all`;
+      const params = new URLSearchParams();
+      
+      if (status) params.append('status', status);
+      if (date) params.append('date', date);
+      
+      if (params.toString()) {
+        url += `?${params.toString()}`;
+      }
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: this.getAuthHeaders()
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch appointments');
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.message);
+      }
+
+      return result.data;
+    } catch (error) {
+      console.error('Error fetching appointments:', error);
+      throw error;
+    }
+  }
+
+  async confirmAppointment(appointmentId: number, doctorNotes?: string): Promise<boolean> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/appointments/${appointmentId}/confirm`, {
+        method: 'PATCH',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify({ doctorNotes })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to confirm appointment');
+      }
+
+      const result = await response.json();
+      return result.success;
+    } catch (error) {
+      console.error('Error confirming appointment:', error);
+      throw error;
+    }
+  }
+
+  async rejectAppointment(appointmentId: number, cancellationReason: string): Promise<boolean> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/appointments/${appointmentId}/reject`, {
+        method: 'PATCH',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify({ cancellationReason })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to reject appointment');
+      }
+
+      const result = await response.json();
+      return result.success;
+    } catch (error) {
+      console.error('Error rejecting appointment:', error);
+      throw error;
+    }
+  }
+
+  async completeAppointment(appointmentId: number, doctorNotes?: string): Promise<boolean> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/appointments/${appointmentId}/complete`, {
+        method: 'PATCH',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify({ doctorNotes })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to complete appointment');
+      }
+
+      const result = await response.json();
+      return result.success;
+    } catch (error) {
+      console.error('Error completing appointment:', error);
+      throw error;
+    }
+  }
   
   async getDoctorProfileImage(doctorId: number): Promise<string | null> {
     try {

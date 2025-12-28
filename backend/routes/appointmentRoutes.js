@@ -147,4 +147,232 @@ router.delete("/:appointmentId", (req, res) => {
   });
 });
 
+// Get today's appointments for doctor
+router.get("/doctor/:doctorId/today", (req, res) => {
+  const { doctorId } = req.params;
+
+  const sql = `
+    SELECT 
+      a.id,
+      a.appointment_date,
+      a.appointment_time,
+      a.appointment_type,
+      a.status,
+      a.reason,
+      a.notes,
+      CONCAT(p.firstName, ' ', p.lastName) as patient_name,
+      p.phone as patient_phone,
+      p.bloodGroup as patient_blood_group
+    FROM appointments a
+    LEFT JOIN patients p ON a.patient_id = p.id
+    WHERE a.doctor_id = ? 
+    AND a.appointment_date = CURDATE()
+    AND a.status IN ('confirmed', 'pending')
+    ORDER BY a.appointment_time ASC
+  `;
+
+  db.query(sql, [doctorId], (err, results) => {
+    if (err) {
+      console.error("Error fetching today's appointments:", err);
+      return res.status(500).json({
+        success: false,
+        message: "Error fetching appointments"
+      });
+    }
+
+    res.json({
+      success: true,
+      data: results,
+      count: results.length
+    });
+  });
+});
+
+// Get pending appointment requests for doctor
+router.get("/doctor/:doctorId/pending", (req, res) => {
+  const { doctorId } = req.params;
+
+  const sql = `
+    SELECT 
+      a.id,
+      a.appointment_date,
+      a.appointment_time,
+      a.appointment_type,
+      a.reason,
+      a.notes,
+      a.created_at,
+      CONCAT(p.firstName, ' ', p.lastName) as patient_name,
+      p.phone as patient_phone,
+      p.email as patient_email,
+      p.bloodGroup as patient_blood_group,
+      p.id as patient_id
+    FROM appointments a
+    LEFT JOIN patients p ON a.patient_id = p.id
+    WHERE a.doctor_id = ? 
+    AND a.status = 'pending'
+    ORDER BY a.appointment_date ASC, a.appointment_time ASC
+  `;
+
+  db.query(sql, [doctorId], (err, results) => {
+    if (err) {
+      console.error("Error fetching pending appointments:", err);
+      return res.status(500).json({
+        success: false,
+        message: "Error fetching pending appointments"
+      });
+    }
+
+    res.json({
+      success: true,
+      data: results,
+      count: results.length
+    });
+  });
+});
+
+// Get all appointments for doctor (with filters)
+router.get("/doctor/:doctorId/all", (req, res) => {
+  const { doctorId } = req.params;
+  const { status, date } = req.query;
+
+  let sql = `
+    SELECT 
+      a.id,
+      a.appointment_date,
+      a.appointment_time,
+      a.appointment_type,
+      a.status,
+      a.reason,
+      a.doctor_notes,
+      a.created_at,
+      CONCAT(p.firstName, ' ', p.lastName) as patient_name,
+      p.phone as patient_phone,
+      p.id as patient_id
+    FROM appointments a
+    LEFT JOIN patients p ON a.patient_id = p.id
+    WHERE a.doctor_id = ?
+  `;
+
+  const params = [doctorId];
+
+  if (status) {
+    sql += " AND a.status = ?";
+    params.push(status);
+  }
+
+  if (date) {
+    sql += " AND a.appointment_date = ?";
+    params.push(date);
+  }
+
+  sql += " ORDER BY a.appointment_date DESC, a.appointment_time DESC";
+
+  db.query(sql, params, (err, results) => {
+    if (err) {
+      console.error("Error fetching doctor appointments:", err);
+      return res.status(500).json({
+        success: false,
+        message: "Error fetching appointments"
+      });
+    }
+
+    res.json({
+      success: true,
+      data: results,
+      count: results.length
+    });
+  });
+});
+
+// Confirm appointment
+router.patch("/:appointmentId/confirm", (req, res) => {
+  const { appointmentId } = req.params;
+  const { doctorNotes } = req.body;
+
+  const sql = `
+    UPDATE appointments 
+    SET status = 'confirmed', 
+        confirmed_at = NOW(),
+        doctor_notes = ?,
+        updated_at = NOW()
+    WHERE id = ?
+  `;
+
+  db.query(sql, [doctorNotes, appointmentId], (err, result) => {
+    if (err) {
+      console.error("Error confirming appointment:", err);
+      return res.status(500).json({
+        success: false,
+        message: "Error confirming appointment"
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Appointment confirmed successfully"
+    });
+  });
+});
+
+// Reject appointment
+router.patch("/:appointmentId/reject", (req, res) => {
+  const { appointmentId } = req.params;
+  const { cancellationReason } = req.body;
+
+  const sql = `
+    UPDATE appointments 
+    SET status = 'cancelled',
+        cancelled_at = NOW(),
+        cancelled_by = 'doctor',
+        cancellation_reason = ?,
+        updated_at = NOW()
+    WHERE id = ?
+  `;
+
+  db.query(sql, [cancellationReason, appointmentId], (err, result) => {
+    if (err) {
+      console.error("Error rejecting appointment:", err);
+      return res.status(500).json({
+        success: false,
+        message: "Error rejecting appointment"
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Appointment rejected successfully"
+    });
+  });
+});
+
+// Mark appointment as completed
+router.patch("/:appointmentId/complete", (req, res) => {
+  const { appointmentId } = req.params;
+  const { doctorNotes } = req.body;
+
+  const sql = `
+    UPDATE appointments 
+    SET status = 'completed',
+        completed_at = NOW(),
+        doctor_notes = ?,
+        updated_at = NOW()
+    WHERE id = ?
+  `;
+
+  db.query(sql, [doctorNotes, appointmentId], (err, result) => {
+    if (err) {
+      console.error("Error completing appointment:", err);
+      return res.status(500).json({
+        success: false,
+        message: "Error completing appointment"
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Appointment marked as completed"
+    });
+  });
+});
+
 module.exports = router;

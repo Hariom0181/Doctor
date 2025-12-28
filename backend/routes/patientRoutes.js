@@ -869,8 +869,8 @@ router.get('/:patientId/medical-records', authenticatePatient, async (req, res) 
         });
       }
 
-      console.log("Raw medical records from database:", results);
-      console.log("Number of medical records:", results.length);
+      // console.log("Raw medical records from database:", results);
+      // console.log("Number of medical records:", results.length);
 
       // If no records found, return empty array but with success
       if (results.length === 0) {

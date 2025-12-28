@@ -41,6 +41,7 @@ import {
   AlertCircle,
   RefreshCw
 } from "lucide-react";
+import { Check, CheckCircle } from "lucide-react";
 
 
 // Sample doctor data
@@ -147,6 +148,17 @@ export default function DoctorDashboard() {
   const [prescribingMedication, setPrescribingMedication] = useState(false);
   const [totalPrescriptions, setTotalPrescriptions] = useState(0);
 
+  // Appointment states
+  const [todayAppointments, setTodayAppointments] = useState<any[]>([]);
+  const [pendingAppointments, setPendingAppointments] = useState<any[]>([]);
+  const [isLoadingAppointments, setIsLoadingAppointments] = useState(false);
+  const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
+  const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
+  const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
+  const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
+  const [actionNotes, setActionNotes] = useState('');
+  const [processingAction, setProcessingAction] = useState(false);
+
 
   // Your existing useState declarations
   useEffect(() => {
@@ -173,6 +185,8 @@ export default function DoctorDashboard() {
           if (parsedData.id) {
             await loadProfileImage(parsedData.id);
             await loadPrescriptionCount();
+            await loadTodayAppointments(parsedData.id); // ✅ ADD THIS
+            await loadPendingAppointments(parsedData.id);
 
 
           }
@@ -189,6 +203,18 @@ export default function DoctorDashboard() {
 
     loadDoctorData();
   }, []);
+  // Auto-refresh appointments
+  useEffect(() => {
+    if (!doctorData?.id) return;
+
+    const refreshInterval = setInterval(async () => {
+      console.log('🔄 Auto-refreshing doctor appointments...');
+      await loadTodayAppointments();
+      await loadPendingAppointments();
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(refreshInterval);
+  }, [doctorData?.id]);
 
 
 
@@ -241,6 +267,152 @@ export default function DoctorDashboard() {
 
     setFilteredRecords(filtered);
   };
+
+
+  // Load today's appointments
+  const loadTodayAppointments = async (doctorId?: number) => {
+    const id = doctorId || doctorData?.id;
+    if (!id) return;
+
+    console.log('📅 Loading today\'s appointments for doctor:', id);
+    setIsLoadingAppointments(true);
+
+    try {
+      const data = await doctorApiService.getTodayAppointments(id);
+      console.log('✅ Today\'s appointments loaded:', data);
+      setTodayAppointments(data);
+    } catch (error) {
+      console.error('❌ Error loading today\'s appointments:', error);
+    } finally {
+      setIsLoadingAppointments(false);
+    }
+  };
+
+  // Load pending appointment requests
+  const loadPendingAppointments = async (doctorId?: number) => {
+    const id = doctorId || doctorData?.id;
+    if (!id) return;
+
+    console.log('⏳ Loading pending appointments for doctor:', id);
+
+    try {
+      const data = await doctorApiService.getPendingAppointments(id);
+      console.log('✅ Pending appointments loaded:', data);
+      setPendingAppointments(data);
+    } catch (error) {
+      console.error('❌ Error loading pending appointments:', error);
+    }
+  };
+
+  // Confirm appointment
+  const handleConfirmAppointment = async () => {
+    if (!selectedAppointment) return;
+
+    setProcessingAction(true);
+
+    try {
+      const success = await doctorApiService.confirmAppointment(
+        selectedAppointment.id,
+        actionNotes
+      );
+
+      if (success) {
+        alert('✅ Appointment confirmed successfully!');
+        setIsConfirmDialogOpen(false);
+        setActionNotes('');
+        setSelectedAppointment(null);
+
+        // Reload appointments
+        await loadTodayAppointments();
+        await loadPendingAppointments();
+      }
+    } catch (error) {
+      console.error('Error confirming appointment:', error);
+      alert('❌ Failed to confirm appointment');
+    } finally {
+      setProcessingAction(false);
+    }
+  };
+
+  // Reject appointment
+  const handleRejectAppointment = async () => {
+    if (!selectedAppointment) return;
+
+    if (!actionNotes.trim()) {
+      alert('Please provide a reason for rejection');
+      return;
+    }
+
+    setProcessingAction(true);
+
+    try {
+      const success = await doctorApiService.rejectAppointment(
+        selectedAppointment.id,
+        actionNotes
+      );
+
+      if (success) {
+        alert('✅ Appointment rejected');
+        setIsRejectDialogOpen(false);
+        setActionNotes('');
+        setSelectedAppointment(null);
+
+        // Reload appointments
+        await loadTodayAppointments();
+        await loadPendingAppointments();
+      }
+    } catch (error) {
+      console.error('Error rejecting appointment:', error);
+      alert('❌ Failed to reject appointment');
+    } finally {
+      setProcessingAction(false);
+    }
+  };
+
+  // Complete appointment
+  const handleCompleteAppointment = async () => {
+    if (!selectedAppointment) return;
+
+    setProcessingAction(true);
+
+    try {
+      const success = await doctorApiService.completeAppointment(
+        selectedAppointment.id,
+        actionNotes
+      );
+
+      if (success) {
+        alert('✅ Appointment marked as completed!');
+        setIsCompleteDialogOpen(false);
+        setActionNotes('');
+        setSelectedAppointment(null);
+
+        // Reload appointments
+        await loadTodayAppointments();
+      }
+    } catch (error) {
+      console.error('Error completing appointment:', error);
+      alert('❌ Failed to complete appointment');
+    } finally {
+      setProcessingAction(false);
+    }
+  };
+
+  // Helper to format time
+  const formatTime = (time: string) => {
+    if (!time) return '';
+    const [hours, minutes] = time.split(':');
+    const hour = parseInt(hours);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour % 12 || 12;
+    return `${displayHour}:${minutes} ${ampm}`;
+  };
+
+
+
+
+
+
   const formatExaminationType = (type: string) => {
     switch (type?.toLowerCase()) {
       case 'general':
@@ -1521,6 +1693,7 @@ export default function DoctorDashboard() {
             </CardContent>
           </Card>
 
+
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center">
@@ -1532,6 +1705,7 @@ export default function DoctorDashboard() {
               </div>
             </CardContent>
           </Card>
+
 
           <Card>
             <CardContent className="p-6">
@@ -1598,22 +1772,121 @@ export default function DoctorDashboard() {
                   <CardDescription>Your appointments for today</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {todayAppointments.map((appointment, index) => (
-                    <div key={index} className="border rounded-lg p-4 bg-white">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h4 className="font-medium">{appointment.patient}</h4>
-                          <p className="text-sm text-gray-600">{appointment.type} • {appointment.duration}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm font-medium">{appointment.time}</p>
-                          <Badge variant={appointment.status === "confirmed" ? "default" : "secondary"}>
-                            {appointment.status}
-                          </Badge>
+                  {isLoadingAppointments ? (
+                    <div className="text-center py-6">
+                      <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
+                      <p className="text-xs text-gray-500 mt-2">Loading schedule...</p>
+                    </div>
+                  ) : todayAppointments.length === 0 ? (
+                    <div className="text-center py-6">
+                      <Calendar className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                      <p className="text-sm text-gray-600">No appointments today</p>
+                    </div>
+                  ) : (
+                    todayAppointments.slice(0, 5).map((appointment) => (
+                      <div key={appointment.id} className="border rounded-lg p-4 bg-white hover:shadow-sm transition-shadow">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className="font-medium">{appointment.patient_name}</h4>
+                            <p className="text-sm text-gray-600">
+                              {appointment.appointment_type} • 30 min
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-medium">{formatTime(appointment.appointment_time)}</p>
+                            <Badge variant={appointment.status === "confirmed" ? "default" : "secondary"}>
+                              {appointment.status === 'pending' ? '⏳ Pending' : '✅ Confirmed'}
+                            </Badge>
+                          </div>
                         </div>
                       </div>
+                    ))
+                  )}
+
+                  {todayAppointments.length > 5 && (
+                    <p className="text-xs text-center text-gray-500 pt-2">
+                      +{todayAppointments.length - 5} more appointments
+                    </p>
+                  )}
+                </CardContent>
+
+              </Card>
+
+              {/* Pending Appointment Requests */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <Bell className="w-5 h-5 mr-2" />
+                      Pending Requests
                     </div>
-                  ))}
+                    {pendingAppointments.length > 0 && (
+                      <Badge variant="destructive">{pendingAppointments.length}</Badge>
+                    )}
+                  </CardTitle>
+                  <CardDescription>Appointments waiting for confirmation</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {pendingAppointments.length === 0 ? (
+                    <div className="text-center py-6">
+                      <CheckCircle className="w-10 h-10 text-green-500 mx-auto mb-2" />
+                      <p className="text-sm text-gray-600">No pending requests</p>
+                    </div>
+                  ) : (
+                    pendingAppointments.slice(0, 3).map((appointment) => (
+                      <div key={appointment.id} className="border rounded-lg p-4 bg-yellow-50 border-yellow-200">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1">
+                            <h4 className="font-medium">{appointment.patient_name}</h4>
+                            <p className="text-sm text-gray-600">
+                              {appointment.appointment_type}
+                            </p>
+                            <p className="text-sm text-gray-600">
+                              {new Date(appointment.appointment_date).toLocaleDateString()} at {formatTime(appointment.appointment_time)}
+                            </p>
+                            {appointment.reason && (
+                              <p className="text-xs text-gray-500 mt-1 italic">
+                                Reason: {appointment.reason}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex space-x-2">
+                          {/* <Button
+                            size="sm"
+                            onClick={() => {
+                              setSelectedAppointment(appointment);
+                              setIsConfirmDialogOpen(true);
+                            }}
+                          >
+                            <Check className="w-3 h-3 mr-1" />
+                            Confirm
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedAppointment(appointment);
+                              setIsRejectDialogOpen(true);
+                            }}
+                          >
+                            <X className="w-3 h-3 mr-1" />
+                            Reject
+                          </Button> */}
+                        </div>
+                      </div>
+                    ))
+                  )}
+
+                  {pendingAppointments.length > 3 && (
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => setActiveTab('appointments')}
+                    >
+                      View All {pendingAppointments.length} Requests
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
 
@@ -1859,81 +2132,403 @@ export default function DoctorDashboard() {
                   <CardTitle>Today's Appointments</CardTitle>
                   <CardDescription>Manage your schedule</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  {todayAppointments.map((appointment, index) => (
-                    <div key={index} className="border rounded-lg p-4 bg-white">
-                      <div className="flex items-center justify-between mb-3">
-                        <div>
-                          <h4 className="font-medium">{appointment.patient}</h4>
-                          <p className="text-sm text-gray-600">{appointment.type}</p>
-                          <p className="text-sm text-gray-600">{appointment.time} • {appointment.duration}</p>
-                        </div>
-                        <Badge variant={appointment.status === "confirmed" ? "default" : "secondary"}>
-                          {appointment.status}
-                        </Badge>
-                      </div>
-                      <div className="flex space-x-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            alert(`Starting consultation with ${appointment.patient}\nType: ${appointment.type}\nTime: ${appointment.time}`);
-                          }}
-                        >
-                          Start Consultation
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            alert(`Reschedule appointment for ${appointment.patient}?`);
-                          }}
-                        >
-                          Reschedule
-                        </Button>
-                      </div>
+                <CardContent>
+                  {isLoadingAppointments ? (
+                    <div className="text-center py-8">
+                      <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary mb-2" />
+                      <p className="text-gray-600">Loading appointments...</p>
                     </div>
-                  ))}
+                  ) : todayAppointments.length === 0 ? (
+                    <div className="text-center py-12">
+                      <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                      <h3 className="font-medium text-gray-800 mb-2">No Appointments Today</h3>
+                      <p className="text-sm text-gray-600">
+                        You have no scheduled appointments for today
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {todayAppointments.map((appointment) => (
+                        <div key={appointment.id} className="border rounded-lg p-6 bg-white hover:shadow-md transition-shadow">
+                          <div className="flex items-start justify-between mb-4">
+                            <div className="flex-1">
+                              <div className="flex items-center space-x-3 mb-2">
+                                <h4 className="font-semibold text-lg">{appointment.patient_name}</h4>
+                                <Badge variant={appointment.status === "confirmed" ? "default" : "secondary"}>
+                                  {appointment.status === 'pending' ? '⏳ Pending' : '✅ Confirmed'}
+                                </Badge>
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm mb-3">
+                                <div className="space-y-1">
+                                  <p className="text-gray-600">
+                                    <strong>Type:</strong> {appointment.appointment_type}
+                                  </p>
+                                  <p className="text-gray-600">
+                                    <strong>Time:</strong> {formatTime(appointment.appointment_time)}
+                                  </p>
+                                  <p className="text-gray-600">
+                                    <strong>Duration:</strong> 30 minutes
+                                  </p>
+                                </div>
+                                <div className="space-y-1">
+                                  <p className="text-gray-600">
+                                    <strong>Phone:</strong> {appointment.patient_phone}
+                                  </p>
+                                  {appointment.patient_blood_group && (
+                                    <p className="text-gray-600">
+                                      <strong>Blood Group:</strong> {appointment.patient_blood_group}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+
+                              {appointment.reason && (
+                                <div className="bg-blue-50 border-l-4 border-blue-400 p-3 rounded mb-3">
+                                  <p className="text-sm text-blue-900">
+                                    <strong>Reason:</strong> {appointment.reason}
+                                  </p>
+                                </div>
+                              )}
+
+                              {appointment.notes && (
+                                <div className="bg-gray-50 p-3 rounded">
+                                  <p className="text-sm text-gray-700">
+                                    <strong>Notes:</strong> {appointment.notes}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap gap-2 pt-4 border-t">
+                            {appointment.status === 'confirmed' && (
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedAppointment(appointment);
+                                  setIsCompleteDialogOpen(true);
+                                }}
+                              >
+                                <CheckCircle className="w-3 h-3 mr-1" />
+                                Mark as Completed
+                              </Button>
+                            )}
+
+                            {appointment.status === 'pending' && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedAppointment(appointment);
+                                    setIsConfirmDialogOpen(true);
+                                  }}
+                                >
+                                  <Check className="w-3 h-3 mr-1" />
+                                  Confirm
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setSelectedAppointment(appointment);
+                                    setIsRejectDialogOpen(true);
+                                  }}
+                                >
+                                  <X className="w-3 h-3 mr-1" />
+                                  Reject
+                                </Button>
+                              </>
+                            )}
+
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                // Navigate to patient details or medical records
+                                alert(`View patient details for ${appointment.patient_name}`);
+                              }}
+                            >
+                              <User className="w-3 h-3 mr-1" />
+                              View Patient
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Schedule Management</CardTitle>
-                  <CardDescription>Manage appointment slots</CardDescription>
+                  <CardTitle className="flex items-center justify-between">
+                    <span>Availability Information</span>
+                    <Badge variant="secondary">Info</Badge>
+                  </CardTitle>
+                  <CardDescription>Your working hours and appointment policy</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <Button
-                    className="w-full"
-                    onClick={() => {
-                      alert("Add Available Slot:\n\nSelect date and time slots when you're available for appointments.");
-                    }}
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Available Slot
-                  </Button>
+                  {/* Current Status */}
+                  <div className="bg-green-50 border-l-4 border-green-400 p-4 rounded">
+                    <div className="flex items-start">
+                      <CheckCircle className="w-5 h-5 text-green-600 mr-2 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-green-900 mb-1">
+                          Accepting Appointments
+                        </p>
+                        <p className="text-sm text-green-800">
+                          Patients can request appointments anytime. You'll receive requests for confirmation.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Working Hours */}
+                  <div className="border rounded-lg p-4">
+                    <p className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
+                      <Clock className="w-4 h-4 mr-2" />
+                      Typical Working Hours
+                    </p>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Monday - Friday:</span>
+                        <span className="font-medium">9:00 AM - 5:00 PM</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Saturday:</span>
+                        <span className="font-medium">9:00 AM - 1:00 PM</span>
+                      </div>
+                      <div className="flex justify-between col-span-2">
+                        <span className="text-gray-600">Sunday:</span>
+                        <span className="font-medium text-red-600">Closed</span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-3 italic">
+                      Note: These are reference hours. You can confirm appointments outside these times if needed.
+                    </p>
+                  </div>
+
+                  {/* Quick Stats */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-blue-50 p-3 rounded text-center">
+                      <p className="text-2xl font-bold text-blue-700">{pendingAppointments.length}</p>
+                      <p className="text-xs text-blue-600">Pending Requests</p>
+                    </div>
+                    <div className="bg-green-50 p-3 rounded text-center">
+                      <p className="text-2xl font-bold text-green-700">{todayAppointments.length}</p>
+                      <p className="text-xs text-green-600">Today's Schedule</p>
+                    </div>
+                  </div>
+
+                  {/* Future Feature Button */}
                   <Button
                     variant="outline"
                     className="w-full"
-                    onClick={() => {
-                      alert("Weekly Schedule:\n\nMon: 9AM-5PM\nTue: 9AM-5PM\nWed: 9AM-1PM\nThu: 9AM-5PM\nFri: 9AM-5PM\nSat: 9AM-12PM\nSun: Closed");
-                    }}
+                    disabled
                   >
-                    <Calendar className="w-4 h-4 mr-2" />
-                    View Weekly Schedule
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => {
-                      alert("Set Break Times:\n\nLunch: 1PM-2PM daily\nTea Break: 11AM-11:15AM, 4PM-4:15PM");
-                    }}
-                  >
-                    <Clock className="w-4 h-4 mr-2" />
-                    Set Break Times
+                    <Settings className="w-4 h-4 mr-2" />
+                    Advanced Slot Management (Coming Soon)
                   </Button>
                 </CardContent>
               </Card>
+
+              {/* Confirm Appointment Dialog */}
+              <Dialog open={isConfirmDialogOpen} onOpenChange={setIsConfirmDialogOpen}>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Confirm Appointment</DialogTitle>
+                    <DialogDescription>
+                      Confirm this appointment and notify the patient
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  {selectedAppointment && (
+                    <div className="space-y-4">
+                      <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+                        <p><strong>Patient:</strong> {selectedAppointment.patient_name}</p>
+                        <p><strong>Type:</strong> {selectedAppointment.appointment_type}</p>
+                        <p><strong>Date:</strong> {new Date(selectedAppointment.appointment_date).toLocaleDateString()}</p>
+                        <p><strong>Time:</strong> {formatTime(selectedAppointment.appointment_time)}</p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="confirm-notes">Notes for Patient (Optional)</Label>
+                        <Textarea
+                          id="confirm-notes"
+                          placeholder="Add any special instructions or notes..."
+                          value={actionNotes}
+                          onChange={(e) => setActionNotes(e.target.value)}
+                          rows={3}
+                        />
+                      </div>
+
+                      <div className="flex gap-3">
+                        <Button
+                          onClick={handleConfirmAppointment}
+                          disabled={processingAction}
+                          className="flex-1"
+                        >
+                          {processingAction ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Confirming...
+                            </>
+                          ) : (
+                            <>
+                              <Check className="w-4 h-4 mr-2" />
+                              Confirm Appointment
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setIsConfirmDialogOpen(false);
+                            setActionNotes('');
+                            setSelectedAppointment(null);
+                          }}
+                          disabled={processingAction}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </DialogContent>
+              </Dialog>
+
+              {/* Reject Appointment Dialog */}
+              <Dialog open={isRejectDialogOpen} onOpenChange={setIsRejectDialogOpen}>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Reject Appointment</DialogTitle>
+                    <DialogDescription>
+                      Provide a reason for rejecting this appointment
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  {selectedAppointment && (
+                    <div className="space-y-4">
+                      <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded space-y-2">
+                        <p><strong>Patient:</strong> {selectedAppointment.patient_name}</p>
+                        <p><strong>Date:</strong> {new Date(selectedAppointment.appointment_date).toLocaleDateString()}</p>
+                        <p><strong>Time:</strong> {formatTime(selectedAppointment.appointment_time)}</p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="reject-reason">
+                          Reason for Rejection <span className="text-red-500">*</span>
+                        </Label>
+                        <Textarea
+                          id="reject-reason"
+                          placeholder="Please provide a reason (e.g., Not available at this time, Emergency case, etc.)"
+                          value={actionNotes}
+                          onChange={(e) => setActionNotes(e.target.value)}
+                          rows={4}
+                          required
+                        />
+                      </div>
+
+                      <div className="flex gap-3">
+                        <Button
+                          variant="destructive"
+                          onClick={handleRejectAppointment}
+                          disabled={processingAction || !actionNotes.trim()}
+                          className="flex-1"
+                        >
+                          {processingAction ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Rejecting...
+                            </>
+                          ) : (
+                            <>
+                              <X className="w-4 h-4 mr-2" />
+                              Reject Appointment
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setIsRejectDialogOpen(false);
+                            setActionNotes('');
+                            setSelectedAppointment(null);
+                          }}
+                          disabled={processingAction}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </DialogContent>
+              </Dialog>
+
+              {/* Complete Appointment Dialog */}
+              <Dialog open={isCompleteDialogOpen} onOpenChange={setIsCompleteDialogOpen}>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Mark as Completed</DialogTitle>
+                    <DialogDescription>
+                      Mark this appointment as completed and add consultation notes
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  {selectedAppointment && (
+                    <div className="space-y-4">
+                      <div className="bg-green-50 border-l-4 border-green-400 p-4 rounded space-y-2">
+                        <p><strong>Patient:</strong> {selectedAppointment.patient_name}</p>
+                        <p><strong>Type:</strong> {selectedAppointment.appointment_type}</p>
+                        <p><strong>Time:</strong> {formatTime(selectedAppointment.appointment_time)}</p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="complete-notes">Consultation Summary (Optional)</Label>
+                        <Textarea
+                          id="complete-notes"
+                          placeholder="Add brief summary of consultation, diagnosis, or follow-up instructions..."
+                          value={actionNotes}
+                          onChange={(e) => setActionNotes(e.target.value)}
+                          rows={4}
+                        />
+                      </div>
+
+                      <div className="flex gap-3">
+                        <Button
+                          onClick={handleCompleteAppointment}
+                          disabled={processingAction}
+                          className="flex-1"
+                        >
+                          {processingAction ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Completing...
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle className="w-4 h-4 mr-2" />
+                              Mark as Completed
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setIsCompleteDialogOpen(false);
+                            setActionNotes('');
+                            setSelectedAppointment(null);
+                          }}
+                          disabled={processingAction}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </DialogContent>
+              </Dialog>
             </div>
           </TabsContent>
           {/* -------------------------------------------------------------------------------------------- */}
