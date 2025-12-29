@@ -577,7 +577,7 @@ class DoctorApiService {
   /**
    * Update medical record
    */
-  async updateMedicalRecord(recordId: number, recordData: Partial<AddMedicalRecordRequest>): Promise<MedicalRecord> {
+  async updateMedicalRecordx(recordId: number, recordData: Partial<AddMedicalRecordRequest>): Promise<MedicalRecord> {
     try {
       console.log('🏥 Updating medical record:', recordId, recordData);
       
@@ -706,7 +706,55 @@ class DoctorApiService {
       throw error;
     }
   }
-
+  // Update medical record
+  async updateMedicalRecord(
+    recordId: number,
+    recordData: {
+      examinationType: string;
+      diagnosis: string;
+      prescription?: string;
+      nextCheckupDate?: string;
+      additionalNotes?: string;
+    }
+  ): Promise<boolean> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/patients/medical-records/${recordId}`, {
+        method: 'PUT',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify(recordData)
+      });
+  
+      if (!response.ok) {
+        throw new Error('Failed to update medical record');
+      }
+  
+      const result = await response.json();
+      return result.success;
+    } catch (error) {
+      console.error('Error updating medical record:', error);
+      throw error;
+    }
+  }
+  
+  // Get single medical record
+  async getMedicalRecord(recordId: number): Promise<any> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/patients/medical-records/${recordId}`, {
+        method: 'GET',
+        headers: this.getAuthHeaders()
+      });
+  
+      if (!response.ok) {
+        throw new Error('Failed to fetch medical record');
+      }
+  
+      const result = await response.json();
+      return result.data;
+    } catch (error) {
+      console.error('Error fetching medical record:', error);
+      throw error;
+    }
+  }
   async getDoctorPrescriptions(doctorId: number): Promise<any[]> {
     try {
       const response = await fetch(`${API_BASE_URL}/prescriptions/doctor/${doctorId}`, {

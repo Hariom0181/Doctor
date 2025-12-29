@@ -121,7 +121,111 @@ router.post("/:patientId/upload-profile", upload.single("profileImage"), async (
     });
   }
 });
+// Update medical record
+router.put('/medical-records/:recordId', async (req, res) => {
+  try {
+    const { recordId } = req.params;
+    const {
+      examinationType,
+      diagnosis,
+      prescription,
+      nextCheckupDate,
+      additionalNotes
+    } = req.body;
 
+    const updateSql = `
+      UPDATE medical_records 
+      SET 
+        examination_type = ?,
+        diagnosis = ?,
+        prescription = ?,
+        next_checkup_date = ?,
+        additional_notes = ?,
+        updated_at = NOW()
+      WHERE id = ?
+    `;
+
+    db.query(
+      updateSql,
+      [examinationType, diagnosis, prescription, nextCheckupDate, additionalNotes, recordId],
+      (err, result) => {
+        if (err) {
+          console.error('Error updating medical record:', err);
+          return res.status(500).json({
+            success: false,
+            message: 'Error updating medical record'
+          });
+        }
+
+        if (result.affectedRows === 0) {
+          return res.status(404).json({
+            success: false,
+            message: 'Medical record not found'
+          });
+        }
+
+        res.json({
+          success: true,
+          message: 'Medical record updated successfully'
+        });
+      }
+    );
+  } catch (error) {
+    console.error('Server error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// Get single medical record by ID
+router.get('/medical-records/:recordId', async (req, res) => {
+  try {
+    const { recordId } = req.params;
+
+    const sql = `
+      SELECT 
+        mr.*,
+        CONCAT(d.first_name, ' ', d.last_name) AS doctor_name,
+        d.specialization AS doctor_specialization,
+        d.current_hospital,
+        CONCAT(p.firstName, ' ', p.lastName) AS patient_name
+      FROM medical_records mr
+      LEFT JOIN doctors d ON mr.doctor_id = d.id
+      LEFT JOIN patients p ON mr.patient_id = p.id
+      WHERE mr.id = ?
+    `;
+
+    db.query(sql, [recordId], (err, results) => {
+      if (err) {
+        console.error('Error fetching medical record:', err);
+        return res.status(500).json({
+          success: false,
+          message: 'Error fetching medical record'
+        });
+      }
+
+      if (results.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Medical record not found'
+        });
+      }
+
+      res.json({
+        success: true,
+        data: results[0]
+      });
+    });
+  } catch (error) {
+    console.error('Server error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
 // Get profile image endpoint
 router.get("/:patientId/profile-image", (req, res) => {
   const patientId = req.params.patientId;

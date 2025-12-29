@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { doctorApiService, type MedicalRecord } from '@/services/doctorApi'
-import { Camera, X } from 'lucide-react';
+import { Camera, ChevronDown, ChevronUp, X } from 'lucide-react';
 import { patientApiService } from '@/services/patientApi';
 import type { PatientProfile } from '@/services/patientApi';
 import {
@@ -165,6 +165,10 @@ export default function DoctorDashboard() {
   const [viewingPatient, setViewingPatient] = useState<any>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [loadingPatientDetails, setLoadingPatientDetails] = useState(false);
+  const [showAllRecords, setShowAllRecords] = useState(false);
+  const [recordSearchQuery, setRecordSearchQuery] = useState('');
+  const [isEditRecordOpen, setIsEditRecordOpen] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<any>(null);
 
 
   // Your existing useState declarations
@@ -311,7 +315,111 @@ export default function DoctorDashboard() {
       setIsLoadingActivities(false);
     }
   };
+  // Add these state variables at the top with other state declarations
 
+
+  // Add this helper function to export records as PDF
+  const exportRecordAsPDF = (record: any) => {
+    const patientName = getPatientNameById(record.patientId);
+    const recordRef = generateRecordReference(record);
+
+    // Create PDF content
+    const pdfContent = `
+  MEDICAL RECORD - ${recordRef}
+  ${'='.repeat(60)}
+  
+  Patient: ${patientName}
+  Date: ${formatDate(record.createdAt)}
+  Examination Type: ${formatExaminationType(record.examinationType)}
+  
+  DIAGNOSIS:
+  ${record.diagnosis}
+  
+  ${record.prescription ? `PRESCRIPTION:\n${record.prescription}\n\n` : ''}
+  ${record.nextCheckupDate ? `NEXT CHECKUP:\n${formatDate(record.nextCheckupDate)}\n\n` : ''}
+  ${record.additionalNotes ? `ADDITIONAL NOTES:\n${record.additionalNotes}\n\n` : ''}
+  
+  ${'='.repeat(60)}
+  Generated on: ${new Date().toLocaleString()}
+    `.trim();
+
+    // Create blob and download
+    const blob = new Blob([pdfContent], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Medical_Record_${recordRef}_${patientName.replace(/\s+/g, '_')}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+
+    // toast({
+    //   title: "Success",
+    //   description: "Medical record exported successfully"
+    // });
+  };
+
+  // Add this function to handle edit
+  const handleEditRecord = async (record: any) => {
+    try {
+      const fullRecord = await doctorApiService.getMedicalRecord(record.id);
+      setEditingRecord(fullRecord);
+      setIsEditRecordOpen(true);
+    } catch (error) {
+      console.error('Error loading record for edit:', error);
+      // toast({
+      //   title: "Error",
+      //   description: "Failed to load record details",
+      //   variant: "destructive"
+      // });
+    }
+  };
+
+  // Add this function to save edited record
+  const handleSaveEditedRecord = async () => {
+    if (!editingRecord) return;
+
+    try {
+      await doctorApiService.updateMedicalRecord(editingRecord.id, {
+        examinationType: editingRecord.examination_type,
+        diagnosis: editingRecord.diagnosis,
+        prescription: editingRecord.prescription,
+        nextCheckupDate: editingRecord.next_checkup_date,
+        additionalNotes: editingRecord.additional_notes
+      });
+
+      // toast({
+      //   title: "Success",
+      //   description: "Medical record updated successfully"
+      // });
+
+      setIsEditRecordOpen(false);
+      setEditingRecord(null);
+      fetchMedicalRecords(); // Refresh the list
+    } catch (error) {
+      console.error('Error updating record:', error);
+      // toast({
+      //   title: "Error",
+      //   description: "Failed to update medical record",
+      //   variant: "destructive"
+      // });
+    }
+  };
+
+  // Filter records by search query
+  const searchFilteredRecords = filteredRecords.filter(record => {
+    if (!recordSearchQuery.trim()) return true;
+    const patientName = getPatientNameById(record.patientId).toLowerCase();
+    return patientName.includes(recordSearchQuery.toLowerCase());
+  });
+
+  // Show only latest 3 or all based on showAllRecords state
+  const displayedRecords = showAllRecords
+    ? searchFilteredRecords
+    : searchFilteredRecords.slice(0, 3);
+
+  // Now replace your Card JSX with this:
   // Helper to get activity icon color
   const getActivityColor = (priority: string) => {
     switch (priority) {
@@ -2068,71 +2176,71 @@ export default function DoctorDashboard() {
               </CardContent>
             </Card>
             <Dialog open={isRejectDialogOpen} onOpenChange={setIsRejectDialogOpen}>
-                <DialogContent className="max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>Reject Appointment</DialogTitle>
-                    <DialogDescription>
-                      Provide a reason for rejecting this appointment
-                    </DialogDescription>
-                  </DialogHeader>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Reject Appointment</DialogTitle>
+                  <DialogDescription>
+                    Provide a reason for rejecting this appointment
+                  </DialogDescription>
+                </DialogHeader>
 
-                  {selectedAppointment && (
-                    <div className="space-y-4">
-                      <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded space-y-2">
-                        <p><strong>Patient:</strong> {selectedAppointment.patient_name}</p>
-                        <p><strong>Date:</strong> {new Date(selectedAppointment.appointment_date).toLocaleDateString()}</p>
-                        <p><strong>Time:</strong> {formatTime(selectedAppointment.appointment_time)}</p>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="reject-reason">
-                          Reason for Rejection <span className="text-red-500">*</span>
-                        </Label>
-                        <Textarea
-                          id="reject-reason"
-                          placeholder="Please provide a reason (e.g., Not available at this time, Emergency case, etc.)"
-                          value={actionNotes}
-                          onChange={(e) => setActionNotes(e.target.value)}
-                          rows={4}
-                          required
-                        />
-                      </div>
-
-                      <div className="flex gap-3">
-                        <Button
-                          variant="destructive"
-                          onClick={handleRejectAppointment}
-                          disabled={processingAction || !actionNotes.trim()}
-                          className="flex-1"
-                        >
-                          {processingAction ? (
-                            <>
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              Rejecting...
-                            </>
-                          ) : (
-                            <>
-                              <X className="w-4 h-4 mr-2" />
-                              Reject Appointment
-                            </>
-                          )}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => {
-                            setIsRejectDialogOpen(false);
-                            setActionNotes('');
-                            setSelectedAppointment(null);
-                          }}
-                          disabled={processingAction}
-                        >
-                          Cancel
-                        </Button>
-                      </div>
+                {selectedAppointment && (
+                  <div className="space-y-4">
+                    <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded space-y-2">
+                      <p><strong>Patient:</strong> {selectedAppointment.patient_name}</p>
+                      <p><strong>Date:</strong> {new Date(selectedAppointment.appointment_date).toLocaleDateString()}</p>
+                      <p><strong>Time:</strong> {formatTime(selectedAppointment.appointment_time)}</p>
                     </div>
-                  )}
-                </DialogContent>
-              </Dialog>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="reject-reason">
+                        Reason for Rejection <span className="text-red-500">*</span>
+                      </Label>
+                      <Textarea
+                        id="reject-reason"
+                        placeholder="Please provide a reason (e.g., Not available at this time, Emergency case, etc.)"
+                        value={actionNotes}
+                        onChange={(e) => setActionNotes(e.target.value)}
+                        rows={4}
+                        required
+                      />
+                    </div>
+
+                    <div className="flex gap-3">
+                      <Button
+                        variant="destructive"
+                        onClick={handleRejectAppointment}
+                        disabled={processingAction || !actionNotes.trim()}
+                        className="flex-1"
+                      >
+                        {processingAction ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Rejecting...
+                          </>
+                        ) : (
+                          <>
+                            <X className="w-4 h-4 mr-2" />
+                            Reject Appointment
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setIsRejectDialogOpen(false);
+                          setActionNotes('');
+                          setSelectedAppointment(null);
+                        }}
+                        disabled={processingAction}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
           <TabsContent value="patients" className="space-y-6">
@@ -2285,150 +2393,150 @@ export default function DoctorDashboard() {
               </CardContent>
 
             </Card>
-            
-             <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-                <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle>Patient Details</DialogTitle>
-                  </DialogHeader>
 
-                  {loadingPatientDetails ? (
-                    <div className="flex justify-center py-8">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                    </div>
-                  ) : viewingPatient ? (
-                    <div className="space-y-6">
-                      {/* Profile Section */}
-                      <div className="flex items-start space-x-4 pb-4 border-b">
-                        <Avatar className="w-20 h-20">
-                          {viewingPatient.profilePicture || viewingPatient.profile_img ? (
-                            <img
-                              src={viewingPatient.profilePicture || `http://localhost:5000${viewingPatient.profile_img}`}
-                              alt={viewingPatient.name || `${viewingPatient.firstName} ${viewingPatient.lastName}`}
-                            />
-                          ) : (
-                            <AvatarFallback className="text-2xl">
-                              {viewingPatient.firstName?.[0]}{viewingPatient.lastName?.[0]}
-                            </AvatarFallback>
+            <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+              <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Patient Details</DialogTitle>
+                </DialogHeader>
+
+                {loadingPatientDetails ? (
+                  <div className="flex justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  </div>
+                ) : viewingPatient ? (
+                  <div className="space-y-6">
+                    {/* Profile Section */}
+                    <div className="flex items-start space-x-4 pb-4 border-b">
+                      <Avatar className="w-20 h-20">
+                        {viewingPatient.profilePicture || viewingPatient.profile_img ? (
+                          <img
+                            src={viewingPatient.profilePicture || `http://localhost:5000${viewingPatient.profile_img}`}
+                            alt={viewingPatient.name || `${viewingPatient.firstName} ${viewingPatient.lastName}`}
+                          />
+                        ) : (
+                          <AvatarFallback className="text-2xl">
+                            {viewingPatient.firstName?.[0]}{viewingPatient.lastName?.[0]}
+                          </AvatarFallback>
+                        )}
+                      </Avatar>
+                      <div>
+                        <h3 className="text-xl font-semibold">
+                          {viewingPatient.name || `${viewingPatient.firstName} ${viewingPatient.lastName}`}
+                        </h3>
+                        <p className="text-sm text-gray-600">Patient ID: {viewingPatient.id}</p>
+                        <div className="flex gap-2 mt-2">
+                          {viewingPatient.gender && <Badge>{viewingPatient.gender}</Badge>}
+                          {viewingPatient.age && (
+                            <Badge variant="outline">{viewingPatient.age} years</Badge>
                           )}
-                        </Avatar>
-                        <div>
-                          <h3 className="text-xl font-semibold">
-                            {viewingPatient.name || `${viewingPatient.firstName} ${viewingPatient.lastName}`}
-                          </h3>
-                          <p className="text-sm text-gray-600">Patient ID: {viewingPatient.id}</p>
-                          <div className="flex gap-2 mt-2">
-                            {viewingPatient.gender && <Badge>{viewingPatient.gender}</Badge>}
-                            {viewingPatient.age && (
-                              <Badge variant="outline">{viewingPatient.age} years</Badge>
-                            )}
-                            {viewingPatient.bloodGroup && (
-                              <Badge variant="outline">Blood Group: {viewingPatient.bloodGroup}</Badge>
-                            )}
-                          </div>
+                          {viewingPatient.bloodGroup && (
+                            <Badge variant="outline">Blood Group: {viewingPatient.bloodGroup}</Badge>
+                          )}
                         </div>
                       </div>
+                    </div>
 
-                      {/* Personal Information */}
+                    {/* Personal Information */}
+                    <div>
+                      <h4 className="font-semibold mb-3 flex items-center">
+                        <User className="w-4 h-4 mr-2" />
+                        Personal Information
+                      </h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-sm text-gray-600">Email</p>
+                          <p className="font-medium">{viewingPatient.email}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600">Phone</p>
+                          <p className="font-medium">{viewingPatient.phone || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600">Date of Birth</p>
+                          <p className="font-medium">
+                            {viewingPatient.dateOfBirth
+                              ? new Date(viewingPatient.dateOfBirth).toLocaleDateString()
+                              : 'N/A'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600">Gender</p>
+                          <p className="font-medium">{viewingPatient.gender || 'N/A'}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Address */}
+                    {(viewingPatient.address || viewingPatient.city || viewingPatient.state) && (
                       <div>
                         <h4 className="font-semibold mb-3 flex items-center">
-                          <User className="w-4 h-4 mr-2" />
-                          Personal Information
+                          <MapPin className="w-4 h-4 mr-2" />
+                          Address
+                        </h4>
+                        <p className="text-gray-700">
+                          {viewingPatient.address && <>{viewingPatient.address}<br /></>}
+                          {viewingPatient.city && viewingPatient.state &&
+                            `${viewingPatient.city}, ${viewingPatient.state}`
+                          }
+                          {viewingPatient.pincode && ` - ${viewingPatient.pincode}`}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Emergency Contact */}
+                    {(viewingPatient.emergencyContact || viewingPatient.emergencyPhone) && (
+                      <div>
+                        <h4 className="font-semibold mb-3 flex items-center">
+                          <Phone className="w-4 h-4 mr-2" />
+                          Emergency Contact
                         </h4>
                         <div className="grid grid-cols-2 gap-4">
                           <div>
-                            <p className="text-sm text-gray-600">Email</p>
-                            <p className="font-medium">{viewingPatient.email}</p>
+                            <p className="text-sm text-gray-600">Contact Name</p>
+                            <p className="font-medium">{viewingPatient.emergencyContact || 'N/A'}</p>
                           </div>
                           <div>
-                            <p className="text-sm text-gray-600">Phone</p>
-                            <p className="font-medium">{viewingPatient.phone || 'N/A'}</p>
-                          </div>
-                          <div>
-                            <p className="text-sm text-gray-600">Date of Birth</p>
-                            <p className="font-medium">
-                              {viewingPatient.dateOfBirth
-                                ? new Date(viewingPatient.dateOfBirth).toLocaleDateString()
-                                : 'N/A'}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-sm text-gray-600">Gender</p>
-                            <p className="font-medium">{viewingPatient.gender || 'N/A'}</p>
+                            <p className="text-sm text-gray-600">Contact Phone</p>
+                            <p className="font-medium">{viewingPatient.emergencyPhone || 'N/A'}</p>
                           </div>
                         </div>
                       </div>
+                    )}
 
-                      {/* Address */}
-                      {(viewingPatient.address || viewingPatient.city || viewingPatient.state) && (
-                        <div>
-                          <h4 className="font-semibold mb-3 flex items-center">
-                            <MapPin className="w-4 h-4 mr-2" />
-                            Address
-                          </h4>
-                          <p className="text-gray-700">
-                            {viewingPatient.address && <>{viewingPatient.address}<br /></>}
-                            {viewingPatient.city && viewingPatient.state &&
-                              `${viewingPatient.city}, ${viewingPatient.state}`
-                            }
-                            {viewingPatient.pincode && ` - ${viewingPatient.pincode}`}
-                          </p>
-                        </div>
-                      )}
-
-                      {/* Emergency Contact */}
-                      {(viewingPatient.emergencyContact || viewingPatient.emergencyPhone) && (
-                        <div>
-                          <h4 className="font-semibold mb-3 flex items-center">
-                            <Phone className="w-4 h-4 mr-2" />
-                            Emergency Contact
-                          </h4>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <p className="text-sm text-gray-600">Contact Name</p>
-                              <p className="font-medium">{viewingPatient.emergencyContact || 'N/A'}</p>
-                            </div>
-                            <div>
-                              <p className="text-sm text-gray-600">Contact Phone</p>
-                              <p className="font-medium">{viewingPatient.emergencyPhone || 'N/A'}</p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Medical Information */}
-                      <div>
-                        <h4 className="font-semibold mb-3 flex items-center">
-                          <FileText className="w-4 h-4 mr-2" />
-                          Medical Information
-                        </h4>
-                        <div className="space-y-3">
-                          {viewingPatient.bloodGroup && (
-                            <div>
-                              <p className="text-sm text-gray-600">Blood Group</p>
-                              <p className="font-medium">{viewingPatient.bloodGroup}</p>
-                            </div>
-                          )}
+                    {/* Medical Information */}
+                    <div>
+                      <h4 className="font-semibold mb-3 flex items-center">
+                        <FileText className="w-4 h-4 mr-2" />
+                        Medical Information
+                      </h4>
+                      <div className="space-y-3">
+                        {viewingPatient.bloodGroup && (
                           <div>
-                            <p className="text-sm text-gray-600">Allergies</p>
-                            <p className="font-medium">{viewingPatient.allergies || 'None reported'}</p>
+                            <p className="text-sm text-gray-600">Blood Group</p>
+                            <p className="font-medium">{viewingPatient.bloodGroup}</p>
                           </div>
-                          <div>
-                            <p className="text-sm text-gray-600">Medical History</p>
-                            <p className="font-medium">{viewingPatient.medicalHistory || 'No history recorded'}</p>
-                          </div>
+                        )}
+                        <div>
+                          <p className="text-sm text-gray-600">Allergies</p>
+                          <p className="font-medium">{viewingPatient.allergies || 'None reported'}</p>
                         </div>
-                      </div>
-
-                      {/* Registration Date */}
-                      <div className="pt-4 border-t text-sm text-gray-600">
-                        <p>Registered on: {new Date(viewingPatient.createdAt || viewingPatient.created_at || '').toLocaleDateString()}</p>
+                        <div>
+                          <p className="text-sm text-gray-600">Medical History</p>
+                          <p className="font-medium">{viewingPatient.medicalHistory || 'No history recorded'}</p>
+                        </div>
                       </div>
                     </div>
-                  ) : null}
-                </DialogContent>
-              </Dialog>
-              
+
+                    {/* Registration Date */}
+                    <div className="pt-4 border-t text-sm text-gray-600">
+                      <p>Registered on: {new Date(viewingPatient.createdAt || viewingPatient.created_at || '').toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                ) : null}
+              </DialogContent>
+            </Dialog>
+
           </TabsContent>
 
           <TabsContent value="appointments" className="space-y-6">
@@ -2773,7 +2881,7 @@ export default function DoctorDashboard() {
               </Dialog>
               {/* View Patient Details Dialog */}
               {/* View Patient Details Dialog */}
-             
+
               {/* Complete Appointment Dialog */}
               <Dialog open={isCompleteDialogOpen} onOpenChange={setIsCompleteDialogOpen}>
                 <DialogContent className="max-w-md">
@@ -2849,8 +2957,20 @@ export default function DoctorDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <div className="flex space-x-4">
+                  <div className="flex justify-between items-center flex-wrap gap-3">
+                    <div className="flex space-x-4 flex-wrap gap-2">
+                      {/* Search Input */}
+                      <div className="relative w-64">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <Input
+                          type="text"
+                          placeholder="Search by patient name..."
+                          value={recordSearchQuery}
+                          onChange={(e) => setRecordSearchQuery(e.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
+
                       <Select value={selectedPatientFilter} onValueChange={setSelectedPatientFilter}>
                         <SelectTrigger className="w-48">
                           <SelectValue placeholder="Filter by patient" />
@@ -2858,7 +2978,7 @@ export default function DoctorDashboard() {
                         <SelectContent>
                           <SelectItem value="all">All Patients</SelectItem>
                           {linkedPatients.map(patient => (
-                            <SelectItem key={patient.id} value={patient.id}>
+                            <SelectItem key={patient.id} value={patient.id.toString()}>
                               {patient.name}
                             </SelectItem>
                           ))}
@@ -2879,14 +2999,13 @@ export default function DoctorDashboard() {
                     </div>
 
                     <div className="flex space-x-2">
-                    <Button
-                    variant="outline"
-                    className="w-full"
-                    disabled
-                  >
-                    
-                    Upload Results (Coming Soon)
-                  </Button>
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        disabled
+                      >
+                        Upload Results (Coming Soon)
+                      </Button>
                       <Button onClick={() => setIsAddRecordOpen(true)}>
                         <Plus className="w-4 h-4 mr-2" />
                         New Record
@@ -2916,106 +3035,237 @@ export default function DoctorDashboard() {
                   )}
 
                   {/* No Records State */}
-                  {!isLoadingRecords && !recordsError && filteredRecords.length === 0 && (
+                  {!isLoadingRecords && !recordsError && searchFilteredRecords.length === 0 && (
                     <div className="text-center py-12">
                       <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
                         <FileText className="w-8 h-8 text-gray-400" />
                       </div>
                       <p className="text-gray-600 font-medium">
-                        {medicalRecords.length === 0
-                          ? "No medical records found"
-                          : "No records match the current filters"
+                        {recordSearchQuery
+                          ? "No records match your search"
+                          : medicalRecords.length === 0
+                            ? "No medical records found"
+                            : "No records match the current filters"
                         }
                       </p>
                       <p className="text-sm text-gray-500 mt-1">
-                        {medicalRecords.length === 0
-                          ? "Add your first medical record to get started!"
-                          : "Try adjusting your filter settings."
+                        {recordSearchQuery
+                          ? "Try a different search term"
+                          : medicalRecords.length === 0
+                            ? "Add your first medical record to get started!"
+                            : "Try adjusting your filter settings."
                         }
                       </p>
                     </div>
                   )}
 
-                  {/* Records List - Scrollable Container */}
-                  {!isLoadingRecords && !recordsError && filteredRecords.length > 0 && (
-                    <div className="max-h-96 overflow-y-auto space-y-3 pr-2">
-                      {filteredRecords.map((record) => (
-                        <div key={record.id} className="border rounded-lg p-3 bg-white shadow-sm hover:shadow-md transition-shadow">
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <h4 className="font-medium text-gray-900">
-                                  {formatExaminationType(record.examinationType)}
-                                </h4>
-                                <span className="text-sm text-gray-500">•</span>
-                                <span className="text-sm font-medium text-blue-600">
-                                  {getPatientNameById(record.patientId)}
-                                </span>
-                              </div>
+                  {/* Records List */}
+                  {!isLoadingRecords && !recordsError && searchFilteredRecords.length > 0 && (
+                    <>
+                      <div className="space-y-3">
+                        {displayedRecords.map((record) => (
+                          <div key={record.id} className="border rounded-lg p-3 bg-white shadow-sm hover:shadow-md transition-shadow">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <h4 className="font-medium text-gray-900">
+                                    {formatExaminationType(record.examinationType)}
+                                  </h4>
+                                  <span className="text-sm text-gray-500">•</span>
+                                  <span className="text-sm font-medium text-blue-600">
+                                    {getPatientNameById(record.patientId)}
+                                  </span>
+                                </div>
 
-                              <p className="text-xs text-gray-500 mb-2">
-                                {formatDate(record.createdAt)} • {generateRecordReference(record)}
-                              </p>
-
-                              <div className="space-y-1">
-                                <p className="text-sm text-gray-800">
-                                  <span className="font-medium">Diagnosis:</span> {record.diagnosis}
+                                <p className="text-xs text-gray-500 mb-2">
+                                  {formatDate(record.createdAt)} • {generateRecordReference(record)}
                                 </p>
 
-                                {record.prescription && (
-                                  <p className="text-sm text-gray-600">
-                                    <span className="font-medium">Prescription:</span> {record.prescription}
+                                <div className="space-y-1">
+                                  <p className="text-sm text-gray-800">
+                                    <span className="font-medium">Diagnosis:</span> {record.diagnosis}
                                   </p>
-                                )}
 
-                                {record.nextCheckupDate && (
-                                  <p className="text-xs text-gray-500">
-                                    <span className="font-medium">Next Checkup:</span> {formatDate(record.nextCheckupDate)}
-                                  </p>
-                                )}
+                                  {record.prescription && (
+                                    <p className="text-sm text-gray-600">
+                                      <span className="font-medium">Prescription:</span> {record.prescription}
+                                    </p>
+                                  )}
 
-                                {record.additionalNotes && (
-                                  <p className="text-xs text-gray-500">
-                                    <span className="font-medium">Notes:</span> {record.additionalNotes}
-                                  </p>
-                                )}
+                                  {record.nextCheckupDate && (
+                                    <p className="text-xs text-gray-500">
+                                      <span className="font-medium">Next Checkup:</span> {formatDate(record.nextCheckupDate)}
+                                    </p>
+                                  )}
+
+                                  {record.additionalNotes && (
+                                    <p className="text-xs text-gray-500">
+                                      <span className="font-medium">Notes:</span> {record.additionalNotes}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="flex flex-col space-y-1 ml-4">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 text-xs"
+                                  onClick={() => handleEditRecord(record)}
+                                >
+                                  <Edit className="w-3 h-3 mr-1" />
+                                  Edit
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 text-xs"
+                                  onClick={() => exportRecordAsPDF(record)}
+                                >
+                                  <Download className="w-3 h-3 mr-1" />
+                                  Export
+                                </Button>
                               </div>
                             </div>
-
-                            <div className="flex flex-col space-y-1 ml-4">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-8 text-xs"
-                                onClick={() => {
-                                  alert(`Edit medical record ${generateRecordReference(record)}\nFor: ${getPatientNameById(record.patientId)}\nType: ${formatExaminationType(record.examinationType)}`);
-                                  // TODO: Implement edit functionality
-                                }}
-                              >
-                                <Edit className="w-3 h-3 mr-1" />
-                                Edit
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-8 text-xs"
-                                onClick={() => {
-                                  alert(`Exporting medical record ${generateRecordReference(record)} as PDF...\nDownload will start shortly.`);
-                                  // TODO: Implement export functionality
-                                }}
-                              >
-                                <Download className="w-3 h-3 mr-1" />
-                                Export
-                              </Button>
-                            </div>
                           </div>
+                        ))}
+                      </div>
+
+                      {/* Show All Button */}
+                      {searchFilteredRecords.length > 3 && (
+                        <div className="text-center pt-2">
+                          <Button
+                            variant="outline"
+                            onClick={() => setShowAllRecords(!showAllRecords)}
+                          >
+                            {showAllRecords ? (
+                              <>
+                                <ChevronUp className="w-4 h-4 mr-2" />
+                                Show Less
+                              </>
+                            ) : (
+                              <>
+                                <ChevronDown className="w-4 h-4 mr-2" />
+                                Show All ({searchFilteredRecords.length - 3} more)
+                              </>
+                            )}
+                          </Button>
                         </div>
-                      ))}
-                    </div>
+                      )}
+                    </>
                   )}
                 </div>
               </CardContent>
             </Card>
+
+            {/* Edit Record Dialog */}
+            <Dialog open={isEditRecordOpen} onOpenChange={setIsEditRecordOpen}>
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Edit Medical Record</DialogTitle>
+                  <DialogDescription>
+                    Update the medical record details below
+                  </DialogDescription>
+                </DialogHeader>
+
+                {editingRecord && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-sm font-medium">Patient</label>
+                      <Input
+                        value={editingRecord.patient_name || ''}
+                        disabled
+                        className="bg-gray-50"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium">Examination Type *</label>
+                      <Select
+                        value={editingRecord.examination_type}
+                        onValueChange={(value) =>
+                          setEditingRecord({ ...editingRecord, examination_type: value })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="general_checkup">General Checkup</SelectItem>
+                          <SelectItem value="blood_test">Blood Test</SelectItem>
+                          <SelectItem value="heart_screening">Heart Screening</SelectItem>
+                          <SelectItem value="diabetes_checkup">Diabetes Checkup</SelectItem>
+                          <SelectItem value="eye_examination">Eye Examination</SelectItem>
+                          <SelectItem value="dental_checkup">Dental Checkup</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium">Diagnosis *</label>
+                      <Textarea
+                        value={editingRecord.diagnosis}
+                        onChange={(e) =>
+                          setEditingRecord({ ...editingRecord, diagnosis: e.target.value })
+                        }
+                        rows={3}
+                        placeholder="Enter diagnosis details..."
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium">Prescription</label>
+                      <Textarea
+                        value={editingRecord.prescription || ''}
+                        onChange={(e) =>
+                          setEditingRecord({ ...editingRecord, prescription: e.target.value })
+                        }
+                        rows={3}
+                        placeholder="Enter prescription details..."
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium">Next Checkup Date</label>
+                      <Input
+                        type="date"
+                        value={editingRecord.next_checkup_date?.split('T')[0] || ''}
+                        onChange={(e) =>
+                          setEditingRecord({ ...editingRecord, next_checkup_date: e.target.value })
+                        }
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium">Additional Notes</label>
+                      <Textarea
+                        value={editingRecord.additional_notes || ''}
+                        onChange={(e) =>
+                          setEditingRecord({ ...editingRecord, additional_notes: e.target.value })
+                        }
+                        rows={3}
+                        placeholder="Any additional notes..."
+                      />
+                    </div>
+
+                    <div className="flex justify-end space-x-2 pt-4">
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setIsEditRecordOpen(false);
+                          setEditingRecord(null);
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                      <Button onClick={handleSaveEditedRecord}>
+                        Save Changes
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </DialogContent>
+            </Dialog>
           </TabsContent>
         </Tabs>
       </div>
