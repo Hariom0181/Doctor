@@ -2,3 +2,17 @@ PROBLEMS
 Not fetching the medical records 
 not showing the appointments 
 prescribtion is adding but not reflecting at the patients dashboard 
+
+
+
+ Age > 65: +2 points
+- Frequent visits (>5 in 30 days): +3 points
+- Warning health metrics: +2 points
+- Critical health metrics: +4 points
+- Critical diagnosis keywords: +4 points
+- Warning diagnosis keywords: +2 points
+
+Status:
+- Score >= 7: Critical
+- Score 4-6: Attention Needed
+- Score 0-3: Normal 

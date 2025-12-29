@@ -72,6 +72,203 @@ const authenticateDoctor = (req, res, next) => {
   }
 };
 
+// Get recent patient activities for doctor
+router.get("/:doctorId/recent-activities", (req, res) => {
+  const { doctorId } = req.params;
+  const { limit = 10, date } = req.query;
+
+  const sql = `
+    SELECT 
+      'medical_record' as activity_type,
+      mr.id,
+      CONCAT(p.firstName, ' ', p.lastName) as patient_name,
+      mr.examination_type as activity_title,
+      'Medical record created' as activity_description,
+      mr.created_at as activity_time,
+      'normal' as priority
+    FROM medical_records mr
+    LEFT JOIN patients p ON mr.patient_id = p.id
+    WHERE mr.doctor_id = ?
+    
+    UNION ALL
+    
+    SELECT 
+      'appointment' as activity_type,
+      a.id,
+      CONCAT(p.firstName, ' ', p.lastName) as patient_name,
+      CONCAT('Appointment ', a.status) as activity_title,
+      a.appointment_type as activity_description,
+      a.updated_at as activity_time,
+      CASE 
+        WHEN a.status = 'pending' THEN 'medium'
+        WHEN a.status = 'confirmed' THEN 'normal'
+        WHEN a.status = 'cancelled' THEN 'low'
+        ELSE 'normal'
+      END as priority
+    FROM appointments a
+    LEFT JOIN patients p ON a.patient_id = p.id
+    WHERE a.doctor_id = ?
+    
+    UNION ALL
+    
+    SELECT 
+      'prescription' as activity_type,
+      pr.id,
+      CONCAT(p.firstName, ' ', p.lastName) as patient_name,
+      'Prescription created' as activity_title,
+      pr.medication_name as activity_description,
+      pr.created_at as activity_time,
+      'normal' as priority
+    FROM prescriptions pr
+    LEFT JOIN patients p ON pr.patient_id = p.id
+    WHERE pr.doctor_id = ?
+    
+    ORDER BY activity_time DESC
+    LIMIT ?
+  `;
+
+  const limitNum = parseInt(limit);
+  db.query(sql, [doctorId, doctorId, doctorId, limitNum], (err, results) => {
+    if (err) {
+      console.error("Error fetching activities:", err);
+      return res.status(500).json({
+        success: false,
+        message: "Error fetching activities"
+      });
+    }
+
+    res.json({
+      success: true,
+      data: results,
+      count: results.length
+    });
+  });
+});
+
+// Calculate patient risk score
+router.get("/:doctorId/patients/risk-assessment", (req, res) => {
+  const { doctorId } = req.params;
+
+  const sql = `
+    SELECT 
+      p.id,
+      CONCAT(p.firstName, ' ', p.lastName) as patient_name,
+      p.bloodGroup,
+      p.allergies,
+      p.medicalHistory,
+      p.dateOfBirth,
+      
+      -- Count recent medical records
+      (SELECT COUNT(*) FROM medical_records mr 
+       WHERE mr.patient_id = p.id 
+       AND mr.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)) as recent_visits,
+      
+      -- Get latest health metrics
+      (SELECT status FROM health_metrics hm 
+       WHERE hm.patient_id = p.id 
+       ORDER BY hm.recorded_date DESC LIMIT 1) as latest_metric_status,
+      
+      -- Check for pending/critical keywords in diagnosis
+      (SELECT diagnosis FROM medical_records mr 
+       WHERE mr.patient_id = p.id 
+       ORDER BY mr.created_at DESC LIMIT 1) as latest_diagnosis,
+      
+      -- Get latest prescription
+      (SELECT medication_name FROM prescriptions pr 
+       WHERE pr.patient_id = p.id 
+       AND pr.status = 'active'
+       ORDER BY pr.created_at DESC LIMIT 1) as active_medication
+      
+    FROM patients p
+    INNER JOIN patient_doctors pd ON p.id = pd.patient_id
+    WHERE pd.doctor_id = ? AND pd.status = 'active'
+  `;
+
+  db.query(sql, [doctorId], (err, results) => {
+    if (err) {
+      console.error("Error fetching patient risk data:", err);
+      return res.status(500).json({
+        success: false,
+        message: "Error calculating risk"
+      });
+    }
+
+    // Calculate risk for each patient
+    const patientsWithRisk = results.map(patient => {
+      let riskScore = 0;
+      let riskFactors = [];
+
+      // Age risk (elderly)
+      const age = new Date().getFullYear() - new Date(patient.dateOfBirth).getFullYear();
+      if (age > 65) {
+        riskScore += 2;
+        riskFactors.push('Elderly patient');
+      }
+
+      // Recent visits frequency
+      if (patient.recent_visits > 5) {
+        riskScore += 3;
+        riskFactors.push('Frequent visits');
+      }
+
+      // Latest metric status
+      if (patient.latest_metric_status === 'warning') {
+        riskScore += 2;
+        riskFactors.push('Warning health metrics');
+      } else if (patient.latest_metric_status === 'critical') {
+        riskScore += 4;
+        riskFactors.push('Critical health metrics');
+      }
+
+      // Diagnosis keywords
+      const criticalKeywords = ['critical', 'severe', 'emergency', 'acute', 'urgent'];
+      const warningKeywords = ['elevated', 'high', 'low', 'irregular', 'abnormal'];
+      
+      if (patient.latest_diagnosis) {
+        const diagnosisLower = patient.latest_diagnosis.toLowerCase();
+        if (criticalKeywords.some(keyword => diagnosisLower.includes(keyword))) {
+          riskScore += 4;
+          riskFactors.push('Critical diagnosis');
+        } else if (warningKeywords.some(keyword => diagnosisLower.includes(keyword))) {
+          riskScore += 2;
+          riskFactors.push('Attention needed');
+        }
+      }
+
+      // Determine status based on risk score
+      let status, priority;
+      if (riskScore >= 7) {
+        status = 'Critical';
+        priority = 'critical';
+      } else if (riskScore >= 4) {
+        status = 'Attention Needed';
+        priority = 'medium';
+      } else {
+        status = 'Normal';
+        priority = 'normal';
+      }
+
+      return {
+        ...patient,
+        riskScore,
+        riskFactors,
+        status,
+        priority,
+        age
+      };
+    });
+
+    // Sort by risk score (highest first)
+    patientsWithRisk.sort((a, b) => b.riskScore - a.riskScore);
+
+    res.json({
+      success: true,
+      data: patientsWithRisk,
+      count: patientsWithRisk.length
+    });
+  });
+});
+
 router.post("/:doctorId/upload-profile", doctorUpload.single("profileImage"), async (req, res) => {
   try {
     const doctorId = req.params.doctorId;
@@ -1340,7 +1537,7 @@ router.get("/medical-records/count", authenticateDoctor, (req, res) => {
       }
 
       const count = results[0].total_records;
-      console.log("✅ Records count retrieved:", count);
+      // console.log("✅ Records count retrieved:", count);
 
       res.json({
         success: true,

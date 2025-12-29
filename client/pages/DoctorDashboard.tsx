@@ -13,6 +13,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { doctorApiService, type MedicalRecord } from '@/services/doctorApi'
 import { Camera, X } from 'lucide-react';
+import { patientApiService } from '@/services/patientApi';
+import type { PatientProfile } from '@/services/patientApi';
 import {
   Heart,
   Calendar,
@@ -158,6 +160,11 @@ export default function DoctorDashboard() {
   const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
   const [actionNotes, setActionNotes] = useState('');
   const [processingAction, setProcessingAction] = useState(false);
+  const [recentActivities, setRecentActivities] = useState<any[]>([]);
+  const [isLoadingActivities, setIsLoadingActivities] = useState(false);
+  const [viewingPatient, setViewingPatient] = useState<any>(null);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [loadingPatientDetails, setLoadingPatientDetails] = useState(false);
 
 
   // Your existing useState declarations
@@ -187,6 +194,7 @@ export default function DoctorDashboard() {
             await loadPrescriptionCount();
             await loadTodayAppointments(parsedData.id); // ✅ ADD THIS
             await loadPendingAppointments(parsedData.id);
+            await loadRecentActivities(parsedData.id);
 
 
           }
@@ -266,6 +274,66 @@ export default function DoctorDashboard() {
     }
 
     setFilteredRecords(filtered);
+  };
+
+  // Function to load and view patient details
+  const handleViewPatient = async (patientId: number) => {
+    try {
+      setLoadingPatientDetails(true);
+      setIsViewDialogOpen(true);
+
+      const details = await patientApiService.getPatientDetails(patientId);
+      setViewingPatient(details);
+    } catch (error) {
+      console.error('Error loading patient details:', error);
+      // toast({
+      //   title: "Error",
+      //   description: "Failed to load patient details",
+      //   variant: "destructive"
+      // });
+      setIsViewDialogOpen(false);
+    } finally {
+      setLoadingPatientDetails(false);
+    }
+  };
+  // Load recent activities
+  const loadRecentActivities = async (doctorId?: number) => {
+    const id = doctorId || doctorData?.id;
+    if (!id) return;
+
+    setIsLoadingActivities(true);
+    try {
+      const data = await doctorApiService.getRecentActivities(id, 10);
+      setRecentActivities(data);
+    } catch (error) {
+      console.error('Error loading activities:', error);
+    } finally {
+      setIsLoadingActivities(false);
+    }
+  };
+
+  // Helper to get activity icon color
+  const getActivityColor = (priority: string) => {
+    switch (priority) {
+      case 'critical': return 'bg-red-500';
+      case 'medium': return 'bg-yellow-500';
+      case 'low': return 'bg-gray-400';
+      default: return 'bg-green-500';
+    }
+  };
+
+  // Helper to format time ago
+  const getTimeAgo = (timestamp: string) => {
+    const now = new Date();
+    const past = new Date(timestamp);
+    const diffMs = now.getTime() - past.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 60) return `${diffMins} min${diffMins !== 1 ? 's' : ''} ago`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
+    return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
   };
 
 
@@ -862,11 +930,15 @@ export default function DoctorDashboard() {
   };
 
   const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "normal": return "bg-success text-success-foreground";
-      case "attention needed": return "bg-warning text-warning-foreground";
-      case "critical": return "bg-destructive text-destructive-foreground";
-      default: return "bg-muted text-muted-foreground";
+    switch (status) {
+      case 'Critical':
+        return 'bg-red-100 text-red-800 border-red-300';
+      case 'Attention Needed':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+      case 'Normal':
+        return 'bg-green-100 text-green-800 border-green-300';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -1167,9 +1239,10 @@ export default function DoctorDashboard() {
                 </div>
               </div>
               <Button
-                onClick={() => {
-                  alert("Schedule Appointment\n\nManage your appointment schedule:\n• View upcoming appointments\n• Set availability\n• Block time slots\n\nPatient booking requests will appear for confirmation.");
-                }}
+                variant="outline"
+                // className=""
+                disabled
+
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Manage Schedule
@@ -1852,7 +1925,7 @@ export default function DoctorDashboard() {
                           </div>
                         </div>
                         <div className="flex space-x-2">
-                          {/* <Button
+                          <Button
                             size="sm"
                             onClick={() => {
                               setSelectedAppointment(appointment);
@@ -1872,7 +1945,7 @@ export default function DoctorDashboard() {
                           >
                             <X className="w-3 h-3 mr-1" />
                             Reject
-                          </Button> */}
+                          </Button>
                         </div>
                       </div>
                     ))
@@ -1893,36 +1966,56 @@ export default function DoctorDashboard() {
               {/* Recent Patient Updates */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Activity className="w-5 h-5 mr-2" />
-                    Recent Patient Updates
+                  <CardTitle className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <Activity className="w-5 h-5 mr-2" />
+                      Recent Patient Activities
+                    </div>
+                    {recentActivities.length > 0 && (
+                      <Badge variant="secondary">{recentActivities.length}</Badge>
+                    )}
                   </CardTitle>
-                  <CardDescription>Latest patient activities</CardDescription>
+                  <CardDescription>Latest patient updates and actions</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-3">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-2 h-2 bg-success rounded-full"></div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">Blood test results uploaded for Rajesh Kumar</p>
-                        <p className="text-xs text-gray-500">2 hours ago</p>
-                      </div>
+                <CardContent>
+                  {isLoadingActivities ? (
+                    <div className="text-center py-6">
+                      <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
+                      <p className="text-xs text-gray-500 mt-2">Loading activities...</p>
                     </div>
-                    <div className="flex items-center space-x-3">
-                      <div className="w-2 h-2 bg-warning rounded-full"></div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">Appointment rescheduled by Sunita Devi</p>
-                        <p className="text-xs text-gray-500">4 hours ago</p>
-                      </div>
+                  ) : recentActivities.length === 0 ? (
+                    <div className="text-center py-6">
+                      <Activity className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                      <p className="text-sm text-gray-600">No recent activities</p>
                     </div>
-                    <div className="flex items-center space-x-3">
-                      <div className="w-2 h-2 bg-primary rounded-full"></div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">New patient registered: Mohan Singh</p>
-                        <p className="text-xs text-gray-500">6 hours ago</p>
-                      </div>
+                  ) : (
+                    <div className="space-y-3 max-h-80 overflow-y-auto">
+                      {recentActivities.slice(0, 10).map((activity, index) => (
+                        <div key={`${activity.activity_type}-${activity.id}-${index}`} className="flex items-start space-x-3">
+                          <div className={`w-2 h-2 mt-2 rounded-full flex-shrink-0 ${getActivityColor(activity.priority)}`}></div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900">
+                              {activity.activity_title} - {activity.patient_name}
+                            </p>
+                            {activity.activity_description && (
+                              <p className="text-xs text-gray-600 truncate">
+                                {activity.activity_description}
+                              </p>
+                            )}
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              {getTimeAgo(activity.activity_time)}
+                            </p>
+                          </div>
+                          <Badge
+                            variant="outline"
+                            className="text-xs flex-shrink-0"
+                          >
+                            {activity.activity_type.replace('_', ' ')}
+                          </Badge>
+                        </div>
+                      ))}
                     </div>
-                  </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -1961,10 +2054,8 @@ export default function DoctorDashboard() {
                           </Button>
                           <Button
                             size="sm"
-                            onClick={() => {
-                              setSelectedPatient(patient);
-                              alert(`CRITICAL PATIENT DETAILS\n\nName: ${patient.name}\nID: ${patient.id}\nAge: ${patient.age}\nCondition: ${patient.condition}\nLast Visit: ${formatDate(patient.lastVisit)}\nNext Appointment: ${patient.nextAppointment}\n\nIMPORTANT: This patient requires immediate medical attention!`);
-                            }}
+                            variant="outline"
+                            onClick={() => handleViewPatient(patient.id)}
                           >
                             <Eye className="w-4 h-4 mr-1" />
                             View
@@ -1976,6 +2067,72 @@ export default function DoctorDashboard() {
                 </div>
               </CardContent>
             </Card>
+            <Dialog open={isRejectDialogOpen} onOpenChange={setIsRejectDialogOpen}>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Reject Appointment</DialogTitle>
+                    <DialogDescription>
+                      Provide a reason for rejecting this appointment
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  {selectedAppointment && (
+                    <div className="space-y-4">
+                      <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded space-y-2">
+                        <p><strong>Patient:</strong> {selectedAppointment.patient_name}</p>
+                        <p><strong>Date:</strong> {new Date(selectedAppointment.appointment_date).toLocaleDateString()}</p>
+                        <p><strong>Time:</strong> {formatTime(selectedAppointment.appointment_time)}</p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="reject-reason">
+                          Reason for Rejection <span className="text-red-500">*</span>
+                        </Label>
+                        <Textarea
+                          id="reject-reason"
+                          placeholder="Please provide a reason (e.g., Not available at this time, Emergency case, etc.)"
+                          value={actionNotes}
+                          onChange={(e) => setActionNotes(e.target.value)}
+                          rows={4}
+                          required
+                        />
+                      </div>
+
+                      <div className="flex gap-3">
+                        <Button
+                          variant="destructive"
+                          onClick={handleRejectAppointment}
+                          disabled={processingAction || !actionNotes.trim()}
+                          className="flex-1"
+                        >
+                          {processingAction ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Rejecting...
+                            </>
+                          ) : (
+                            <>
+                              <X className="w-4 h-4 mr-2" />
+                              Reject Appointment
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setIsRejectDialogOpen(false);
+                            setActionNotes('');
+                            setSelectedAppointment(null);
+                          }}
+                          disabled={processingAction}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </DialogContent>
+              </Dialog>
           </TabsContent>
 
           <TabsContent value="patients" className="space-y-6">
@@ -2071,23 +2228,28 @@ export default function DoctorDashboard() {
                                 </div>
                               </div>
                               <div className="flex items-center space-x-3">
-                                <Badge className={getStatusColor(patient.status)}>
-                                  {patient.status}
-                                </Badge>
+                                <div className="flex items-center space-x-3">
+                                  <Badge className={getStatusColor(patient.status)}>
+                                    {patient.status}
+                                  </Badge>
+
+                                  {/* Show risk factors */}
+                                  {patient.riskFactors && patient.riskFactors.length > 0 && (
+                                    <div className="text-xs text-gray-500">
+                                      ({patient.riskFactors.length} risk factor{patient.riskFactors.length !== 1 ? 's' : ''})
+                                    </div>
+                                  )}
+                                </div>
                                 <div className="flex space-x-2">
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => {
-                                      setSelectedPatient(patient);
-                                      setIsPatientViewOpen(true);
-                                      alert(`Viewing detailed profile for ${patient.name}\nID: ${patient.id}\nCondition: ${patient.condition}\nStatus: ${patient.status}`);
-                                    }}
+                                    onClick={() => handleViewPatient(patient.id)}
                                   >
                                     <Eye className="w-4 h-4 mr-1" />
                                     View
                                   </Button>
-                                  <Button
+                                  {/* <Button
                                     size="sm"
                                     variant="outline"
                                     onClick={() => {
@@ -2096,7 +2258,7 @@ export default function DoctorDashboard() {
                                   >
                                     <Edit className="w-4 h-4 mr-1" />
                                     Edit
-                                  </Button>
+                                  </Button> */}
                                   <Button
                                     size="sm"
                                     variant="outline"
@@ -2123,6 +2285,150 @@ export default function DoctorDashboard() {
               </CardContent>
 
             </Card>
+            
+             <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+                <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Patient Details</DialogTitle>
+                  </DialogHeader>
+
+                  {loadingPatientDetails ? (
+                    <div className="flex justify-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    </div>
+                  ) : viewingPatient ? (
+                    <div className="space-y-6">
+                      {/* Profile Section */}
+                      <div className="flex items-start space-x-4 pb-4 border-b">
+                        <Avatar className="w-20 h-20">
+                          {viewingPatient.profilePicture || viewingPatient.profile_img ? (
+                            <img
+                              src={viewingPatient.profilePicture || `http://localhost:5000${viewingPatient.profile_img}`}
+                              alt={viewingPatient.name || `${viewingPatient.firstName} ${viewingPatient.lastName}`}
+                            />
+                          ) : (
+                            <AvatarFallback className="text-2xl">
+                              {viewingPatient.firstName?.[0]}{viewingPatient.lastName?.[0]}
+                            </AvatarFallback>
+                          )}
+                        </Avatar>
+                        <div>
+                          <h3 className="text-xl font-semibold">
+                            {viewingPatient.name || `${viewingPatient.firstName} ${viewingPatient.lastName}`}
+                          </h3>
+                          <p className="text-sm text-gray-600">Patient ID: {viewingPatient.id}</p>
+                          <div className="flex gap-2 mt-2">
+                            {viewingPatient.gender && <Badge>{viewingPatient.gender}</Badge>}
+                            {viewingPatient.age && (
+                              <Badge variant="outline">{viewingPatient.age} years</Badge>
+                            )}
+                            {viewingPatient.bloodGroup && (
+                              <Badge variant="outline">Blood Group: {viewingPatient.bloodGroup}</Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Personal Information */}
+                      <div>
+                        <h4 className="font-semibold mb-3 flex items-center">
+                          <User className="w-4 h-4 mr-2" />
+                          Personal Information
+                        </h4>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-sm text-gray-600">Email</p>
+                            <p className="font-medium">{viewingPatient.email}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600">Phone</p>
+                            <p className="font-medium">{viewingPatient.phone || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600">Date of Birth</p>
+                            <p className="font-medium">
+                              {viewingPatient.dateOfBirth
+                                ? new Date(viewingPatient.dateOfBirth).toLocaleDateString()
+                                : 'N/A'}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600">Gender</p>
+                            <p className="font-medium">{viewingPatient.gender || 'N/A'}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Address */}
+                      {(viewingPatient.address || viewingPatient.city || viewingPatient.state) && (
+                        <div>
+                          <h4 className="font-semibold mb-3 flex items-center">
+                            <MapPin className="w-4 h-4 mr-2" />
+                            Address
+                          </h4>
+                          <p className="text-gray-700">
+                            {viewingPatient.address && <>{viewingPatient.address}<br /></>}
+                            {viewingPatient.city && viewingPatient.state &&
+                              `${viewingPatient.city}, ${viewingPatient.state}`
+                            }
+                            {viewingPatient.pincode && ` - ${viewingPatient.pincode}`}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Emergency Contact */}
+                      {(viewingPatient.emergencyContact || viewingPatient.emergencyPhone) && (
+                        <div>
+                          <h4 className="font-semibold mb-3 flex items-center">
+                            <Phone className="w-4 h-4 mr-2" />
+                            Emergency Contact
+                          </h4>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <p className="text-sm text-gray-600">Contact Name</p>
+                              <p className="font-medium">{viewingPatient.emergencyContact || 'N/A'}</p>
+                            </div>
+                            <div>
+                              <p className="text-sm text-gray-600">Contact Phone</p>
+                              <p className="font-medium">{viewingPatient.emergencyPhone || 'N/A'}</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Medical Information */}
+                      <div>
+                        <h4 className="font-semibold mb-3 flex items-center">
+                          <FileText className="w-4 h-4 mr-2" />
+                          Medical Information
+                        </h4>
+                        <div className="space-y-3">
+                          {viewingPatient.bloodGroup && (
+                            <div>
+                              <p className="text-sm text-gray-600">Blood Group</p>
+                              <p className="font-medium">{viewingPatient.bloodGroup}</p>
+                            </div>
+                          )}
+                          <div>
+                            <p className="text-sm text-gray-600">Allergies</p>
+                            <p className="font-medium">{viewingPatient.allergies || 'None reported'}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600">Medical History</p>
+                            <p className="font-medium">{viewingPatient.medicalHistory || 'No history recorded'}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Registration Date */}
+                      <div className="pt-4 border-t text-sm text-gray-600">
+                        <p>Registered on: {new Date(viewingPatient.createdAt || viewingPatient.created_at || '').toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                  ) : null}
+                </DialogContent>
+              </Dialog>
+              
           </TabsContent>
 
           <TabsContent value="appointments" className="space-y-6">
@@ -2241,7 +2547,7 @@ export default function DoctorDashboard() {
                               </>
                             )}
 
-                            <Button
+                            {/* <Button
                               size="sm"
                               variant="outline"
                               onClick={() => {
@@ -2251,7 +2557,7 @@ export default function DoctorDashboard() {
                             >
                               <User className="w-3 h-3 mr-1" />
                               View Patient
-                            </Button>
+                            </Button> */}
                           </div>
                         </div>
                       ))}
@@ -2465,7 +2771,9 @@ export default function DoctorDashboard() {
                   )}
                 </DialogContent>
               </Dialog>
-
+              {/* View Patient Details Dialog */}
+              {/* View Patient Details Dialog */}
+             
               {/* Complete Appointment Dialog */}
               <Dialog open={isCompleteDialogOpen} onOpenChange={setIsCompleteDialogOpen}>
                 <DialogContent className="max-w-md">
@@ -2530,6 +2838,7 @@ export default function DoctorDashboard() {
                 </DialogContent>
               </Dialog>
             </div>
+
           </TabsContent>
           {/* -------------------------------------------------------------------------------------------- */}
           <TabsContent value="records" className="space-y-6">
@@ -2570,15 +2879,14 @@ export default function DoctorDashboard() {
                     </div>
 
                     <div className="flex space-x-2">
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          alert("Upload Lab Results:\n\nSelect patient and upload their test results from external labs.");
-                        }}
-                      >
-                        <Upload className="w-4 h-4 mr-2" />
-                        Upload Lab Results
-                      </Button>
+                    <Button
+                    variant="outline"
+                    className="w-full"
+                    disabled
+                  >
+                    
+                    Upload Results (Coming Soon)
+                  </Button>
                       <Button onClick={() => setIsAddRecordOpen(true)}>
                         <Plus className="w-4 h-4 mr-2" />
                         New Record

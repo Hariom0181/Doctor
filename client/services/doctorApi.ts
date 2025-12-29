@@ -298,6 +298,60 @@ class DoctorApiService {
       throw error;
     }
   }
+
+  async getRecentActivities(doctorId: number, limit: number = 10): Promise<any[]> {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/doctors/${doctorId}/recent-activities?limit=${limit}`,
+        {
+          method: 'GET',
+          headers: this.getAuthHeaders()
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch activities');
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.message);
+      }
+
+      return result.data;
+    } catch (error) {
+      console.error('Error fetching activities:', error);
+      throw error;
+    }
+  }
+
+  async getPatientsWithRiskAssessment(doctorId: number): Promise<any[]> {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/doctors/${doctorId}/patients/risk-assessment`,
+        {
+          method: 'GET',
+          headers: this.getAuthHeaders()
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch patient risk data');
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.message);
+      }
+
+      return result.data;
+    } catch (error) {
+      console.error('Error fetching patient risk:', error);
+      throw error;
+    }
+  }
   
   async getDoctorProfileImage(doctorId: number): Promise<string | null> {
     try {

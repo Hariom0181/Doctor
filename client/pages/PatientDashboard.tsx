@@ -193,6 +193,9 @@ export default function PatientDashboard() {
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
   const [uploadingDocument, setUploadingDocument] = useState(false);
   const [showAllDoctorRecords, setShowAllDoctorRecords] = useState(false);
+  const [viewingPatient, setViewingPatient] = useState<PatientProfile | null>(null);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [loadingPatientDetails, setLoadingPatientDetails] = useState(false);
 
   // Prescriptions/Medications state
   const [prescriptions, setPrescriptions] = useState<any[]>([]);
@@ -227,7 +230,7 @@ export default function PatientDashboard() {
         const storedPatientData = localStorage.getItem('patientData');
         if (storedPatientData) {
           const parsedData = JSON.parse(storedPatientData);
-  
+
           const transformedData = {
             id: parsedData.id,
             name: `${parsedData.firstName} ${parsedData.lastName}`,
@@ -238,10 +241,10 @@ export default function PatientDashboard() {
             address: parsedData.address,
             profilePicture: parsedData.profileImage
           };
-  
+
           // ✅ FIX: Set patient data FIRST
           setPatientData(transformedData);
-  
+
           // ✅ FIX: Pass ID directly to functions instead of relying on state
           if (parsedData.id) {
             await loadProfileImage(parsedData.id);
@@ -259,32 +262,11 @@ export default function PatientDashboard() {
         setLoading(false);
       }
     };
-  
+
     loadPatientData();
   }, []);
 
-  // ✅ FIXED: Use separate state to track if data is loaded
-// // useEffect(() => {
-// //   if (!patientData?.id) return;
 
-// //   const refreshInterval = setInterval(async () => {
-// //     console.log('🔄 Auto-refreshing patient data...');
-// //     try {
-// //       await loadAppointments();
-// //       await loadPrescriptions();
-// //       console.log('✅ Refresh complete');
-// //     } catch (error) {
-// //       console.error('❌ Refresh failed:', error);
-// //     }
-// //   }, 30000);
-
-// //   return () => {
-// //     console.log('🧹 Cleaning up refresh interval');
-// //     clearInterval(refreshInterval);
-// //   };
-// }, []); // ✅ EMPTY DEPENDENCY - only run once
-
-  // ✅ ADD THIS - Refresh when tab becomes visible
   useEffect(() => {
     const handleVisibilityChange = async () => {
       if (document.visibilityState === 'visible' && patientData?.id) {
@@ -360,43 +342,21 @@ export default function PatientDashboard() {
     return `HMS${new Date().getFullYear()}${String(id).padStart(4, '0')}`;
   };
 
-  // const fetchPatientDocuments = async () => {
-  //   try {
-  //     setIsLoadingDocuments(true);
-  //     setDocumentsError(null);
-
-  //     if (!patientId) {
-  //       throw new Error("Patient ID not found");
-  //     }
-
-  //     const docs = await patientsApi.getPatientDocuments(patientId);
-  //     setPatientDocuments(docs);
-  //   } catch (err: any) {
-  //     setDocumentsError(err.message || "Failed to load documents");
-  //   } finally {
-  //     setIsLoadingDocuments(false);
-  //   }
-  // };
-  // useEffect(() => {
-  //   fetchPatientDocuments();
-  // }, [patientId]);
-
-  // load presciptions 
-  // Load patient prescriptions
+  
   const loadPrescriptions = async (patientId?: number) => {
     // console.log('=== LOAD PRESCRIPTIONS START ===');
-    
+
     // Use passed ID or state ID
     const id = patientId || patientData?.id;
-    
+
     if (!id) {
       console.log('⚠️ No patient ID, skipping prescription load');
       return;
     }
-    
+
     console.log('📥 Loading prescriptions for patient:', id);
     setIsLoadingPrescriptions(true);
-    
+
     try {
       const data = await patientApiService.getPatientPrescriptions(id, 'active');
       // console.log('✅ Prescriptions loaded:', data);
@@ -408,7 +368,7 @@ export default function PatientDashboard() {
     }
     // console.log('=== LOAD PRESCRIPTIONS END ===');
   };
-  
+
   // Create helper function for initial load
   const loadPrescriptionsById = (patientId: number) => loadPrescriptions(patientId);
 
@@ -430,12 +390,12 @@ export default function PatientDashboard() {
   const loadPatientDocuments = async (patientId?: number) => {
     // Use passed ID or state ID
     const id = patientId || patientData?.id;
-    
+
     if (!id) return;
-    
+
     // console.log('📄 Loading patient documents for:', id);
     setIsLoadingDocuments(true);
-    
+
     try {
       const docs = await patientApiService.getPatientDocuments(id);
       // console.log('📄 Documents loaded:', docs);
@@ -446,7 +406,7 @@ export default function PatientDashboard() {
       setIsLoadingDocuments(false);
     }
   };
-  
+
   // Create helper function for initial load
   const loadPatientDocumentsById = (patientId: number) => loadPatientDocuments(patientId);
 
@@ -548,7 +508,26 @@ export default function PatientDashboard() {
       alert('❌ Failed to delete document');
     }
   };
-
+  // Function to load and view patient details
+  const handleViewPatient = async (patientId: number) => {
+    try {
+      setLoadingPatientDetails(true);
+      setIsViewDialogOpen(true);
+      
+      const details = await patientApiService.getPatientDetails(patientId);
+      setViewingPatient(details);
+    } catch (error) {
+      console.error('Error loading patient details:', error);
+      // toast({
+      //   title: "Error",
+      //   description: "Failed to load patient details",
+      //   variant: "destructive"
+      // });
+      setIsViewDialogOpen(false);
+    } finally {
+      setLoadingPatientDetails(false);
+    }
+  };
   // Format document type for display
   const formatDocumentType = (type: string) => {
     const types: { [key: string]: string } = {
@@ -637,30 +616,30 @@ export default function PatientDashboard() {
 
   const loadAppointments = async (patientId?: number) => {
     // console.log('=== LOAD APPOINTMENTS START ===');
-    
+
     // Use passed ID or state ID
     const id = patientId || patientData?.id;
-    
+
     if (!id) {
       console.log('❌ No patient ID');
       return;
     }
-  
+
     // console.log('📅 Loading appointments for patient:', id);
     setIsLoadingAppointments(true);
-    
+
     try {
       const appointmentsData = await patientApiService.getPatientAppointments(id);
       // console.log('📊 All appointments from API:', appointmentsData);
-      
+
       const now = new Date();
       now.setHours(0, 0, 0, 0);
-      
+
       const upcoming = appointmentsData.filter(apt => {
         const aptDate = new Date(apt.appointment_date);
         return aptDate >= now && apt.status !== 'cancelled' && apt.status !== 'completed';
       });
-      
+
       // console.log('✅ Upcoming appointments:', upcoming);
       setUpcomingAppointments(upcoming);
       setAppointments(appointmentsData);
@@ -671,7 +650,7 @@ export default function PatientDashboard() {
     }
     // console.log('=== LOAD APPOINTMENTS END ===');
   };
-  
+
   // Create helper function for initial load
   const loadAppointmentsById = (patientId: number) => loadAppointments(patientId);
 

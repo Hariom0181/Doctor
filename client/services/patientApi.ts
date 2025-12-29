@@ -10,7 +10,7 @@ export interface LinkedDoctor {
   linkedDate: string;
   relationshipStatus: string;
   relationshipNotes?: string;
-  
+
 }
 // patientApi.ts (or a shared types file)
 export interface PatientProfile {
@@ -43,7 +43,7 @@ export interface PatientMedicalRecord {
   examinationType: string;
   diagnosis: string;
   prescription?: string;
-  currentHospital? : string;
+  currentHospital?: string;
   nextCheckupDate?: string;
   additionalNotes?: string;
   createdAt: string;
@@ -105,7 +105,7 @@ class PatientApiService {
     };
   }
 
-  
+
   async getLinkedDoctors(patientId: string): Promise<LinkedDoctor[]> {
     try {
       // Add timeout to prevent long waits
@@ -128,7 +128,7 @@ class PatientApiService {
       }
 
       const result: ApiResponse<LinkedDoctor[]> = await response.json();
-      
+
       if (!result.success) {
         throw new Error(result.message);
       }
@@ -139,31 +139,64 @@ class PatientApiService {
       throw error;
     }
   }
-  
+  // Get single patient details (for doctor to view)
+  // Get single patient details (for doctor to view)
+  async getPatientDetails(patientId: number): Promise<PatientProfile> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/patients/${patientId}/details`, {
+        method: 'GET',
+        headers: this.getAuthHeaders()
+      });
 
-  
+      if (!response.ok) {
+        throw new Error('Failed to fetch patient details');
+      }
+
+      const result = await response.json();
+      console.log('📦 Raw API response:', result);
+
+      if (!result.success) {
+        throw new Error(result.message);
+      }
+
+      // Map backend field names to frontend expected names
+      const mappedData: PatientProfile = {
+        ...result.data,
+        profilePicture: result.data.profile_img ? `http://localhost:5000${result.data.profile_img}` : undefined,
+        createdAt: result.data.created_at
+      };
+
+      console.log('✅ Mapped patient data:', mappedData);
+      return mappedData;
+    } catch (error) {
+      console.error('❌ Error fetching patient details:', error);
+      throw error;
+    }
+  }
+
+
   async getMedicalRecords(patientId: string): Promise<PatientMedicalRecord[]> {
     try {
       // console.log('🏥 Fetching patient medical records for:', patientId);
-      
+
       const response = await fetch(`${API_BASE_URL}/patients/${patientId}/medical-records`, {
         method: 'GET',
         headers: this.getAuthHeaders(),
       });
-  
+
       console.log('📡 Get medical records response status:', response.status);
-  
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-  
+
       const result: ApiResponse<PatientMedicalRecord[]> = await response.json();
       // console.log('📄 Medical records result:', result);
-      
+
       if (!result.success) {
         throw new Error(result.message);
       }
-  
+
       return result.data;
     } catch (error) {
       console.error('❌ Error fetching medical records:', error);
@@ -174,19 +207,19 @@ class PatientApiService {
     //this files is from patientApi.ts
     try {
       // console.log('🌐 Calling API:', `${API_BASE_URL}/patients/available-doctors`);
-      
-      
+
+
       const response = await fetch(`${API_BASE_URL}/patients/available-doctors`, {
         method: 'GET',
         headers: this.getAuthHeaders(),
-        
+
       });
 
-      
+
       // console.log('📡 Response status:', response.status);
-      
+
       // Log the response text to see the exact error
-  
+
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -194,7 +227,7 @@ class PatientApiService {
 
       const result: ApiResponse<AvailableDoctor[]> = await response.json();
       // console.log('📄 API Response data:', result);
-      
+
       if (!result.success) {
         throw new Error(result.message);
       }
@@ -219,7 +252,7 @@ class PatientApiService {
       }
 
       const result = await response.json();
-      
+
       if (!result.success) {
         throw new Error(result.message);
       }
@@ -241,7 +274,7 @@ class PatientApiService {
       }
 
       const result: ApiResponse<HealthMetric[]> = await response.json();
-      
+
       if (!result.success) {
         throw new Error(result.message);
       }
@@ -260,7 +293,7 @@ class PatientApiService {
       formData.append('profileImage', imageFile);
 
       const token = localStorage.getItem('PatientToken');
-      
+
       const response = await fetch(`${API_BASE_URL}/patients/${patientId}/upload-profile`, {
         method: 'POST',
         headers: {
@@ -276,7 +309,7 @@ class PatientApiService {
       }
 
       const result = await response.json();
-      
+
       if (!result.success) {
         throw new Error(result.message);
       }
@@ -303,7 +336,7 @@ class PatientApiService {
       }
 
       const result = await response.json();
-      
+
       if (result.success && result.profileImagePath) {
         // Return full URL to the image
         return `http://localhost:5000${result.profileImagePath}`;
@@ -319,7 +352,7 @@ class PatientApiService {
   // Helper method to get the latest metric for each type
   getLatestMetrics(metrics: HealthMetric[]): HealthMetric[] {
     const latestMetrics = new Map<string, HealthMetric>();
-    
+
     metrics.forEach(metric => {
       const existing = latestMetrics.get(metric.metricType);
       if (!existing || new Date(metric.recordedDate) > new Date(existing.recordedDate)) {
@@ -353,7 +386,7 @@ class PatientApiService {
       }
 
       const result = await response.json();
-      
+
       if (!result.success) {
         throw new Error(result.message);
       }
@@ -380,7 +413,7 @@ class PatientApiService {
       }
 
       const result = await response.json();
-      
+
       if (!result.success) {
         throw new Error(result.message);
       }
@@ -409,7 +442,7 @@ class PatientApiService {
       }
 
       const result = await response.json();
-      
+
       if (!result.success) {
         throw new Error(result.message);
       }
@@ -442,7 +475,7 @@ class PatientApiService {
   async uploadPatientDocument(formData: FormData): Promise<{ success: boolean; documentId: number; filePath: string }> {
     try {
       const token = localStorage.getItem('PatientToken');
-      
+
       const response = await fetch(`${API_BASE_URL}/documents/upload`, {
         method: 'POST',
         headers: {
@@ -458,7 +491,7 @@ class PatientApiService {
       }
 
       const result = await response.json();
-      
+
       if (!result.success) {
         throw new Error(result.message);
       }
@@ -486,7 +519,7 @@ class PatientApiService {
       }
 
       const result = await response.json();
-      
+
       if (!result.success) {
         throw new Error(result.message);
       }

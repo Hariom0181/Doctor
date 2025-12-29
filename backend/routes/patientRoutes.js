@@ -34,12 +34,12 @@ const fs = require("fs");
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     const uploadDir = path.join(__dirname, "../uploads/patients_profile");
-    
+
     // Create directory if it doesn't exist
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
-    
+
     cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
@@ -344,9 +344,9 @@ router.post(
         errors: errors.array()
       });
     }
-  
+
     const { email, password } = req.body;
-  
+
     // 1. Check if patient exists
     const sql = "SELECT * FROM patients WHERE email = ?";
     db.query(sql, [email.toLowerCase()], (err, results) => {
@@ -357,16 +357,16 @@ router.post(
           message: "Database error during login"
         });
       }
-  
+
       if (results.length === 0) {
         return res.status(401).json({
           success: false,
           message: "Invalid email or password"
         });
       }
-  
+
       const patient = results[0];
-  
+
       // 2. Compare password
       if (patient.password !== password) {
         return res.status(401).json({
@@ -374,7 +374,7 @@ router.post(
           message: "Invalid email or password"
         });
       }
-  
+
       // 3. Update last login time FIRST
       const updateLastLoginSql = "UPDATE patients SET lastLogin = NOW() WHERE id = ?";
       db.query(updateLastLoginSql, [patient.id], (updateErr) => {
@@ -382,7 +382,7 @@ router.post(
           console.error("Error updating last login:", updateErr);
           // Continue anyway - don't fail login for this
         }
-  
+
         // 4. Generate JWT token
         const jwtSecret = process.env.JWT_SECRET || "your-fallback-secret-key-change-in-production";
         const token = jwt.sign(
@@ -394,10 +394,10 @@ router.post(
           jwtSecret,
           { expiresIn: "24h" }
         );
-  
+
         // 5. Get current timestamp for response
-  
-  
+
+
         // 6. Send successful response with current timestamp
         res.status(200).json({
           success: true,
@@ -410,7 +410,7 @@ router.post(
             email: patient.email,
             phone: patient.phone,
             address: patient.address,
-           
+
           },
         });
       });
@@ -822,6 +822,78 @@ router.get("/health-metrics", authenticatePatient, async (req, res) => {
 });
 // GET /api/patients/:patientId/medical-records
 // GET /api/patients/:patientId/medical-records
+
+// GET single patient details by ID (for doctor to view)
+// GET single patient details by ID (for doctor to view)
+router.get('/:patientId/details', (req, res) => {
+  try {
+    const { patientId } = req.params;
+
+    const sql = `
+      SELECT 
+        id,
+        firstName,
+        lastName,
+        email,
+        phone,
+        dateOfBirth,
+        gender,
+        address,
+        city,
+        state,
+        pincode,
+        emergencyContact,
+        emergencyPhone,
+        bloodGroup,
+        allergies,
+        medicalHistory,
+        created_at,
+        profile_img
+      FROM patients 
+      WHERE id = ?
+    `;
+
+    db.query(sql, [patientId], (err, results) => {
+      if (err) {
+        console.error('Database error fetching patient details:', err);
+        return res.status(500).json({
+          success: false,
+          message: 'Database error fetching patient details'
+        });
+      }
+
+      if (results.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Patient not found'
+        });
+      }
+
+      const patient = results[0];
+
+      // Calculate age from dateOfBirth
+      const age = patient.dateOfBirth
+        ? Math.floor((new Date() - new Date(patient.dateOfBirth)) / 31557600000)
+        : null;
+
+      res.json({
+        success: true,
+        message: 'Patient details retrieved successfully',
+        data: {
+          ...patient,
+          age,
+          name: `${patient.firstName} ${patient.lastName}`
+        }
+      });
+    });
+  } catch (error) {
+    console.error('Server error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
 router.get('/:patientId/medical-records', authenticatePatient, async (req, res) => {
   try {
     const { patientId } = req.params;
@@ -1006,6 +1078,6 @@ router.get('/:patientId/medical-records/:recordId', authenticatePatient, async (
   }
 });
 // Add this test route right after the authenticatePatient function
-  
+
 
 module.exports = router;
