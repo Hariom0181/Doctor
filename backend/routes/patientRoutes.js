@@ -906,7 +906,7 @@ router.get("/health-metrics", authenticatePatient, async (req, res) => {
         };
       });
 
-      console.log("Formatted metrics for frontend:", formattedMetrics);
+      
 
       res.json({
         success: true,

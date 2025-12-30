@@ -10,6 +10,7 @@ const dashboardRoutes = require("./routes/dashboardRoutes");
 const appointmentRoutes = require("./routes/appointmentRoutes");
 const documentRoutes = require("./routes/documentRoutes");
 const prescriptionRoutes = require("./routes/prescriptionRoutes");
+const walletRoutes = require('./routes/walletRoutes');
 
 
 
@@ -29,10 +30,12 @@ app.use('/uploads/patient_documents', express.static(path.join(__dirname, 'uploa
 
 
 
+
 // Routes
 app.use("/api/patients", patientRoutes);
 app.use("/api/doctors", doctorRoutes);
 app.use("/api/dashboard", dashboardRoutes); 
+app.use('/api/wallet', walletRoutes);
 app.use("/api/prescriptions", prescriptionRoutes);
 
 

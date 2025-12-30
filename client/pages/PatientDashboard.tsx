@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Camera, X } from 'lucide-react';
+import { WalletCard } from '@/components/WalletCard';
 import {
 
   // ... existing imports ...
@@ -342,7 +343,7 @@ export default function PatientDashboard() {
     return `HMS${new Date().getFullYear()}${String(id).padStart(4, '0')}`;
   };
 
-  
+
   const loadPrescriptions = async (patientId?: number) => {
     // console.log('=== LOAD PRESCRIPTIONS START ===');
 
@@ -513,7 +514,7 @@ export default function PatientDashboard() {
     try {
       setLoadingPatientDetails(true);
       setIsViewDialogOpen(true);
-      
+
       const details = await patientApiService.getPatientDetails(patientId);
       setViewingPatient(details);
     } catch (error) {
@@ -1468,6 +1469,10 @@ export default function PatientDashboard() {
               )}
             </CardContent>
           </Card>
+          {patientData?.id && (
+            <WalletCard patientId={patientData.id} />
+          )}
+
         </div>
 
         {/* Main Dashboard Tabs */}
