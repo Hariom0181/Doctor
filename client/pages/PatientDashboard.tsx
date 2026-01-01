@@ -13,6 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Camera, X } from 'lucide-react';
 import { WalletCard } from '@/components/WalletCard';
+import { VideoConsultationBooking } from '@/components/VideoConsultationBooking';
 import {
 
   // ... existing imports ...
@@ -1471,6 +1472,9 @@ export default function PatientDashboard() {
           </Card>
           {patientData?.id && (
             <WalletCard patientId={patientData.id} />
+          )}
+           {patientData?.id && (
+             <VideoConsultationBooking patientId={patientData?.id} />
           )}
 
         </div>

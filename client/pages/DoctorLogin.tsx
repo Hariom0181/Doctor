@@ -110,9 +110,11 @@ export default function DoctorLogin() {
   
       // Store doctor data for authenticated requests - FIX THE KEYS HERE
       if (data.token) {
+        // localStorage.clear();
         localStorage.setItem("doctorToken", data.token); // Changed from "authToken"
         localStorage.setItem("doctorId", data.doctor.id.toString()); // Added doctorId
         localStorage.setItem("doctorData", JSON.stringify(data.doctor));
+        console.log('🔵 Doctor id from login:', data.doctor.id);
       }
   
       setSubmitMessage({ type: 'success', message: "Login successful! Redirecting..." });

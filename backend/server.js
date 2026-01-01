@@ -11,7 +11,7 @@ const appointmentRoutes = require("./routes/appointmentRoutes");
 const documentRoutes = require("./routes/documentRoutes");
 const prescriptionRoutes = require("./routes/prescriptionRoutes");
 const walletRoutes = require('./routes/walletRoutes');
-
+const videoConsultationRoutes = require('./routes/videoConsultationRoutes');
 
 
 dotenv.config();
@@ -27,6 +27,7 @@ app.use('/uploads/doctors_profile', express.static(path.join(__dirname, 'uploads
 app.use("/api/appointments", appointmentRoutes);
 app.use("/api/documents", documentRoutes);
 app.use('/uploads/patient_documents', express.static(path.join(__dirname, 'uploads/patient_documents')));
+app.use('/api/video-consultations', videoConsultationRoutes);
 
 
 

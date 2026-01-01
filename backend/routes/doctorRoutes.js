@@ -749,6 +749,8 @@ router.post(
         }
 
         const doctor = results[0];
+        console.log("This is doctor id saved into JWT",doctor.id);
+
 
         try {
           const isPasswordValid = await bcrypt.compare(password, doctor.password);

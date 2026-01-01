@@ -15,6 +15,8 @@ import { doctorApiService, type MedicalRecord } from '@/services/doctorApi'
 import { Camera, ChevronDown, ChevronUp, X } from 'lucide-react';
 import { patientApiService } from '@/services/patientApi';
 import type { PatientProfile } from '@/services/patientApi';
+import { DoctorAvailabilitySettings } from '@/components/DoctorAvailabilitySettings';
+import { Video } from 'lucide-react';
 import {
   Heart,
   Calendar,
@@ -199,6 +201,9 @@ export default function DoctorDashboard() {
             await loadTodayAppointments(parsedData.id); // ✅ ADD THIS
             await loadPendingAppointments(parsedData.id);
             await loadRecentActivities(parsedData.id);
+            console.log("Doctor ID :",parsedData.id);
+            // console.log("Doctor ID :",doctorData.id);  
+
 
 
           }
@@ -1939,9 +1944,11 @@ export default function DoctorDashboard() {
             <TabsTrigger value="patients">Patient Management</TabsTrigger>
             <TabsTrigger value="appointments">Appointments</TabsTrigger>
             <TabsTrigger value="records">Medical Records</TabsTrigger>
+            <TabsTrigger value="video-consultation">Video Consultation</TabsTrigger>
+
           </TabsList>
 
-          <TabsContent value="overview" className="space-y-6">
+          <TabsContent value="overview" className="pt-6 space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Today's Appointments */}
               <Card>
@@ -2126,6 +2133,11 @@ export default function DoctorDashboard() {
                   )}
                 </CardContent>
               </Card>
+              {/* <Card>
+                <div className="space-y-6">
+                  <DoctorAvailabilitySettings doctorId={doctorData?.id || 0} />
+                </div>
+              </Card> */}
             </div>
 
             {/* Critical Patients Alert */}
@@ -2243,7 +2255,7 @@ export default function DoctorDashboard() {
             </Dialog>
           </TabsContent>
 
-          <TabsContent value="patients" className="space-y-6">
+          <TabsContent value="patients" className="pt-6 space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle>Patient Management</CardTitle>
@@ -2539,7 +2551,7 @@ export default function DoctorDashboard() {
 
           </TabsContent>
 
-          <TabsContent value="appointments" className="space-y-6">
+          <TabsContent value="appointments" className="pt-6 space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <Card>
                 <CardHeader>
@@ -2949,7 +2961,7 @@ export default function DoctorDashboard() {
 
           </TabsContent>
           {/* -------------------------------------------------------------------------------------------- */}
-          <TabsContent value="records" className="space-y-6">
+          <TabsContent value="records" className="pt-6 space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle>Medical Records Management</CardTitle>
@@ -3267,6 +3279,27 @@ export default function DoctorDashboard() {
               </DialogContent>
             </Dialog>
           </TabsContent>
+
+          <TabsContent value="video-consultation" className="pt-6 space-y-6">
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Video Consultation</CardTitle>
+                  <CardDescription>
+                    Manage your video consultation schedule
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {doctorData?.id &&(
+                  <DoctorAvailabilitySettings doctorId={doctorData?.id} />
+                  
+
+                  ) }
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
         </Tabs>
       </div>
     </div>
