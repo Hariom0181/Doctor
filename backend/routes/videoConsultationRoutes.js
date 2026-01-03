@@ -49,6 +49,41 @@ const authenticatePatient = (req, res, next) => {
   }
 };
 
+// Get Doctor's Consultation Fees (from token)
+router.get('/doctor/consultation-fees', authenticateDoctor, (req, res) => {
+  try {
+    const doctorId = req.doctor.id;
+
+    const sql = `
+      SELECT id, doctor_id, duration_minutes, fee, is_active
+      FROM consultation_fees
+      WHERE doctor_id = ? AND is_active = true
+      ORDER BY duration_minutes ASC
+    `;
+
+    db.query(sql, [doctorId], (err, results) => {
+      if (err) {
+        console.error('Error fetching consultation fees:', err);
+        return res.status(500).json({
+          success: false,
+          message: 'Error fetching consultation fees'
+        });
+      }
+
+      res.json({
+        success: true,
+        data: results
+      });
+    });
+  } catch (error) {
+    console.error('Server error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
 // ==================== DOCTOR ENDPOINTS ====================
 
 // Set/Update Doctor Availability
@@ -231,39 +266,6 @@ router.post('/doctor/consultation-fees', authenticateDoctor, (req, res) => {
 });
 
 // Get Doctor's Consultation Fees
-router.get('/doctor/consultation-fees/:doctorId', (req, res) => {
-  try {
-    const { doctorId } = req.params;
-
-    const sql = `
-      SELECT * FROM consultation_fees
-      WHERE doctor_id = ? AND is_active = true
-      ORDER BY duration_minutes
-    `;
-
-    db.query(sql, [doctorId], (err, results) => {
-      if (err) {
-        console.error('Error fetching fees:', err);
-        return res.status(500).json({
-          success: false,
-          message: 'Error fetching consultation fees'
-        });
-      }
-
-      res.json({
-        success: true,
-        data: results
-      });
-    });
-  } catch (error) {
-    console.error('Server error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error'
-    });
-  }
-});
-
 // Get Available Time Slots for a Doctor on a Specific Date
 router.get('/doctor/:doctorId/available-slots', (req, res) => {
   try {
@@ -277,9 +279,19 @@ router.get('/doctor/:doctorId/available-slots', (req, res) => {
       });
     }
 
-    // Get day of week (1=Monday, 7=Sunday)
-    const dateObj = new Date(date);
-    const dayOfWeek = dateObj.getDay() || 7; // Convert Sunday from 0 to 7
+    // ✅ FIXED: Proper day of week conversion
+    const [year, month, day] = date.split('-').map(Number);
+    const dateObj = new Date(year, month - 1, day);
+    const jsDayOfWeek = dateObj.getDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
+    
+    // Convert JavaScript day (0-6) to database day (1-7)
+    // JavaScript: 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday
+    // Database:   1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday, 7=Sunday
+    const dayOfWeek = jsDayOfWeek === 0 ? 7 : jsDayOfWeek;
+
+    console.log('📅 Date:', date);
+    console.log('📅 JS Day of Week:', jsDayOfWeek);
+    console.log('📅 DB Day of Week:', dayOfWeek);
 
     // Get doctor's availability for this day
     const availabilitySql = `
@@ -295,6 +307,8 @@ router.get('/doctor/:doctorId/available-slots', (req, res) => {
           message: 'Error fetching availability'
         });
       }
+
+      console.log('📋 Availability results:', availability);
 
       if (availability.length === 0) {
         return res.json({
@@ -324,11 +338,17 @@ router.get('/doctor/:doctorId/available-slots', (req, res) => {
           });
         }
 
+        console.log('📅 Existing bookings:', bookings);
+
         // Generate time slots
         const slots = [];
         const startTime = slot.start_time;
         const endTime = slot.end_time;
         const slotDuration = slot.slot_duration_minutes;
+
+        console.log('⏰ Start time:', startTime);
+        console.log('⏰ End time:', endTime);
+        console.log('⏰ Slot duration:', slotDuration);
 
         let currentTime = startTime;
         
@@ -350,6 +370,8 @@ router.get('/doctor/:doctorId/available-slots', (req, res) => {
           const newMinutes = totalMinutes % 60;
           currentTime = `${String(newHours).padStart(2, '0')}:${String(newMinutes).padStart(2, '0')}:00`;
         }
+
+        console.log('✅ Generated slots:', slots);
 
         res.json({
           success: true,
