@@ -9,6 +9,9 @@ import { videoConsultationApiService, type ConsultationFee, type TimeSlot } from
 import { walletApiService } from '@/services/walletApi';
 import { patientApiService, type LinkedDoctor } from '@/services/patientApi';
 import { useToast } from '@/hooks/use-toast';
+import { bookingApiService, type VideoConsultation } from '@/services/bookingApi';
+import { AlertCircle, Calendar as CheckCircle2, XCircle } from 'lucide-react';
+import { VideoCallRoom } from '@/components/VideoCallRoom';
 
 interface VideoConsultationBookingProps {
   patientId: number;
@@ -28,11 +31,66 @@ export function VideoConsultationBooking({ patientId }: VideoConsultationBooking
   const [loading, setLoading] = useState(false);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [step, setStep] = useState<'doctor' | 'duration' | 'datetime' | 'confirm'>('doctor');
+  const [consultations, setConsultations] = useState<VideoConsultation[]>([]);
+  const [loadingConsultations, setLoadingConsultations] = useState(false);
+  // Add with other state declarations
+  const [isInCall, setIsInCall] = useState(false);
+  const [activeConsultation, setActiveConsultation] = useState<VideoConsultation | null>(null);
 
   useEffect(() => {
     loadLinkedDoctors();
     loadWalletBalance();
   }, [patientId]);
+
+
+
+  useEffect(() => {
+    if (patientId) {
+      loadConsultations();
+    }
+  }, [patientId]);
+  const loadConsultations = async () => {
+    try {
+      setLoadingConsultations(true);
+      const data = await bookingApiService.getPatientConsultations(patientId);
+      setConsultations(data);
+    } catch (error) {
+      console.error('Error loading consultations:', error);
+    } finally {
+      setLoadingConsultations(false);
+    }
+  };
+  const handleJoinMeeting = (consultation: VideoConsultation, isDemoMode: boolean = false) => {
+    if (!isDemoMode) {
+      // Check time for real mode
+      const canJoin = canJoinMeeting(consultation.scheduled_date, consultation.scheduled_time, false);
+      if (!canJoin) {
+        toast({
+          title: "Not Available Yet",
+          description: "You can join 15 minutes before the scheduled time",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+
+    setActiveConsultation(consultation);
+    setIsInCall(true);
+  };
+
+  const handleEndCall = async () => {
+    setIsInCall(false);
+    setActiveConsultation(null);
+
+    // Reload consultations to get updated status
+    await loadConsultations();
+    await loadWalletBalance();
+
+    toast({
+      title: "Call Ended",
+      description: "You have left the consultation"
+    });
+  };
 
   const loadLinkedDoctors = async () => {
     try {
@@ -41,6 +99,12 @@ export function VideoConsultationBooking({ patientId }: VideoConsultationBooking
     } catch (error) {
       console.error('Error loading doctors:', error);
     }
+  };
+
+  // Helper to safely format currency
+  const formatFee = (fee: string | number): string => {
+    const numFee = typeof fee === 'string' ? parseFloat(fee) : fee;
+    return isNaN(numFee) ? '0.00' : numFee.toFixed(2);
   };
 
   const loadWalletBalance = async () => {
@@ -56,11 +120,11 @@ export function VideoConsultationBooking({ patientId }: VideoConsultationBooking
     try {
       setLoading(true);
       setSelectedDoctor(doctor);
-      
+
       // Load consultation fees for this doctor
       const fees = await videoConsultationApiService.getDoctorConsultationFees(doctor.id);
       setConsultationFees(fees);
-      
+
       if (fees.length > 0) {
         setStep('duration');
       } else {
@@ -81,24 +145,59 @@ export function VideoConsultationBooking({ patientId }: VideoConsultationBooking
       setLoading(false);
     }
   };
+  // Helper to check if meeting can be joined
+  const canJoinMeeting = (scheduledDate: string, scheduledTime: string, isDemoMode: boolean = false) => {
+    if (isDemoMode) return true; // ✅ Demo mode: always allow
 
+    const consultDateTime = new Date(`${scheduledDate}T${scheduledTime}`);
+    const now = new Date();
+    const timeDiff = (consultDateTime.getTime() - now.getTime()) / (1000 * 60); // Minutes until meeting
+
+    // Can join 15 minutes before OR if meeting time has passed (for 1 hour window)
+    return timeDiff <= 15 && timeDiff >= -60;
+  };
+
+  // Helper to get meeting status message
+  const getMeetingStatus = (scheduledDate: string, scheduledTime: string) => {
+    const consultDateTime = new Date(`${scheduledDate}T${scheduledTime}`);
+    const now = new Date();
+    const timeDiff = (consultDateTime.getTime() - now.getTime()) / (1000 * 60); // Minutes
+
+    if (timeDiff > 15) {
+      return `Available in ${Math.ceil(timeDiff)} minutes`;
+    } else if (timeDiff > 0) {
+      return 'Join Now';
+    } else if (timeDiff >= -60) {
+      return 'Join Now (Meeting Time)';
+    } else {
+      return 'Meeting Ended';
+    }
+  };
   const handleDurationSelect = (fee: ConsultationFee) => {
     setSelectedFee(fee);
     setStep('datetime');
   };
 
+  const toLocalDateString = (date: Date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
+
   const handleDateSelect = async (date: Date | undefined) => {
     if (!date || !selectedDoctor) return;
-    
+
     setSelectedDate(date);
     setSelectedSlot(null);
-    
+
     try {
       setLoadingSlots(true);
-      const dateStr = date.toISOString().split('T')[0];
+      const dateStr = toLocalDateString(date);
       const slotsData = await videoConsultationApiService.getAvailableSlots(selectedDoctor.id, dateStr);
       setAvailableSlots(slotsData.data);
-      
+
       if (slotsData.data.length === 0 || slotsData.data.every(s => !s.available)) {
         toast({
           title: "Not Available",
@@ -131,6 +230,12 @@ export function VideoConsultationBooking({ patientId }: VideoConsultationBooking
       });
       return;
     }
+    const toLocalDateString = (date: Date) => {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    };
 
     // Check wallet balance
     if (walletBalance < selectedFee.fee) {
@@ -144,36 +249,84 @@ export function VideoConsultationBooking({ patientId }: VideoConsultationBooking
 
     try {
       setLoading(true);
-      
-      // TODO: Call booking API (we'll create this next)
-      console.log('Booking:', {
+
+      const bookingData = {
         doctorId: selectedDoctor.id,
-        patientId,
-        date: selectedDate.toISOString().split('T')[0],
-        time: selectedSlot,
-        duration: selectedFee.duration_minutes,
-        fee: selectedFee.fee
-      });
+        scheduledDate: toLocalDateString(selectedDate),
+        scheduledTime: selectedSlot,
+        durationMinutes: selectedFee.duration_minutes,
+        consultationFee: selectedFee.fee
+      };
+
+      await bookingApiService.bookConsultation(bookingData);
 
       toast({
         title: "Request Sent!",
         description: "Your consultation request has been sent to the doctor for approval",
       });
 
+      // Reload consultations and wallet
+      await loadConsultations();
+      await loadWalletBalance();
+
       // Reset and close
       resetBooking();
       setIsBookingOpen(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error booking:', error);
       toast({
         title: "Error",
-        description: "Failed to book consultation",
+        description: error.message || "Failed to book consultation",
         variant: "destructive"
       });
     } finally {
       setLoading(false);
     }
   };
+  const handleCancelConsultation = async (consultationId: number) => {
+    if (!confirm('Are you sure you want to cancel this consultation?')) {
+      return;
+    }
+
+    try {
+      const result = await bookingApiService.cancelConsultation(consultationId);
+
+      toast({
+        title: "Cancelled",
+        description: result.refundAmount
+          ? `Consultation cancelled. ₹${result.refundAmount} refunded to wallet.`
+          : "Consultation cancelled successfully"
+      });
+
+      // Reload consultations and wallet
+      await loadConsultations();
+      await loadWalletBalance();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to cancel consultation",
+        variant: "destructive"
+      });
+    }
+  };
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'pending_approval':
+        return <Badge className="bg-yellow-500"><AlertCircle className="w-3 h-3 mr-1" />Pending Approval</Badge>;
+      case 'confirmed':
+        return <Badge className="bg-green-500"><CheckCircle2 className="w-3 h-3 mr-1" />Confirmed</Badge>;
+      case 'rejected':
+        return <Badge variant="destructive"><XCircle className="w-3 h-3 mr-1" />Rejected</Badge>;
+      case 'cancelled_by_patient':
+        return <Badge variant="outline"><XCircle className="w-3 h-3 mr-1" />Cancelled</Badge>;
+      case 'completed':
+        return <Badge variant="secondary"><CheckCircle2 className="w-3 h-3 mr-1" />Completed</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
+
 
   const resetBooking = () => {
     setSelectedDoctor(null);
@@ -204,10 +357,10 @@ export function VideoConsultationBooking({ patientId }: VideoConsultationBooking
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <Video className="w-5 h-5" />
-                Video Consultation
+                <Video className="w-5 h-5 " />
+                Video Consultations
               </CardTitle>
-              <CardDescription>Book a video consultation with your doctor</CardDescription>
+              <CardDescription>Book and manage your video consultations</CardDescription>
             </div>
             <Button onClick={() => {
               resetBooking();
@@ -218,12 +371,109 @@ export function VideoConsultationBooking({ patientId }: VideoConsultationBooking
             </Button>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="text-center py-8 text-gray-500">
-            <Video className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-            <p>No upcoming video consultations</p>
-            <p className="text-sm mt-1">Book your first consultation to get started</p>
-          </div>
+        <CardContent className="max-h-40 overflow-y-auto">
+          {loadingConsultations ? (
+            <div className="text-center py-8 ">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+              <p className="mt-4 text-gray-600">Loading consultations...</p>
+            </div>
+          ) : consultations.length === 0 ? (
+            <div className="text-center py-12 text-gray-500">
+              <Video className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+              <p className="font-medium">No consultations yet</p>
+              <p className="text-sm mt-1">Book your first video consultation to get started</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {consultations.map((consultation) => (
+                <div key={consultation.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <h4 className="font-semibold">{consultation.doctor_name}</h4>
+                        {getStatusBadge(consultation.status)}
+                      </div>
+
+                      <div className="space-y-1 text-sm text-gray-600">
+                        <p className="flex items-center gap-2">
+                          <User className="w-4 h-4" />
+                          {consultation.doctor_specialization}
+                        </p>
+                        <p className="flex items-center gap-2">
+                          <CalendarIcon className="w-4 h-4" />
+                          {new Date(consultation.scheduled_date).toLocaleDateString()} at {formatTime(consultation.scheduled_time)}
+                        </p>
+                        <p className="flex items-center gap-2">
+                          <Clock className="w-4 h-4" />
+                          {consultation.duration_minutes} minutes • ₹{formatFee(consultation.consultation_fee)}
+                        </p>
+                        <p className="flex items-center gap-2">
+                          <DollarSign className="w-4 h-4" />
+                          Payment: <span className="font-medium">{consultation.payment_status}</span>
+                        </p>
+                      </div>
+
+                      {consultation.rejection_reason && (
+                        <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-800">
+                          <strong>Reason:</strong> {consultation.rejection_reason}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex flex-col gap-2 ml-4">
+                      {/* Join Meeting Button (Confirmed consultations only) */}
+                      {consultation.status === 'confirmed' && (
+                        <>
+                          {/* Demo Mode Button - Always enabled */}
+                          <Button
+                            size="sm"
+                            className="bg-purple-600 hover:bg-purple-700"
+                            onClick={() => handleJoinMeeting(consultation, true)}
+                          >
+                            <Video className="w-4 h-4 mr-1" />
+                            Join (Demo)
+                          </Button>
+
+                          {/* Real Mode Button - Time-based */}
+                          <Button
+                            size="sm"
+                            disabled={!canJoinMeeting(consultation.scheduled_date, consultation.scheduled_time, false)}
+                            onClick={() => handleJoinMeeting(consultation, false)}
+                          >
+                            <Video className="w-4 h-4 mr-1" />
+                            {getMeetingStatus(consultation.scheduled_date, consultation.scheduled_time)}
+                          </Button>
+                        </>
+                      )}
+
+                      {/* Pending Approval */}
+                      {consultation.status === 'pending_approval' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleCancelConsultation(consultation.id)}
+                        >
+                          <XCircle className="w-4 h-4 mr-1" />
+                          Cancel
+                        </Button>
+                      )}
+
+                      {/* Confirmed but can still cancel */}
+                      {consultation.status === 'confirmed' && canJoinMeeting(consultation.scheduled_date, consultation.scheduled_time, false) && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleCancelConsultation(consultation.id)}
+                        >
+                          Cancel
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -382,89 +632,99 @@ export function VideoConsultationBooking({ patientId }: VideoConsultationBooking
                     </div>
                   ) : availableSlots.length === 0 ? (
                     <p className="text-gray-500 text-sm">No slots available for this date</p>) : (
-                        <div className="grid grid-cols-2 gap-2 max-h-96 overflow-y-auto">
-                        {availableSlots.map(slot => (
+                    <div className="grid grid-cols-2 gap-2 max-h-96 overflow-y-auto">
+                      {availableSlots.map(slot => (
                         <Button
-                        key={slot.time}
-                        variant={selectedSlot === slot.time ? "default" : "outline"}
-                        disabled={!slot.available}
-                        onClick={() => slot.available && handleSlotSelect(slot.time)}
-                        className="h-auto py-3"
+                          key={slot.time}
+                          variant={selectedSlot === slot.time ? "default" : "outline"}
+                          disabled={!slot.available}
+                          onClick={() => slot.available && handleSlotSelect(slot.time)}
+                          className="h-auto py-3"
                         >
-                        {formatTime(slot.time)}
+                          {formatTime(slot.time)}
                         </Button>
-                        ))}
-                        </div>
-                        )}
+                      ))}
+                    </div>
+                  )}
 
-                        </div>
-                        </div>
-                        </div>
-                        )}{/* Step 4: Confirm */}
-                        {step === 'confirm' && (
-                          <div className="space-y-4">
-                            <div className="flex items-center justify-between mb-3">
-                              <h3 className="font-semibold">Confirm Booking</h3>
-                              <Button variant="ghost" size="sm" onClick={() => setStep('datetime')}>
-                                ← Back
-                              </Button>
-                            </div>
-                  
-                            <div className="border rounded-lg p-6 space-y-4">
-                              <div className="flex items-start gap-3">
-                                <User className="w-5 h-5 text-gray-600 mt-1" />
-                                <div>
-                                  <p className="text-sm text-gray-600">Doctor</p>
-                                  <p className="font-medium">{selectedDoctor?.name}</p>
-                                  <p className="text-sm text-gray-600">{selectedDoctor?.specialization}</p>
-                                </div>
-                              </div>
-                  
-                              <div className="flex items-start gap-3">
-                                <CalendarIcon className="w-5 h-5 text-gray-600 mt-1" />
-                                <div>
-                                  <p className="text-sm text-gray-600">Date & Time</p>
-                                  <p className="font-medium">
-                                    {selectedDate?.toLocaleDateString()} at {selectedSlot && formatTime(selectedSlot)}
-                                  </p>
-                                </div>
-                              </div>
-                  
-                              <div className="flex items-start gap-3">
-                                <Clock className="w-5 h-5 text-gray-600 mt-1" />
-                                <div>
-                                  <p className="text-sm text-gray-600">Duration</p>
-                                  <p className="font-medium">{selectedFee && getDurationLabel(selectedFee.duration_minutes)}</p>
-                                </div>
-                              </div>
-                  
-                              <div className="flex items-start gap-3">
-                                <DollarSign className="w-5 h-5 text-gray-600 mt-1" />
-                                <div>
-                                  <p className="text-sm text-gray-600">Consultation Fee</p>
-                                  <p className="font-medium text-blue-600">₹{selectedFee?.fee.toFixed(2)}</p>
-                                </div>
-                              </div>
-                            </div>
-                  
-                            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                              <p className="text-sm text-yellow-800">
-                                <strong>Note:</strong> Your booking request will be sent to the doctor for approval. 
-                                The consultation fee will be deducted from your wallet only after the doctor approves.
-                              </p>
-                            </div>
-                  
-                            <div className="flex justify-end gap-2">
-                              <Button variant="outline" onClick={() => setIsBookingOpen(false)}>
-                                Cancel
-                              </Button>
-                              <Button onClick={handleBooking} disabled={loading}>
-                                {loading ? 'Booking...' : 'Confirm Booking'}
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-                      </DialogContent>
-                    </Dialog>
-                  </>);
+                </div>
+              </div>
+            </div>
+          )}{/* Step 4: Confirm */}
+          {step === 'confirm' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold">Confirm Booking</h3>
+                <Button variant="ghost" size="sm" onClick={() => setStep('datetime')}>
+                  ← Back
+                </Button>
+              </div>
+
+              <div className="border rounded-lg p-6 space-y-4">
+                <div className="flex items-start gap-3">
+                  <User className="w-5 h-5 text-gray-600 mt-1" />
+                  <div>
+                    <p className="text-sm text-gray-600">Doctor</p>
+                    <p className="font-medium">{selectedDoctor?.name}</p>
+                    <p className="text-sm text-gray-600">{selectedDoctor?.specialization}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <CalendarIcon className="w-5 h-5 text-gray-600 mt-1" />
+                  <div>
+                    <p className="text-sm text-gray-600">Date & Time</p>
+                    <p className="font-medium">
+                      {selectedDate?.toLocaleDateString()} at {selectedSlot && formatTime(selectedSlot)}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <Clock className="w-5 h-5 text-gray-600 mt-1" />
+                  <div>
+                    <p className="text-sm text-gray-600">Duration</p>
+                    <p className="font-medium">{selectedFee && getDurationLabel(selectedFee.duration_minutes)}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <DollarSign className="w-5 h-5 text-gray-600 mt-1" />
+                  <div>
+                    <p className="text-sm text-gray-600">Consultation Fee</p>
+                    <p className="font-medium text-blue-600">₹{selectedFee?.fee.toFixed(2)}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <p className="text-sm text-yellow-800">
+                  <strong>Note:</strong> Your booking request will be sent to the doctor for approval.
+                  The consultation fee will be deducted from your wallet only after the doctor approves.
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setIsBookingOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleBooking} disabled={loading}>
+                  {loading ? 'Booking...' : 'Confirm Booking'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+      {isInCall && activeConsultation && (
+      <VideoCallRoom
+        consultationId={activeConsultation.id}
+        userId={patientId}
+        role="patient"
+        doctorName={activeConsultation.doctor_name}
+        duration={activeConsultation.duration_minutes}
+        onEndCall={handleEndCall}
+      />
+    )}
+    </>);
 }

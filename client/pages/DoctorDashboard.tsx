@@ -17,6 +17,9 @@ import { patientApiService } from '@/services/patientApi';
 import type { PatientProfile } from '@/services/patientApi';
 import { DoctorAvailabilitySettings } from '@/components/DoctorAvailabilitySettings';
 import { Video } from 'lucide-react';
+import { DoctorConsultationRequests } from '@/components/DoctorConsultationRequests';
+import { getAuthToken } from 'src/utils/auth';
+
 import {
   Heart,
   Calendar,
@@ -132,6 +135,7 @@ export default function DoctorDashboard() {
   const [isLoadingPatients, setIsLoadingPatients] = useState(true);
   const [patientsError, setPatientsError] = useState(null);
   const [isAddHealthMetricsOpen, setIsAddHealthMetricsOpen] = useState(false);
+  const [isSetScheduleOpen , setScheduleOpen] = useState(false);
   const [isAddingRecord, setIsAddingRecord] = useState(false);
   const [medicalRecords, setMedicalRecords] = useState<MedicalRecord[]>([]);
   const [isLoadingRecords, setIsLoadingRecords] = useState(true);
@@ -177,7 +181,7 @@ export default function DoctorDashboard() {
   useEffect(() => {
     const loadDoctorData = async () => {
       try {
-        const storedDoctorData = localStorage.getItem('doctorData');
+        const storedDoctorData = localStorage.getItem('doctorData'); //------------------------------------------------------------------------------------------
         if (storedDoctorData) {
           const parsedData = JSON.parse(storedDoctorData);
           const transformedData = {
@@ -711,7 +715,7 @@ export default function DoctorDashboard() {
     }
   };
   const getCurrentDoctorId = () => {
-    const doctorsData = localStorage.getItem("doctorData");
+    const doctorsData = localStorage.getItem("doctorData"); //------------------------------------------------------------------------------------------
     if (doctorsData) {
       const doctor = JSON.parse(doctorsData);
       return doctor.id?.toString();
@@ -848,7 +852,7 @@ export default function DoctorDashboard() {
     setIsAddingMetrics(true);
 
     try {
-      const token = localStorage.getItem('doctorToken');
+      const token = localStorage.getItem('DoctorToken'); //------------------------------------------------------------------------------------------
 
 
       const response = await fetch(
@@ -915,7 +919,7 @@ export default function DoctorDashboard() {
   // Function to get health metrics for a specific patient  
   const fetchPatientHealthMetrics = async (patientId) => {
     try {
-      const token = localStorage.getItem('doctorToken');
+      const token = localStorage.getItem('DoctorToken'); //------------------------------------------------------------------------------------------
 
       const response = await fetch(
         `http://localhost:5000/api/doctors/patient/${patientId}/health-metrics`,
@@ -955,7 +959,7 @@ export default function DoctorDashboard() {
       setIsLoadingPatients(true);
       setPatientsError(null);
 
-      const token = localStorage.getItem('doctorToken');
+      const token = localStorage.getItem('DoctorToken'); //------------------------------------------------------------------------------------------
 
       if (!token) {
         throw new Error('No authentication token found. Please login again.');
@@ -1352,15 +1356,14 @@ export default function DoctorDashboard() {
                 </div>
               </div>
               <Button
-                variant="outline"
-                // className=""
-                disabled
-
+              variant="outline"
+             disabled
               >
-                <Plus className="w-4 h-4 mr-2" />
-                Manage Schedule
-              </Button>
-            </div>
+            <Plus className="w-4 h-4 mr-2" />
+            Manage Schedule
+            </Button>
+            
+           </div>
           </div>
         )}
 
@@ -3290,6 +3293,9 @@ export default function DoctorDashboard() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
+                  {doctorData?.id &&(
+                 <DoctorConsultationRequests doctorId={doctorData?.id || 0} />
+                  )}
                   {doctorData?.id &&(
                   <DoctorAvailabilitySettings doctorId={doctorData?.id} />
                   

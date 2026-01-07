@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Heart, Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
+import { getAuthToken } from 'src/utils/auth';
+
 
 interface LoginFormData {
   email: string;
@@ -107,8 +109,8 @@ export default function PatientLogin() {
 
       // ✅ Store JWT token for authenticated requests
       if (data.token) {
-        localStorage.setItem("PatientToken", data.token);
-        localStorage.setItem("patientData", JSON.stringify(data.patient));
+        localStorage.setItem("PatientToken", data.token);  //------------------------------------------------------------------------------------------
+        localStorage.setItem("patientData", JSON.stringify(data.patient)); //------------------------------------------------------------------------------------------
       }
 
       setSubmitMessage({ type: 'success', message: "Login successful! Redirecting..." });

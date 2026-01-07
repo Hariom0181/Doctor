@@ -1,4 +1,6 @@
 const API_BASE_URL = 'http://localhost:5000/api';
+// import { getAuthToken } from 'src/utils/auth';
+
 
 export interface WalletTransaction {
   id: number;
@@ -32,13 +34,15 @@ export interface AddMoneyResponse {
 
 class WalletApiService {
   private getAuthHeaders(): HeadersInit {
-    const token = localStorage.getItem('PatientToken');
+    const token = localStorage.getItem('PatientToken'); // ONLY patient token (wallets are patient-only)
+    if (!token) {
+      throw new Error('Patient not authenticated. Please login.');
+    }
     return {
       'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` })
+      Authorization: `Bearer ${token}`
     };
   }
-
   async getBalance(patientId: number): Promise<number> {
     try {
       const response = await fetch(`${API_BASE_URL}/wallet/balance/${patientId}`, {

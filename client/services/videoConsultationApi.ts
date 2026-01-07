@@ -1,4 +1,6 @@
 const API_BASE_URL = 'http://localhost:5000/api';
+// import { getAuthToken } from 'src/utils/auth';
+
 
 export interface DoctorAvailability {
   id: number;
@@ -31,11 +33,24 @@ export interface AvailableSlotsResponse {
 }
 
 class VideoConsultationApiService {
-  private getAuthHeaders(): HeadersInit {
-    const token = localStorage.getItem('doctorToken') || localStorage.getItem('patientToken');
+  private getPatientAuthHeaders(): HeadersInit {
+    const token = localStorage.getItem('PatientToken');
+    if (!token) {
+      throw new Error('Patient not authenticated. Please login.');
+    }
     return {
       'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` })
+      Authorization: `Bearer ${token}`
+    };
+  }
+  private getDoctorAuthHeaders(): HeadersInit {
+    const token = localStorage.getItem('DoctorToken');
+    if (!token) {
+      throw new Error('Doctor not authenticated. Please login.');
+    }
+    return {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`
     };
   }
 
@@ -46,7 +61,7 @@ class VideoConsultationApiService {
         `${API_BASE_URL}/video-consultations/doctor/availability/${doctorId}`,// doctorId = 4
         {
           method: 'GET',
-          headers: this.getAuthHeaders()
+          headers: this.getDoctorAuthHeaders()
         }
       );
 
@@ -66,10 +81,10 @@ class VideoConsultationApiService {
   async getDoctorConsultationFees(doctorId: number): Promise<ConsultationFee[]> {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/video-consultations/doctor/consultation-fees/${doctorId}`,
+        `${API_BASE_URL}/video-consultations/doctor/consultation-fees`,
         {
           method: 'GET',
-          headers: this.getAuthHeaders()
+          headers: this.getDoctorAuthHeaders()
         }
       );
 
@@ -78,7 +93,11 @@ class VideoConsultationApiService {
       }
 
       const result = await response.json();
-      return result.data;
+      return result.data.map((f: any) => ({
+        ...f,
+        fee: Number(f.fee),
+        
+      }));
     } catch (error) {
       console.error('Error fetching fees:', error);
       throw error;
@@ -92,7 +111,7 @@ class VideoConsultationApiService {
         `${API_BASE_URL}/video-consultations/doctor/${doctorId}/available-slots?date=${date}`,
         {
           method: 'GET',
-          headers: this.getAuthHeaders()
+          headers: this.getPatientAuthHeaders()
         }
       );
 
@@ -115,7 +134,7 @@ class VideoConsultationApiService {
         `${API_BASE_URL}/video-consultations/doctor/availability`,
         {
           method: 'POST',
-          headers: this.getAuthHeaders(),
+          headers: this.getDoctorAuthHeaders(),
           body: JSON.stringify({ availability })
         }
       );
@@ -140,7 +159,7 @@ class VideoConsultationApiService {
         `${API_BASE_URL}/video-consultations/doctor/consultation-fees`,
         {
           method: 'POST',
-          headers: this.getAuthHeaders(),
+          headers: this.getDoctorAuthHeaders(),
           body: JSON.stringify({ fees })
         }
       );

@@ -1,4 +1,6 @@
 const API_BASE_URL = 'http://localhost:5000/api';
+// import { getAuthToken } from 'src/utils/auth';
+
 
 export interface LinkedDoctor {
   id: number;
@@ -98,10 +100,13 @@ export interface ApiResponse<T> {
 
 class PatientApiService {
   private getAuthHeaders(): HeadersInit {
-    const token = localStorage.getItem('PatientToken');
+    const token = localStorage.getItem('PatientToken'); // ONLY patient token
+    if (!token) {
+      throw new Error('Patient not authenticated. Please login.');
+    }
     return {
       'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` })
+      Authorization: `Bearer ${token}`
     };
   }
 
@@ -292,7 +297,7 @@ class PatientApiService {
       const formData = new FormData();
       formData.append('profileImage', imageFile);
 
-      const token = localStorage.getItem('PatientToken');
+      const token = localStorage.getItem('PatientToken'); //-----------------------------------------------------------------------------------------
 
       const response = await fetch(`${API_BASE_URL}/patients/${patientId}/upload-profile`, {
         method: 'POST',
@@ -474,7 +479,7 @@ class PatientApiService {
   }
   async uploadPatientDocument(formData: FormData): Promise<{ success: boolean; documentId: number; filePath: string }> {
     try {
-      const token = localStorage.getItem('PatientToken');
+      const token = localStorage.getItem('PatientToken'); //-----------------------------------------------------------------------------------------
 
       const response = await fetch(`${API_BASE_URL}/documents/upload`, {
         method: 'POST',

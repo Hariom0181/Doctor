@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Heart, Stethoscope, Mail, Lock, Eye, EyeOff, Shield, Loader2 } from "lucide-react";
+import { getAuthToken } from 'src/utils/auth';
+
 
 interface LoginFormData {
   email: string;
@@ -111,9 +113,9 @@ export default function DoctorLogin() {
       // Store doctor data for authenticated requests - FIX THE KEYS HERE
       if (data.token) {
         // localStorage.clear();
-        localStorage.setItem("doctorToken", data.token); // Changed from "authToken"
-        localStorage.setItem("doctorId", data.doctor.id.toString()); // Added doctorId
-        localStorage.setItem("doctorData", JSON.stringify(data.doctor));
+        localStorage.setItem("DoctorToken", data.token); // Changed from "authToken" //------------------------------------------------------------------------------------------
+        localStorage.setItem("doctorId", data.doctor.id.toString()); // Added doctorId //------------------------------------------------------------------------------------------
+        localStorage.setItem("doctorData", JSON.stringify(data.doctor));//------------------------------------------------------------------------------------------
         console.log('🔵 Doctor id from login:', data.doctor.id);
       }
   

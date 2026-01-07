@@ -14,6 +14,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Camera, X } from 'lucide-react';
 import { WalletCard } from '@/components/WalletCard';
 import { VideoConsultationBooking } from '@/components/VideoConsultationBooking';
+import { getAuthToken } from 'src/utils/auth';
+
 import {
 
   // ... existing imports ...
@@ -229,7 +231,7 @@ export default function PatientDashboard() {
   useEffect(() => {
     const loadPatientData = async () => {
       try {
-        const storedPatientData = localStorage.getItem('patientData');
+        const storedPatientData = localStorage.getItem('patientData'); //------------------------------------------------------------------------------------------
         if (storedPatientData) {
           const parsedData = JSON.parse(storedPatientData);
 
@@ -256,7 +258,7 @@ export default function PatientDashboard() {
             // Add other functions if needed
           }
         } else {
-          console.warn('No patient data found in localStorage');
+          console.warn('No patient data found in localStorage'); //------------------------------------------------------------------------------------------
         }
       } catch (error) {
         console.error('Error parsing patient data:', error);
@@ -297,7 +299,7 @@ export default function PatientDashboard() {
   // Add this to your fetchMetrics function for better debugging
   const fetchMetrics = async () => {
     try {
-      const patientToken = localStorage.getItem("PatientToken");
+      const patientToken = localStorage.getItem("PatientToken"); //------------------------------------------------------------------------------------------
 
       if (!patientToken) {
         console.error("No patient token found. User may not be logged in.");
@@ -796,7 +798,7 @@ export default function PatientDashboard() {
       setIsLoadingRecentRecords(true);
       setMedicalRecordsError(null);
 
-      const patientData = JSON.parse(localStorage.getItem('patientData') || '{}');
+      const patientData = JSON.parse(localStorage.getItem('patientData') || '{}'); //------------------------------------------------------------------------------------------
       const patientId = patientData.id;
 
       if (!patientId) {
@@ -928,7 +930,7 @@ export default function PatientDashboard() {
     }
   };
   const getCurrentPatientId = () => {
-    const patientData = localStorage.getItem("patientData");
+    const patientData = localStorage.getItem("patientData"); //------------------------------------------------------------------------------------------
     if (patientData) {
       const patient = JSON.parse(patientData);
       return patient.id?.toString();

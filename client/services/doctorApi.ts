@@ -1,4 +1,5 @@
 const API_BASE_URL = 'http://localhost:5000/api';
+// import { getAuthToken } from 'src/utils/auth';
 
 export interface LinkedPatient {
   id: string;
@@ -78,10 +79,13 @@ export interface LoginResponse {
 
 class DoctorApiService {
   private getAuthHeaders(): HeadersInit {
-    const token = localStorage.getItem('doctorToken'); // Changed to match naming convention
+    const token = localStorage.getItem('DoctorToken'); // ONLY doctor token
+    if (!token) {
+      throw new Error('Doctor not authenticated. Please login.');
+    }
     return {
       'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` })
+      Authorization: `Bearer ${token}`
     };
   }
 
@@ -109,8 +113,8 @@ class DoctorApiService {
 
       if (result.success && result.token) {
         // Store JWT token and doctor data
-        localStorage.setItem('DoctorToken', result.token);
-        localStorage.setItem('doctorData', JSON.stringify(result.doctor));
+        localStorage.setItem('DoctorToken', result.token); //-----------------------------------------------------------------------------------------
+        localStorage.setItem('doctorData', JSON.stringify(result.doctor));//-----------------------------------------------------------------------------------------
         console.log('✅ Doctor login successful, token stored');
       }
 
@@ -125,7 +129,7 @@ class DoctorApiService {
       const formData = new FormData();
       formData.append('profileImage', imageFile);
   
-      const token = localStorage.getItem('DoctorToken'); // Note: DoctorToken not PatientToken
+      const token = localStorage.getItem('DoctorToken'); //-----------------------------------------------------------------------------------------
       
       const response = await fetch(`${API_BASE_URL}/doctors/${doctorId}/upload-profile`, {
         method: 'POST',
@@ -379,8 +383,8 @@ class DoctorApiService {
 
   async logout(): Promise<void> {
     try {
-      localStorage.removeItem('DoctorToken');
-      localStorage.removeItem('doctorData');
+      localStorage.removeItem('DoctorToken');//-----------------------------------------------------------------------------------------
+      localStorage.removeItem('doctorData');//-----------------------------------------------------------------------------------------
       console.log('✅ Doctor logged out successfully');
     } catch (error) {
       console.error('❌ Error during logout:', error);
@@ -648,14 +652,14 @@ class DoctorApiService {
   
   // Check if doctor is authenticated
   isAuthenticated(): boolean {
-    const token = localStorage.getItem('DoctorToken');
+    const token = localStorage.getItem('DoctorToken');//-----------------------------------------------------------------------------------------
     return !!token;
   }
 
   // Get stored doctor data
   getStoredDoctorData(): DoctorProfile | null {
     try {
-      const doctorData = localStorage.getItem('doctorData');
+      const doctorData = localStorage.getItem('doctorData');//-----------------------------------------------------------------------------------------
       return doctorData ? JSON.parse(doctorData) : null;
     } catch (error) {
       console.error('Error parsing stored doctor data:', error);

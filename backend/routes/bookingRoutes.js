@@ -278,17 +278,24 @@ router.delete('/:consultationId/cancel', authenticatePatient, (req, res) => {
         });
       }
 
-      // Check cancellation time (5 minutes before)
-      const scheduledDateTime = new Date(`${consultation.scheduled_date.toISOString().split('T')[0]} ${consultation.scheduled_time}`);
+      // ✅ FIXED: Check cancellation time (5 minutes before)
+      // Format the date properly to avoid timezone issues
+      const scheduledDateStr = consultation.scheduled_date.toISOString().split('T')[0];
+      const scheduledTimeStr = consultation.scheduled_time;
+      const scheduledDateTime = new Date(`${scheduledDateStr}T${scheduledTimeStr}`);
       const now = new Date();
       const timeDiff = (scheduledDateTime - now) / (1000 * 60); // Minutes
 
+      console.log('⏰ Scheduled date:', scheduledDateStr);
+      console.log('⏰ Scheduled time:', scheduledTimeStr);
+      console.log('⏰ Scheduled datetime:', scheduledDateTime);
+      console.log('⏰ Current time:', now);
       console.log('⏰ Time until consultation:', timeDiff, 'minutes');
 
-      if (timeDiff < 25) {
+      if (timeDiff < 5) { // ✅ FIXED: Changed from 25 to 5
         return res.status(400).json({
           success: false,
-          message: 'Cannot cancel within 5 minutes of consultation time' // -------------------------------------------------------------------------------------------
+          message: 'Cannot cancel within 5 minutes of consultation time'
         });
       }
 
@@ -393,7 +400,6 @@ router.delete('/:consultationId/cancel', authenticatePatient, (req, res) => {
     });
   }
 });
-
 // ==================== DOCTOR ENDPOINTS ====================
 
 // Get Pending Approval Requests

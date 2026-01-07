@@ -44,3 +44,9 @@ add patient
 appointments all tab 
 
 medical records 
+
+
+
+
+
+approval issue 
