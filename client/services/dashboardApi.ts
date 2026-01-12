@@ -1,12 +1,12 @@
-const API_BASE_URL = "http://localhost:5000/api/dashboard";  // ✅ Correct port
+const API_BASE_URL = "http://localhost:5000/api/dashboard";  
 
 export const dashboardApi = {
   getStats: async () => {
     const response = await fetch(`${API_BASE_URL}/stats`);
     if (!response.ok) throw new Error('Failed to fetch stats');
     const json = await response.json();
-    return json;  // return full JSON, frontend expects { success, data }
-  },
+    return json;  
+  },  
 
   getRecentActivities: async () => {
     const response = await fetch(`${API_BASE_URL}/recent-activities`);

@@ -15,6 +15,7 @@ import { Camera, X } from 'lucide-react';
 import { WalletCard } from '@/components/WalletCard';
 import { VideoConsultationBooking } from '@/components/VideoConsultationBooking';
 import { getAuthToken } from 'src/utils/auth';
+import {MedicalReportAnalyzer} from '@/components/MedicalReportAnalyzer';
 
 import {
 
@@ -1478,6 +1479,10 @@ export default function PatientDashboard() {
            {patientData?.id && (
              <VideoConsultationBooking patientId={patientData?.id} />
           )}
+           {patientData?.id && (
+             <MedicalReportAnalyzer />
+          )}
+         
 
         </div>
 

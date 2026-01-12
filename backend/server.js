@@ -13,15 +13,19 @@ const prescriptionRoutes = require("./routes/prescriptionRoutes");
 const walletRoutes = require('./routes/walletRoutes');
 const videoConsultationRoutes = require('./routes/videoConsultationRoutes');
 const bookingRoutes = require('./routes/bookingRoutes');
+const aiRoutes = require('./routes/aiRoutes');
 const agoraRoutes = require('./routes/agoraRoutes');
 
 
 dotenv.config();
+// Test Gemini API Key on startup
+console.log('🔑 GEMINI_API_KEY:', process.env.GEMINI_API_KEY ? 'EXISTS ✅' : 'MISSING ❌');
 const app = express();
 
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
+
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/uploads/patients_profile', express.static(path.join(__dirname, 'uploads/patients_profile')));
@@ -40,6 +44,7 @@ app.use("/api/doctors", doctorRoutes);
 app.use("/api/dashboard", dashboardRoutes); 
 app.use('/api/wallet', walletRoutes);
 app.use("/api/prescriptions", prescriptionRoutes);
+app.use('/api/ai', aiRoutes);
 
 
 

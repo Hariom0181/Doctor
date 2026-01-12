@@ -65,7 +65,75 @@ router.get("/stats", (req, res) => {
       });
     });
 });
+router.get('/stats', async (req, res) => {
+  try {
+    // Get total patients
+    const [patientsResult] = await db.promise().query(
+      'SELECT COUNT(*) as count FROM patients'
+    );
 
+    // Get total records
+    const [recordsResult] = await db.promise().query(
+      'SELECT COUNT(*) as count FROM medical_records'
+    );
+
+    // Get total doctors
+    const [doctorsResult] = await db.promise().query(
+      'SELECT COUNT(*) as count FROM doctors WHERE is_verified = 1'
+    );
+
+    // ✅ Calculate avoided checkups and money saved
+    // Find patients who had multiple records of same type within 30 days
+    const [avoidedCheckupsResult] = await db.promise().query(`
+      SELECT 
+        COUNT(*) as avoided_count,
+        SUM(
+          CASE 
+            WHEN examination_type = 'blood_test' THEN 1300
+            WHEN examination_type = 'heart_screening' THEN 2000
+            WHEN examination_type = 'general_checkup' THEN 800
+            WHEN examination_type = 'diabetes_checkup' THEN 1500
+            ELSE 1000
+          END
+        ) as total_saved
+      FROM (
+        SELECT 
+          mr1.patient_id,
+          mr1.examination_type,
+          mr1.created_at,
+          COUNT(mr2.id) as duplicate_count
+        FROM medical_records mr1
+        LEFT JOIN medical_records mr2 
+          ON mr1.patient_id = mr2.patient_id 
+          AND mr1.examination_type = mr2.examination_type
+          AND mr2.created_at < mr1.created_at
+          AND mr2.created_at >= DATE_SUB(mr1.created_at, INTERVAL 30 DAY)
+        GROUP BY mr1.id, mr1.patient_id, mr1.examination_type, mr1.created_at
+        HAVING duplicate_count > 0
+      ) as duplicates
+    `);
+
+    const avoidedCheckups = avoidedCheckupsResult[0]?.avoided_count || 0;
+    const moneySaved = avoidedCheckupsResult[0]?.total_saved || 0;
+
+    res.json({
+      success: true,
+      data: {
+        totalPatients: patientsResult[0].count,
+        totalRecords: recordsResult[0].count,
+        totalDoctors: doctorsResult[0].count,
+        moneySaved: parseFloat(moneySaved),
+        avoidedCheckups: parseInt(avoidedCheckups)
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching dashboard stats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching dashboard statistics'
+    });
+  }
+});
 // Get recent activities
 router.get("/recent-activities", (req, res) => {
   const sql = `

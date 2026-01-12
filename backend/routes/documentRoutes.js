@@ -103,7 +103,81 @@ router.post("/upload", upload.single("document"), (req, res) => {
     });
   }
 });
+// Extract text from document using Google Vision API
+router.post("/extract-text/:documentId", async (req, res) => {
+  try {
+    const { documentId } = req.params;
 
+    // Get document from database
+    const sql = "SELECT file_path, document_name FROM patient_documents WHERE id = ?";
+    
+    db.query(sql, [documentId], async (err, results) => {
+      if (err) {
+        return res.status(500).json({
+          success: false,
+          message: "Error fetching document"
+        });
+      }
+
+      if (results.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "Document not found"
+        });
+      }
+
+      const filePath = path.join(__dirname, "..", results[0].file_path);
+
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({
+          success: false,
+          message: "File not found on server"
+        });
+      }
+
+      // Use Google Vision API for all files
+      const { GoogleGenerativeAI } = require("@google/generative-ai");
+      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+
+      const fileData = fs.readFileSync(filePath);
+      const base64Data = fileData.toString('base64');
+      const fileExt = path.extname(results[0].document_name).toLowerCase();
+
+      let mimeType;
+      if (fileExt === '.pdf') mimeType = 'application/pdf';
+      else if (fileExt === '.png') mimeType = 'image/png';
+      else if (['.jpg', '.jpeg'].includes(fileExt)) mimeType = 'image/jpeg';
+      else mimeType = 'image/gif';
+
+      const result = await model.generateContent([
+        "Extract all text and values from this medical report. Return the complete data in a structured format.",
+        {
+          inlineData: {
+            data: base64Data,
+            mimeType: mimeType
+          }
+        }
+      ]);
+
+      const response = await result.response;
+      const extractedText = response.text();
+
+      res.json({
+        success: true,
+        extractedText: extractedText,
+        documentName: results[0].document_name
+      });
+    });
+
+  } catch (error) {
+    console.error("Text extraction error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Error extracting text"
+    });
+  }
+});
 // Get patient's documents
 router.get("/patient/:patientId", (req, res) => {
   const { patientId } = req.params;
