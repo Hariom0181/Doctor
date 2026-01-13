@@ -45,28 +45,39 @@ User's question: ${userMessage}`;
   }
 
   // Feature 2: Analyze Lab Reports (FIXED)
-  async analyzeMedicalReport(reportData) {
+  async analyzeMedicalReport(reportData, language = 'english') {
     try {
       // Validate input
       if (!reportData || typeof reportData !== 'string') {
         throw new Error('Invalid report data provided');
       }
-
-      const prompt = `Analyze this medical/lab report and provide insights:
-
-${reportData}
-
-Please provide:
-1. **High Values**: List any abnormally high values and what they might indicate
-2. **Low Values**: List any abnormally low values and what they might indicate
-3. **Dietary Suggestions**: Recommend foods to eat or avoid based on the results
-4. **Lifestyle Recommendations**: Suggest lifestyle changes
-5. **When to Consult Doctor**: Indicate if immediate medical attention is needed
-
-Format your response clearly with headings and bullet points.
-IMPORTANT: This is general guidance only, not a medical diagnosis.`;
-
-      console.log('📊 Analyzing report with Gemini AI...');
+  
+      const languageInstructions = {
+        hindi: 'Respond in Hindi (हिंदी में जवाब दें)',
+        marathi: 'Respond in Marathi (मराठीत उत्तर द्या)',
+        gujarati: 'Respond in Gujarati (ગુજરાતીમાં જવાબ આપો)',
+        tamil: 'Respond in Tamil (தமிழில் பதிலளிக்கவும்)',
+        telugu: 'Respond in Telugu (తెలుగులో సమాధానం ఇవ్వండి)',
+        english: 'Respond in English'
+      };
+  
+      const prompt = `${languageInstructions[language] || languageInstructions.english}
+  
+  Analyze this medical/lab report and provide insights:
+  
+  ${reportData}
+  
+  Please provide:
+  1. **High Values**: List any abnormally high values and what they might indicate
+  2. **Low Values**: List any abnormally low values and what they might indicate
+  3. **Dietary Suggestions**: Recommend foods to eat or avoid based on the results
+  4. **Lifestyle Recommendations**: Suggest lifestyle changes
+  5. **When to Consult Doctor**: Indicate if immediate medical attention is needed
+  
+  Format your response clearly with headings and bullet points.
+  IMPORTANT: This is general guidance only, not a medical diagnosis.`;
+  
+      console.log('📊 Analyzing report with Gemini AI in', language);
       const result = await this.model.generateContent(prompt);
       const response = await result.response;
       const text = response.text();

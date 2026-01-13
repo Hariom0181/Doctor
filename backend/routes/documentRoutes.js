@@ -138,7 +138,7 @@ router.post("/extract-text/:documentId", async (req, res) => {
       // Use Google Vision API for all files
       const { GoogleGenerativeAI } = require("@google/generative-ai");
       const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+      const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
 
       const fileData = fs.readFileSync(filePath);
       const base64Data = fileData.toString('base64');
@@ -213,7 +213,70 @@ router.get("/patient/:patientId", (req, res) => {
     });
   });
 });
+// Extract text WITHOUT saving to database (for analysis only)
+router.post("/extract-only", upload.single("document"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "No file uploaded"
+      });
+    }
 
+    const filePath = req.file.path;
+    const fileExt = path.extname(req.file.originalname).toLowerCase();
+
+    // Extract text using Google Vision
+    const { GoogleGenerativeAI } = require("@google/generative-ai");
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
+
+    const fileData = fs.readFileSync(filePath);
+    const base64Data = fileData.toString('base64');
+
+    let mimeType;
+    if (fileExt === '.pdf') mimeType = 'application/pdf';
+    else if (fileExt === '.png') mimeType = 'image/png';
+    else if (['.jpg', '.jpeg'].includes(fileExt)) mimeType = 'image/jpeg';
+    else mimeType = 'image/gif';
+
+    const result = await model.generateContent([
+      "Extract all text and values from this medical report. Return the complete data in a structured format.",
+      {
+        inlineData: {
+          data: base64Data,
+          mimeType: mimeType
+        }
+      }
+    ]);
+
+    const response = await result.response;
+    const extractedText = response.text();
+
+    // Delete the temporary file
+    fs.unlinkSync(filePath);
+
+    res.json({
+      success: true,
+      extractedText: extractedText
+    });
+
+  } catch (error) {
+    console.error("Text extraction error:", error);
+    
+    // Clean up file on error
+    if (req.file) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (e) {}
+    }
+    
+    res.status(500).json({
+      success: false,
+      message: error.message || "Error extracting text"
+    });
+  }
+});
 // Delete document
 router.delete("/:documentId", (req, res) => {
   const { documentId } = req.params;
