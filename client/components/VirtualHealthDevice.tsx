@@ -93,7 +93,7 @@ export function VirtualHealthDevice({ patientId, onMetricsUpdate }: VirtualHealt
         }
 
         setIsSending(false);
-      }, 1000); // Every 30 seconds
+      }, 5000); // Every 30 seconds
     }
 
     return () => {
