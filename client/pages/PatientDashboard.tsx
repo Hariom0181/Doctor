@@ -15,7 +15,8 @@ import { Camera, X } from 'lucide-react';
 import { WalletCard } from '@/components/WalletCard';
 import { VideoConsultationBooking } from '@/components/VideoConsultationBooking';
 import { getAuthToken } from 'src/utils/auth';
-import {MedicalReportAnalyzer} from '@/components/MedicalReportAnalyzer';
+import { MedicalReportAnalyzer } from '@/components/MedicalReportAnalyzer';
+import { Brain } from 'lucide-react';
 
 import {
 
@@ -1476,13 +1477,13 @@ export default function PatientDashboard() {
           {patientData?.id && (
             <WalletCard patientId={patientData.id} />
           )}
-           {patientData?.id && (
-             <VideoConsultationBooking patientId={patientData?.id} />
+          {patientData?.id && (
+            <VideoConsultationBooking patientId={patientData?.id} />
           )}
-           {patientData?.id && (
-             <MedicalReportAnalyzer />
+          {patientData?.id && (
+            <MedicalReportAnalyzer patientId={patientData?.id} />
           )}
-         
+
 
         </div>
 
@@ -2417,39 +2418,7 @@ export default function PatientDashboard() {
                   <CardDescription>Your basic details and contact information</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {/* <div className="flex items-center space-x-4 mb-6">
-                    <Avatar className="w-20 h-20">
-                      <AvatarImage src={patientData.profilePicture} alt={patientData.name} />
-                      <AvatarFallback>{patientData.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
-                    </Avatar>
-                    <Button variant="outline">Change Photo</Button>
-                  </div>
-                  <div className="space-y-3">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Full Name</p>
-                      <p className="text-sm">{patientData.name}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Age</p>
-                      <p className="text-sm">{patientData.age} years</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Patient ID</p>
-                      <p className="text-sm">{patientData.id}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Email</p>
-                      <p className="text-sm">{patientData.email}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Phone</p>
-                      <p className="text-sm">{patientData.phone}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Blood Group</p>
-                      <p className="text-sm">{patientData.bloodGroup}</p>
-                    </div>
-                  </div> */}
+
                   <Button className="w-full">Edit Profile</Button>
                 </CardContent>
               </Card>
@@ -2553,6 +2522,62 @@ export default function PatientDashboard() {
               </Card>
             </div>
           </TabsContent>
+          {/* AI Analysis Card */}
+          {linkedDoctors.length > 0 ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Brain className="w-5 h-5" />
+                  AI Health Analysis
+                </CardTitle>
+                <CardDescription>
+                  Get AI-powered insights about your health status
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-sm text-blue-800">
+                    <strong>About AI Analysis:</strong> Our AI analyzes your complete medical history,
+                    recent visits, diagnoses, and vital signs to calculate a comprehensive health risk score
+                    and provide personalized insights.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="text-sm font-semibold">What's Analyzed:</h4>
+                  <ul className="text-sm text-gray-600 space-y-1">
+                    <li>• Age and medical history</li>
+                    <li>• Recent diagnoses and prescriptions</li>
+                    <li>• Visit frequency (last 3 months)</li>
+                    <li>• Identified health patterns</li>
+                    <li>• Chronic conditions and allergies</li>
+                  </ul>
+                </div>
+
+                <div className="pt-2">
+                  <p className="text-xs text-yellow-800 bg-yellow-50 border border-yellow-200 rounded p-2">
+                    <strong>Note:</strong> Your doctor needs to trigger this analysis.
+                    Contact Dr. {linkedDoctors[0].name} to request an AI health assessment.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Brain className="w-5 h-5" />
+                  AI Health Analysis
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-gray-600">
+                  Please link with a doctor first to access AI health analysis.
+                </p>
+              </CardContent>
+            </Card>
+          )
+          }
         </Tabs>
 
         {/* Emergency Banner */}

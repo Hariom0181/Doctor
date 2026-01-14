@@ -15,6 +15,7 @@ const videoConsultationRoutes = require('./routes/videoConsultationRoutes');
 const bookingRoutes = require('./routes/bookingRoutes');
 const aiRoutes = require('./routes/aiRoutes');
 const agoraRoutes = require('./routes/agoraRoutes');
+const IOThealthmetrics = require('./routes/healthMetricsRoutes')
 
 
 dotenv.config();
@@ -36,7 +37,8 @@ app.use('/uploads/patient_documents', express.static(path.join(__dirname, 'uploa
 app.use('/api/video-consultations', videoConsultationRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/agora', agoraRoutes);
-
+app.use('/api/health-metrics',IOThealthmetrics);
+// app.use('/api/health-metrics', require('./routes/healthMetricsRoutes'));
 
 // Routes
 app.use("/api/patients", patientRoutes);
@@ -45,7 +47,7 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use("/api/prescriptions", prescriptionRoutes);
 app.use('/api/ai', aiRoutes);
-
+// app.use('/api/health-metrics',healthMetricsRoutes);
 
 
 // Start Server

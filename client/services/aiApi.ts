@@ -24,15 +24,21 @@ class AIApiService {
       Authorization: `Bearer ${token}`
     };
   }
-
   private getDoctorAuthHeaders(): HeadersInit {
-    const token = localStorage.getItem('DoctorToken');
+    // This matches your auth.ts precisely
+    const token = localStorage.getItem('doctorToken'); 
+    
     if (!token) {
-      throw new Error('Doctor not authenticated. Please login.');
+      console.error("Auth Error: doctorToken not found in localStorage");
+      throw new Error('Doctor not authenticated. Please login again.');
     }
+
+    // Optional: Clean up potential extra quotes if stored via JSON.stringify
+    const cleanToken = token.startsWith('"') ? JSON.parse(token) : token;
+
     return {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`
+      'Authorization': `Bearer ${cleanToken}`
     };
   }
 
@@ -74,21 +80,21 @@ class AIApiService {
   }
 
   // Feature 2: Analyze Medical Report
-  async analyzeReport(reportData: string): Promise<string> {
+  async analyzeReport(reportData: string, language: string = 'english'): Promise<string> {
     try {
       console.log('📊 Analyzing medical report...');
-
+  
       const response = await fetch(`${API_BASE_URL}/ai/analyze-report`, {
         method: 'POST',
         headers: this.getPatientAuthHeaders(),
-        body: JSON.stringify({ reportData })
+        body: JSON.stringify({ reportData, language })
       });
-
+  
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.message || 'Failed to analyze report');
       }
-
+  
       const result = await response.json();
       console.log('✅ Report analysis complete');
       return result.analysis;
@@ -97,7 +103,72 @@ class AIApiService {
       throw error;
     }
   }
+  // Calculate and save risk score
+  async calculateAndSaveRiskScore(patientId: number): Promise<RiskScoreData> {
+    try {
+      console.log('🎯 Calculating and saving risk score for patient:', patientId);
 
+      const response = await fetch(`${API_BASE_URL}/ai/risk-score-save/${patientId}`, {
+        method: 'POST',
+        headers: this.getPatientAuthHeaders()
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to calculate risk score');
+      }
+
+      const result = await response.json();
+      console.log('✅ Risk score saved');
+      return result.data;
+    } catch (error) {
+      console.error('Risk score error:', error);
+      throw error;
+    }
+  }
+
+  // Generate and save medical insights
+  async generateAndSaveMedicalInsights(patientId: number): Promise<string> {
+    try {
+      console.log('💡 Generating and saving medical insights for patient:', patientId);
+
+      const response = await fetch(`${API_BASE_URL}/ai/medical-insights-save/${patientId}`, {
+        method: 'POST',
+        headers: this.getDoctorAuthHeaders()
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to generate insights');
+      }
+
+      const result = await response.json();
+      console.log('✅ Medical insights saved');
+      return result.insights;
+    } catch (error) {
+      console.error('Medical insights error:', error);
+      throw error;
+    }
+  }
+
+  // Get critical patients
+  async getCriticalPatients(doctorId: number): Promise<any[]> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/ai/critical-patients/${doctorId}`, {
+        headers: this.getDoctorAuthHeaders()
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch critical patients');
+      }
+
+      const result = await response.json();
+      return result.data || [];
+    } catch (error) {
+      console.error('Critical patients error:', error);
+      throw error;
+    }
+  }
   // Feature 3: Calculate Risk Score
   async calculateRiskScore(patientId: number): Promise<RiskScoreData> {
     try {
@@ -118,6 +189,48 @@ class AIApiService {
       return result.data;
     } catch (error) {
       console.error('Risk score error:', error);
+      throw error;
+    }
+  }
+  // Extract text from uploaded document
+  async extractTextFromDocument(documentId: number): Promise<string> {
+    try {
+      console.log('📄 Extracting text from document:', documentId);
+
+      const response = await fetch(`${API_BASE_URL}/documents/extract-text/${documentId}`, {
+        method: 'POST',
+        headers: this.getPatientAuthHeaders()
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to extract text');
+      }
+
+      const result = await response.json();
+      console.log('✅ Text extracted successfully');
+      return result.extractedText;
+    } catch (error) {
+      console.error('Text extraction error:', error);
+      throw error;
+    }
+  }
+
+  // Get patient documents
+  async getPatientDocuments(patientId: number): Promise<any[]> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/documents/patient/${patientId}`, {
+        headers: this.getPatientAuthHeaders()
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch documents');
+      }
+
+      const result = await response.json();
+      return result.data || [];
+    } catch (error) {
+      console.error('Fetch documents error:', error);
       throw error;
     }
   }

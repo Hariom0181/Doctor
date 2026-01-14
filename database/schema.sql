@@ -134,3 +134,18 @@ CREATE TABLE patient_doctors (
   KEY patient_id (patient_id),
   KEY doctor_id (doctor_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS patient_health_metrics (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  patient_id INT NOT NULL,
+  heart_rate INT,
+  blood_pressure_systolic INT,
+  blood_pressure_diastolic INT,
+  weight DECIMAL(5,2),
+  blood_sugar INT,
+  spo2 INT,
+  recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  source ENUM('manual', 'device', 'simulator') DEFAULT 'manual',
+  FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
+  INDEX idx_patient_metrics (patient_id, recorded_at)
+);

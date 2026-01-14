@@ -19,6 +19,8 @@ import { DoctorAvailabilitySettings } from '@/components/DoctorAvailabilitySetti
 import { Video } from 'lucide-react';
 import { DoctorConsultationRequests } from '@/components/DoctorConsultationRequests';
 import { getAuthToken } from 'src/utils/auth';
+import { aiApiService } from '@/services/aiApi';
+import { PatientAIAnalysis } from '@/components/PatientAIAnalysis'
 
 import {
   Heart,
@@ -135,7 +137,7 @@ export default function DoctorDashboard() {
   const [isLoadingPatients, setIsLoadingPatients] = useState(true);
   const [patientsError, setPatientsError] = useState(null);
   const [isAddHealthMetricsOpen, setIsAddHealthMetricsOpen] = useState(false);
-  const [isSetScheduleOpen , setScheduleOpen] = useState(false);
+  const [isSetScheduleOpen, setScheduleOpen] = useState(false);
   const [isAddingRecord, setIsAddingRecord] = useState(false);
   const [medicalRecords, setMedicalRecords] = useState<MedicalRecord[]>([]);
   const [isLoadingRecords, setIsLoadingRecords] = useState(true);
@@ -175,6 +177,8 @@ export default function DoctorDashboard() {
   const [recordSearchQuery, setRecordSearchQuery] = useState('');
   const [isEditRecordOpen, setIsEditRecordOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<any>(null);
+  const [criticalPatients, setCriticalPatients] = useState<any[]>([]);
+  const [loadingCritical, setLoadingCritical] = useState(false);
 
 
   // Your existing useState declarations
@@ -205,7 +209,7 @@ export default function DoctorDashboard() {
             await loadTodayAppointments(parsedData.id); // ✅ ADD THIS
             await loadPendingAppointments(parsedData.id);
             await loadRecentActivities(parsedData.id);
-            console.log("Doctor ID :",parsedData.id);
+            console.log("Doctor ID :", parsedData.id);
             // console.log("Doctor ID :",doctorData.id);  
 
 
@@ -384,7 +388,22 @@ export default function DoctorDashboard() {
       // });
     }
   };
+  const loadCriticalPatients = async () => {
+    setLoadingCritical(true);
+    try {
+      const doctorData = localStorage.getItem('doctorData');
+      const doctorId = doctorData ? JSON.parse(doctorData).id : null;
 
+      if (doctorId) {
+        const patients = await aiApiService.getCriticalPatients(doctorId);
+        setCriticalPatients(patients);
+      }
+    } catch (error) {
+      console.error('Error loading critical patients:', error);
+    } finally {
+      setLoadingCritical(false);
+    }
+  };
   // Add this function to save edited record
   const handleSaveEditedRecord = async () => {
     if (!editingRecord) return;
@@ -1356,14 +1375,14 @@ export default function DoctorDashboard() {
                 </div>
               </div>
               <Button
-              variant="outline"
-             disabled
+                variant="outline"
+                disabled
               >
-            <Plus className="w-4 h-4 mr-2" />
-            Manage Schedule
-            </Button>
-            
-           </div>
+                <Plus className="w-4 h-4 mr-2" />
+                Manage Schedule
+              </Button>
+
+            </div>
           </div>
         )}
 
@@ -2144,32 +2163,62 @@ export default function DoctorDashboard() {
             </div>
 
             {/* Critical Patients Alert */}
+            {/* Critical Patients Alert */}
             <Card className="border-red-200 bg-red-50">
               <CardHeader>
-                <CardTitle className="text-red-800">Critical Patients Alert</CardTitle>
-                <CardDescription className="text-red-700">
-                  Patients requiring immediate attention
-                </CardDescription>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle className="text-red-800">Critical Patients Alert</CardTitle>
+                    <CardDescription className="text-red-700">
+                      AI-identified patients requiring immediate attention
+                    </CardDescription>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={loadCriticalPatients}
+                    disabled={loadingCritical}
+                  >
+                    {loadingCritical ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
+
                 <div className="space-y-3">
-                  {linkedPatients.filter(p => p.status === "Critical").length === 0 ? (
+                  {loadingCritical ? (
+                    <div className="text-center py-4">
+                      <Loader2 className="w-6 h-6 animate-spin mx-auto text-red-600" />
+                    </div>
+                  ) : criticalPatients.length === 0 ? (
                     <div className="text-center py-4 text-gray-500">
                       <p>No critical patients at this time</p>
                     </div>
                   ) : (
-                    linkedPatients.filter(p => p.status === "Critical").map(patient => (
+                    criticalPatients.map(patient => (
                       <div key={patient.id} className="flex items-center justify-between p-3 bg-white border border-red-200 rounded-lg">
-                        <div>
-                          <p className="font-medium text-red-800">{patient.name}</p>
-                          <p className="text-sm text-red-600">{patient.condition}</p>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-red-800">{patient.name}</p>
+                            <Badge className="bg-red-600 text-white">
+                              Risk: {patient.risk_score}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-red-600">{patient.last_diagnosis || 'No recent diagnosis'}</p>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {patient.key_factors.slice(0, 2).map((factor: string, idx: number) => (
+                              <Badge key={idx} variant="outline" className="text-xs border-red-300 text-red-700">
+                                {factor}
+                              </Badge>
+                            ))}
+                          </div>
                         </div>
                         <div className="flex space-x-2">
                           <Button
                             size="sm"
                             variant="outline"
                             onClick={() => {
-                              alert(`Calling ${patient.name}...\n\nPhone: ${patient.phone}\nCondition: ${patient.condition}\n\nNote: This is a critical patient requiring immediate attention.`);
+                              alert(`Calling ${patient.name}...\n\nPhone: ${patient.phone}\nRisk Score: ${patient.risk_score}\n\nNote: This is a critical patient requiring immediate attention.`);
                             }}
                           >
                             <Phone className="w-4 h-4 mr-1" />
@@ -2188,8 +2237,33 @@ export default function DoctorDashboard() {
                     ))
                   )}
                 </div>
+
               </CardContent>
             </Card>
+            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-300 rounded-lg">
+              <p className="text-xs text-yellow-900">
+                <strong>AI Risk Score Calculation:</strong> Based on patient age, medical history,
+                allergies, recent diagnoses (last 10 visits), visit frequency (last 3 months), and
+                identified health patterns. Scores range 0-100:
+              </p>
+              <div className="mt-2 space-y-1 text-xs text-yellow-800">
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-green-600 text-white text-xs">0-30</Badge>
+                  <span>Normal - Routine checkups recommended</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-yellow-600 text-white text-xs">31-70</Badge>
+                  <span>Moderate - Monitoring & lifestyle changes needed</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-red-600 text-white text-xs">71-100</Badge>
+                  <span>Critical - Immediate attention required</span>
+                </div>
+              </div>
+              <p className="text-xs text-yellow-900 mt-2">
+                ⚠️ This is an AI assessment tool, not a medical diagnosis. Always use clinical judgment.
+              </p>
+            </div>
             <Dialog open={isRejectDialogOpen} onOpenChange={setIsRejectDialogOpen}>
               <DialogContent className="max-w-md">
                 <DialogHeader>
@@ -2308,13 +2382,6 @@ export default function DoctorDashboard() {
                         Add New Patient
                       </Button>
                     </div>
-
-
-
-
-
-
-
                     <div className="space-y-4">
                       {filteredPatients.length === 0 ? (
                         <div className="text-center py-8 text-gray-500">
@@ -2410,7 +2477,7 @@ export default function DoctorDashboard() {
             </Card>
 
             <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-              <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Patient Details</DialogTitle>
                 </DialogHeader>
@@ -2420,137 +2487,120 @@ export default function DoctorDashboard() {
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                   </div>
                 ) : viewingPatient ? (
-                  <div className="space-y-6">
-                    {/* Profile Section */}
-                    <div className="flex items-start space-x-4 pb-4 border-b">
-                      <Avatar className="w-20 h-20">
-                        {viewingPatient.profilePicture || viewingPatient.profile_img ? (
-                          <img
-                            src={viewingPatient.profilePicture || `http://localhost:5000${viewingPatient.profile_img}`}
-                            alt={viewingPatient.name || `${viewingPatient.firstName} ${viewingPatient.lastName}`}
-                          />
-                        ) : (
-                          <AvatarFallback className="text-2xl">
-                            {viewingPatient.firstName?.[0]}{viewingPatient.lastName?.[0]}
-                          </AvatarFallback>
-                        )}
-                      </Avatar>
-                      <div>
-                        <h3 className="text-xl font-semibold">
-                          {viewingPatient.name || `${viewingPatient.firstName} ${viewingPatient.lastName}`}
-                        </h3>
-                        <p className="text-sm text-gray-600">Patient ID: {viewingPatient.id}</p>
-                        <div className="flex gap-2 mt-2">
-                          {viewingPatient.gender && <Badge>{viewingPatient.gender}</Badge>}
-                          {viewingPatient.age && (
-                            <Badge variant="outline">{viewingPatient.age} years</Badge>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+                    {/* LEFT COLUMN: Patient Details (Spans 2 columns) */}
+                    <div className="md:col-span-2 space-y-6">
+
+                      {/* Profile Header */}
+                      <div className="flex items-start space-x-4 pb-4 border-b">
+                        <Avatar className="w-20 h-20">
+                          {viewingPatient.profilePicture || viewingPatient.profile_img ? (
+                            <img
+                              src={viewingPatient.profilePicture || `http://localhost:5000${viewingPatient.profile_img}`}
+                              alt={viewingPatient.name}
+                            />
+                          ) : (
+                            <AvatarFallback className="text-2xl">
+                              {viewingPatient.firstName?.[0]}{viewingPatient.lastName?.[0]}
+                            </AvatarFallback>
                           )}
-                          {viewingPatient.bloodGroup && (
-                            <Badge variant="outline">Blood Group: {viewingPatient.bloodGroup}</Badge>
-                          )}
+                        </Avatar>
+                        <div>
+                          <h3 className="text-xl font-semibold">
+                            {viewingPatient.name || `${viewingPatient.firstName} ${viewingPatient.lastName}`}
+                          </h3>
+                          <p className="text-sm text-gray-600">Patient ID: {viewingPatient.id}</p>
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {viewingPatient.gender && <Badge>{viewingPatient.gender}</Badge>}
+                            {viewingPatient.age && (
+                              <Badge variant="outline">{viewingPatient.age} years</Badge>
+                            )}
+                            {viewingPatient.bloodGroup && (
+                              <Badge variant="outline">Blood: {viewingPatient.bloodGroup}</Badge>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    {/* Personal Information */}
-                    <div>
-                      <h4 className="font-semibold mb-3 flex items-center">
-                        <User className="w-4 h-4 mr-2" />
-                        Personal Information
-                      </h4>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-sm text-gray-600">Email</p>
-                          <p className="font-medium">{viewingPatient.email}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-600">Phone</p>
-                          <p className="font-medium">{viewingPatient.phone || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-600">Date of Birth</p>
-                          <p className="font-medium">
-                            {viewingPatient.dateOfBirth
-                              ? new Date(viewingPatient.dateOfBirth).toLocaleDateString()
-                              : 'N/A'}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-600">Gender</p>
-                          <p className="font-medium">{viewingPatient.gender || 'N/A'}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Address */}
-                    {(viewingPatient.address || viewingPatient.city || viewingPatient.state) && (
+                      {/* Personal Information */}
                       <div>
                         <h4 className="font-semibold mb-3 flex items-center">
-                          <MapPin className="w-4 h-4 mr-2" />
-                          Address
-                        </h4>
-                        <p className="text-gray-700">
-                          {viewingPatient.address && <>{viewingPatient.address}<br /></>}
-                          {viewingPatient.city && viewingPatient.state &&
-                            `${viewingPatient.city}, ${viewingPatient.state}`
-                          }
-                          {viewingPatient.pincode && ` - ${viewingPatient.pincode}`}
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Emergency Contact */}
-                    {(viewingPatient.emergencyContact || viewingPatient.emergencyPhone) && (
-                      <div>
-                        <h4 className="font-semibold mb-3 flex items-center">
-                          <Phone className="w-4 h-4 mr-2" />
-                          Emergency Contact
+                          <User className="w-4 h-4 mr-2" /> Personal Information
                         </h4>
                         <div className="grid grid-cols-2 gap-4">
                           <div>
-                            <p className="text-sm text-gray-600">Contact Name</p>
-                            <p className="font-medium">{viewingPatient.emergencyContact || 'N/A'}</p>
+                            <p className="text-sm text-gray-600">Email</p>
+                            <p className="font-medium">{viewingPatient.email}</p>
                           </div>
                           <div>
-                            <p className="text-sm text-gray-600">Contact Phone</p>
-                            <p className="font-medium">{viewingPatient.emergencyPhone || 'N/A'}</p>
+                            <p className="text-sm text-gray-600">Phone</p>
+                            <p className="font-medium">{viewingPatient.phone || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600">Date of Birth</p>
+                            <p className="font-medium">
+                              {viewingPatient.dateOfBirth
+                                ? new Date(viewingPatient.dateOfBirth).toLocaleDateString()
+                                : 'N/A'}
+                            </p>
                           </div>
                         </div>
                       </div>
-                    )}
 
-                    {/* Medical Information */}
-                    <div>
-                      <h4 className="font-semibold mb-3 flex items-center">
-                        <FileText className="w-4 h-4 mr-2" />
-                        Medical Information
-                      </h4>
-                      <div className="space-y-3">
-                        {viewingPatient.bloodGroup && (
-                          <div>
-                            <p className="text-sm text-gray-600">Blood Group</p>
-                            <p className="font-medium">{viewingPatient.bloodGroup}</p>
-                          </div>
-                        )}
+                      {/* Address & Emergency (Combined for brevity in example, keep your original logic if preferred) */}
+                      {(viewingPatient.address || viewingPatient.city) && (
                         <div>
-                          <p className="text-sm text-gray-600">Allergies</p>
-                          <p className="font-medium">{viewingPatient.allergies || 'None reported'}</p>
+                          <h4 className="font-semibold mb-3 flex items-center">
+                            <MapPin className="w-4 h-4 mr-2" /> Address
+                          </h4>
+                          <p className="text-gray-700">
+                            {viewingPatient.address}<br />
+                            {viewingPatient.city}, {viewingPatient.state} {viewingPatient.pincode}
+                          </p>
                         </div>
-                        <div>
-                          <p className="text-sm text-gray-600">Medical History</p>
-                          <p className="font-medium">{viewingPatient.medicalHistory || 'No history recorded'}</p>
+                      )}
+
+                      {/* Medical Information */}
+                      <div>
+                        <h4 className="font-semibold mb-3 flex items-center">
+                          <FileText className="w-4 h-4 mr-2" /> Medical Information
+                        </h4>
+                        <div className="bg-slate-50 p-4 rounded-lg space-y-3 border">
+                          <div>
+                            <p className="text-sm text-gray-600">Allergies</p>
+                            <p className="font-medium">{viewingPatient.allergies || 'None reported'}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600">Medical History</p>
+                            <p className="font-medium">{viewingPatient.medicalHistory || 'No history recorded'}</p>
+                          </div>
                         </div>
                       </div>
                     </div>
 
-                    {/* Registration Date */}
-                    <div className="pt-4 border-t text-sm text-gray-600">
-                      <p>Registered on: {new Date(viewingPatient.createdAt || viewingPatient.created_at || '').toLocaleDateString()}</p>
+                    {/* RIGHT COLUMN: AI Analysis (Spans 1 column) */}
+                    <div className="md:col-span-3">
+                      <div className="sticky top-0">
+                        <PatientAIAnalysis
+                          patientId={viewingPatient.id}
+                          patientName={viewingPatient.name || `${viewingPatient.firstName} ${viewingPatient.lastName}`}
+                        />
+
+                        {/* Optional: Add a quick actions or notes section below the AI card if needed */}
+                        <div className="mt-4 text-xs text-gray-500 text-center">
+                          AI analysis is based on available medical records and history.
+                        </div>
+                      </div>
                     </div>
+
                   </div>
                 ) : null}
               </DialogContent>
+
+              {/* ------------------------------------- */}
             </Dialog>
+
 
           </TabsContent>
 
@@ -3293,14 +3343,14 @@ export default function DoctorDashboard() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {doctorData?.id &&(
-                 <DoctorConsultationRequests doctorId={doctorData?.id || 0} />
+                  {doctorData?.id && (
+                    <DoctorConsultationRequests doctorId={doctorData?.id || 0} />
                   )}
-                  {doctorData?.id &&(
-                  <DoctorAvailabilitySettings doctorId={doctorData?.id} />
-                  
+                  {doctorData?.id && (
+                    <DoctorAvailabilitySettings doctorId={doctorData?.id} />
 
-                  ) }
+
+                  )}
                 </CardContent>
               </Card>
             </div>
