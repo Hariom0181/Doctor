@@ -1,31 +1,52 @@
-const { v2: cloudinary } = require('cloudinary');
+const { v2: cloudinary } = require("cloudinary");
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
+const multer = require("multer");
 
+// Cloudinary config
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-module.exports = cloudinary;
-
-const storage = new CloudinaryStorage({
-  cloudinary: cloudinary,
+// ==============================
+// Profile Image Storage
+// ==============================
+const profileStorage = new CloudinaryStorage({
+  cloudinary,
   params: {
-    folder: 'patient_documents', // Folder name in Cloudinary
-    allowed_formats: ['jpg', 'jpeg', 'png', 'pdf', 'gif'],
-    resource_type: 'auto', // Automatically detect file type
-    public_id: (req, file) => `patient_${req.body.patientId}_${Date.now()}` // Unique filename
-  }
+    folder: "patient_profiles",
+    allowed_formats: ["jpg", "jpeg", "png"],
+    transformation: [{ width: 500, height: 500, crop: "limit" }],
+    public_id: (req) => `patient_${req.params.patientId}_${Date.now()}`
+  },
 });
 
-const fileFilter = (req, file, cb) => {
-  const allowedTypes = /jpeg|jpg|png|gif|pdf/;
-  const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-  const mimetype = allowedTypes.test(file.mimetype);
+const uploadProfile = multer({
+  storage: profileStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+});
 
-  if (mimetype && extname) {
-    return cb(null, true);
-  } else {
-    cb(new Error("Only images (JPEG, JPG, PNG, GIF) and PDF files are allowed!"));
-  }
+// ==============================
+// Document Storage
+// ==============================
+const documentStorage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: "patient_documents",
+    allowed_formats: ["jpg", "jpeg", "png", "pdf", "gif"],
+    resource_type: "auto",
+    public_id: (req) => `patient_${req.body.patientId}_${Date.now()}`
+  },
+});
+
+const uploadDocument = multer({
+  storage: documentStorage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+});
+
+module.exports = {
+  cloudinary,
+  uploadProfile,
+  uploadDocument
 };

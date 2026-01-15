@@ -2128,7 +2128,7 @@ export default function PatientDashboard() {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => window.open(`http://localhost:5000${doc.file_path}`, '_blank')}
+                                  onClick={() => window.open(doc.file_path, '_blank')}
                                 >
                                   <Download className="w-3 h-3 mr-1" />
                                   View

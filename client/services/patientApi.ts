@@ -344,7 +344,7 @@ class PatientApiService {
 
       if (result.success && result.profileImagePath) {
         // Return full URL to the image
-        return `http://localhost:5000${result.profileImagePath}`;
+        success: result.success;
       }
 
       return null;

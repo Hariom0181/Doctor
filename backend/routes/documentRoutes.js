@@ -1,47 +1,23 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../config/db");
-const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
+const { uploadProfile } = require("../config/cloudinary");
+const { uploadDocument, cloudinary } = require("../config/cloudinary");
+const CloudinaryStorage = require('multer-storage-cloudinary').CloudinaryStorage;
+// const { uploadDocument, cloudinary } = require("../config/cloudinary");
+
+
 
 // Configure multer for document upload
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    const uploadDir = path.join(__dirname, "../uploads/patient_documents");
-    
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    
-    cb(null, uploadDir);
-  },
-  filename: function (req, file, cb) {
-    const uniqueName = `patient_${req.body.patientId}_${Date.now()}${path.extname(file.originalname)}`;
-    cb(null, uniqueName);
-  }
-});
 
-const fileFilter = (req, file, cb) => {
-  const allowedTypes = /jpeg|jpg|png|gif|pdf/;
-  const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-  const mimetype = allowedTypes.test(file.mimetype);
 
-  if (mimetype && extname) {
-    return cb(null, true);
-  } else {
-    cb(new Error("Only images (JPEG, JPG, PNG, GIF) and PDF files are allowed!"));
-  }
-};
 
-const upload = multer({
-  storage: storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
-  fileFilter: fileFilter
-});
+
+
 
 // Upload patient document
-router.post("/upload", upload.single("document"), (req, res) => {
+// Upload patient document to Cloudinary
+router.post("/upload", uploadDocument.single("document"), (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({
@@ -58,14 +34,7 @@ router.post("/upload", upload.single("document"), (req, res) => {
       notes
     } = req.body;
 
-    if (!patientId || !documentType || !documentDate) {
-      return res.status(400).json({
-        success: false,
-        message: "Patient ID, document type, and date are required"
-      });
-    }
-
-    const filePath = `/uploads/patient_documents/${req.file.filename}`;
+    const filePath = req.file.path; // ✅ Cloudinary URL
     const documentName = req.file.originalname;
 
     const sql = `
@@ -79,10 +48,9 @@ router.post("/upload", upload.single("document"), (req, res) => {
       [patientId, documentType, documentName, filePath, documentDate, hospitalName, notes],
       (err, result) => {
         if (err) {
-          console.error("Error saving document:", err);
           return res.status(500).json({
             success: false,
-            message: "Error saving document to database"
+            message: "Error saving document"
           });
         }
 
@@ -90,25 +58,24 @@ router.post("/upload", upload.single("document"), (req, res) => {
           success: true,
           message: "Document uploaded successfully",
           documentId: result.insertId,
-          filePath: filePath
+          filePath
         });
       }
     );
 
   } catch (error) {
-    console.error("Upload error:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Error uploading document"
+      message: "Document upload failed"
     });
   }
 });
-// Extract text from document using Google Vision API
+// tract text from document using Google Vision API
+// Extract text from Cloudinary document
 router.post("/extract-text/:documentId", async (req, res) => {
   try {
     const { documentId } = req.params;
 
-    // Get document from database
     const sql = "SELECT file_path, document_name FROM patient_documents WHERE id = ?";
     
     db.query(sql, [documentId], async (err, results) => {
@@ -126,23 +93,18 @@ router.post("/extract-text/:documentId", async (req, res) => {
         });
       }
 
-      const filePath = path.join(__dirname, "..", results[0].file_path);
+      const cloudinaryUrl = results[0].file_path; // This is Cloudinary URL
+      const fileExt = path.extname(results[0].document_name).toLowerCase();
 
-      if (!fs.existsSync(filePath)) {
-        return res.status(404).json({
-          success: false,
-          message: "File not found on server"
-        });
-      }
+      // Fetch file from Cloudinary
+      const axios = require('axios');
+      const response = await axios.get(cloudinaryUrl, { responseType: 'arraybuffer' });
+      const fileData = Buffer.from(response.data);
+      const base64Data = fileData.toString('base64');
 
-      // Use Google Vision API for all files
       const { GoogleGenerativeAI } = require("@google/generative-ai");
       const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-      const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
-
-      const fileData = fs.readFileSync(filePath);
-      const base64Data = fileData.toString('base64');
-      const fileExt = path.extname(results[0].document_name).toLowerCase();
+      const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
       let mimeType;
       if (fileExt === '.pdf') mimeType = 'application/pdf';
@@ -160,8 +122,8 @@ router.post("/extract-text/:documentId", async (req, res) => {
         }
       ]);
 
-      const response = await result.response;
-      const extractedText = response.text();
+      const aiResponse = await result.response;
+      const extractedText = aiResponse.text();
 
       res.json({
         success: true,
@@ -214,7 +176,9 @@ router.get("/patient/:patientId", (req, res) => {
   });
 });
 // Extract text WITHOUT saving to database (for analysis only)
-router.post("/extract-only", upload.single("document"), async (req, res) => {
+// Extract text WITHOUT saving (for AI analysis)
+router.post("/extract-only", uploadDocument.single("document"), async (req, res) => {
+
   try {
     if (!req.file) {
       return res.status(400).json({
@@ -223,16 +187,18 @@ router.post("/extract-only", upload.single("document"), async (req, res) => {
       });
     }
 
-    const filePath = req.file.path;
+    const cloudinaryUrl = req.file.path;
     const fileExt = path.extname(req.file.originalname).toLowerCase();
 
-    // Extract text using Google Vision
+    // Fetch from Cloudinary
+    const axios = require('axios');
+    const response = await axios.get(cloudinaryUrl, { responseType: 'arraybuffer' });
+    const fileData = Buffer.from(response.data);
+    const base64Data = fileData.toString('base64');
+
     const { GoogleGenerativeAI } = require("@google/generative-ai");
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
-
-    const fileData = fs.readFileSync(filePath);
-    const base64Data = fileData.toString('base64');
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
     let mimeType;
     if (fileExt === '.pdf') mimeType = 'application/pdf';
@@ -250,11 +216,15 @@ router.post("/extract-only", upload.single("document"), async (req, res) => {
       }
     ]);
 
-    const response = await result.response;
-    const extractedText = response.text();
+    const aiResponse = await result.response;
+    const extractedText = aiResponse.text();
 
-    // Delete the temporary file
-    fs.unlinkSync(filePath);
+    // Delete from Cloudinary (temporary file)
+    const publicIdMatch = cloudinaryUrl.match(/\/patient_documents\/([^\.]+)/);
+    if (publicIdMatch) {
+      const publicId = `patient_documents/${publicIdMatch[1]}`;
+      await cloudinary.uploader.destroy(publicId, { resource_type: 'auto' });
+    }
 
     res.json({
       success: true,
@@ -263,14 +233,6 @@ router.post("/extract-only", upload.single("document"), async (req, res) => {
 
   } catch (error) {
     console.error("Text extraction error:", error);
-    
-    // Clean up file on error
-    if (req.file) {
-      try {
-        fs.unlinkSync(req.file.path);
-      } catch (e) {}
-    }
-    
     res.status(500).json({
       success: false,
       message: error.message || "Error extracting text"
@@ -278,13 +240,13 @@ router.post("/extract-only", upload.single("document"), async (req, res) => {
   }
 });
 // Delete document
-router.delete("/:documentId", (req, res) => {
+// Delete document from Cloudinary
+router.delete("/:documentId", async (req, res) => {
   const { documentId } = req.params;
 
-  // First get file path
   const getFileSql = "SELECT file_path FROM patient_documents WHERE id = ?";
   
-  db.query(getFileSql, [documentId], (err, results) => {
+  db.query(getFileSql, [documentId], async (err, results) => {
     if (err) {
       console.error("Error fetching document:", err);
       return res.status(500).json({
@@ -300,12 +262,17 @@ router.delete("/:documentId", (req, res) => {
       });
     }
 
-    const filePath = path.join(__dirname, "..", results[0].file_path);
+    const cloudinaryUrl = results[0].file_path;
+    
+    // Extract public_id from Cloudinary URL
+    // URL format: https://res.cloudinary.com/cloud_name/image/upload/v123456/patient_documents/file_name.jpg
+    const publicIdMatch = cloudinaryUrl.match(/\/patient_documents\/([^\.]+)/);
+    const publicId = publicIdMatch ? `patient_documents/${publicIdMatch[1]}` : null;
 
-    // Delete from database
+    // Delete from database first
     const deleteSql = "DELETE FROM patient_documents WHERE id = ?";
     
-    db.query(deleteSql, [documentId], (deleteErr) => {
+    db.query(deleteSql, [documentId], async (deleteErr) => {
       if (deleteErr) {
         console.error("Error deleting document:", deleteErr);
         return res.status(500).json({
@@ -314,12 +281,13 @@ router.delete("/:documentId", (req, res) => {
         });
       }
 
-      // Delete file from storage
-      if (fs.existsSync(filePath)) {
+      // Delete from Cloudinary
+      if (publicId) {
         try {
-          fs.unlinkSync(filePath);
-        } catch (fileErr) {
-          console.error("Error deleting file:", fileErr);
+          await cloudinary.uploader.destroy(publicId, { resource_type: 'image' });
+        } catch (cloudinaryErr) {
+          console.error("Error deleting from Cloudinary:", cloudinaryErr);
+          // Continue even if Cloudinary delete fails
         }
       }
 
