@@ -35,7 +35,17 @@ const authenticatePatient = (req, res, next) => {
 
 router.post(
   "/:patientId/upload-profile",
-  uploadProfile.single("profileImage"),
+  (req, res, next) => {
+    uploadProfile.single("profileImage")(req, res, (err) => {
+      if (err) {
+        return res.status(400).json({
+          success: false,
+          message: err.message || "File upload failed"
+        });
+      }
+      next();
+    });
+  },
   async (req, res) => {
     try {
       if (!req.file) {
@@ -46,9 +56,10 @@ router.post(
       }
 
       const { patientId } = req.params;
-      const cloudinaryUrl = req.file.path; // ✅ Cloudinary URL
+      const cloudinaryUrl = req.file.path;
 
       const sql = "UPDATE patients SET profile_img = ? WHERE id = ?";
+
       db.query(sql, [cloudinaryUrl, patientId], (err) => {
         if (err) {
           return res.status(500).json({
@@ -62,8 +73,8 @@ router.post(
           profileImagePath: cloudinaryUrl
         });
       });
-
     } catch (error) {
+      console.error("Profile upload failed:", error);
       res.status(500).json({
         success: false,
         message: "Profile upload failed"
