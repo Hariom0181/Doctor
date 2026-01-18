@@ -215,11 +215,39 @@ export function VideoConsultationBooking({ patientId }: VideoConsultationBooking
       setLoadingSlots(false);
     }
   };
+  const isPastSlot = (date: Date | undefined, time: string) => {
+    if (!date) return false;
+
+    const now = new Date();
+    const [hours, minutes] = time.split(':').map(Number);
+
+    const slotDateTime = new Date(date);
+    slotDateTime.setHours(hours, minutes, 0, 0);
+
+    return (
+      date.toDateString() === now.toDateString() &&
+      slotDateTime < now
+    );
+  };
+
+
+
 
   const handleSlotSelect = (slot: string) => {
     setSelectedSlot(slot);
     setStep('confirm');
   };
+
+  const isPastSlotStrict = (date: Date, time: string) => {
+    const now = new Date();
+    const [h, m] = time.split(':').map(Number);
+
+    const slotDateTime = new Date(date);
+    slotDateTime.setHours(h, m, 0, 0);
+
+    return slotDateTime < now;
+  };
+
 
   const handleBooking = async () => {
     if (!selectedDoctor || !selectedFee || !selectedDate || !selectedSlot) {
@@ -230,6 +258,19 @@ export function VideoConsultationBooking({ patientId }: VideoConsultationBooking
       });
       return;
     }
+    // ⛔ FINAL SAFETY CHECK: prevent booking past slot
+    if (isPastSlotStrict(selectedDate, selectedSlot)) {
+      toast({
+        title: "Invalid Time Slot",
+        description: "This time slot has already passed. Please select another slot.",
+        variant: "destructive",
+      });
+
+      setStep('datetime');
+      setSelectedSlot(null);
+      return;
+    }
+
     const toLocalDateString = (date: Date) => {
       const y = date.getFullYear();
       const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -633,17 +674,24 @@ export function VideoConsultationBooking({ patientId }: VideoConsultationBooking
                   ) : availableSlots.length === 0 ? (
                     <p className="text-gray-500 text-sm">No slots available for this date</p>) : (
                     <div className="grid grid-cols-2 gap-2 max-h-96 overflow-y-auto">
-                      {availableSlots.map(slot => (
-                        <Button
-                          key={slot.time}
-                          variant={selectedSlot === slot.time ? "default" : "outline"}
-                          disabled={!slot.available}
-                          onClick={() => slot.available && handleSlotSelect(slot.time)}
-                          className="h-auto py-3"
-                        >
-                          {formatTime(slot.time)}
-                        </Button>
-                      ))}
+                      {availableSlots.map(slot => {
+                        const isDisabled =
+                          !slot.available || isPastSlot(selectedDate, slot.time);
+
+                        return (
+                          <Button
+                            key={slot.time}
+                            variant={selectedSlot === slot.time ? "default" : "outline"}
+                            disabled={isDisabled}
+                            onClick={() => !isDisabled && handleSlotSelect(slot.time)}
+                            className="h-auto py-3"
+                          >
+                            {formatTime(slot.time)}
+                          </Button>
+                        );
+                      })}
+
+
                     </div>
                   )}
 
@@ -717,14 +765,14 @@ export function VideoConsultationBooking({ patientId }: VideoConsultationBooking
         </DialogContent>
       </Dialog>
       {isInCall && activeConsultation && (
-      <VideoCallRoom
-        consultationId={activeConsultation.id}
-        userId={patientId}
-        role="patient"  
-        doctorName={activeConsultation.doctor_name}
-        duration={activeConsultation.duration_minutes}
-        onEndCall={handleEndCall}
-      />
-    )}
+        <VideoCallRoom
+          consultationId={activeConsultation.id}
+          userId={patientId}
+          role="patient"
+          doctorName={activeConsultation.doctor_name}
+          duration={activeConsultation.duration_minutes}
+          onEndCall={handleEndCall}
+        />
+      )}
     </>);
 }

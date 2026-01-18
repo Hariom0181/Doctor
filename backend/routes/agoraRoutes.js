@@ -163,7 +163,7 @@ router.post('/start/:consultationId', authenticateDoctor, (req, res) => {
     // Verify consultation
     const consultationSql = `
       SELECT * FROM video_consultations
-      WHERE id = ? AND doctor_id = ? AND status = 'confirmed'
+      WHERE id = ? AND doctor_id = ? AND status = 'in_progress'
     `;
 
     db.query(consultationSql, [consultationId, doctorId], (err, results) => {

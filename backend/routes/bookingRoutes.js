@@ -56,6 +56,12 @@ router.post('/book', authenticatePatient, (req, res) => {
   try {
     const patientId = req.patient.id;
     const { doctorId, scheduledDate, scheduledTime, durationMinutes, consultationFee } = req.body;
+    const scheduledDateTime = new Date(`${scheduledDate}T${scheduledTime}`);
+    const now = new Date();
+    const diffMinutes = (scheduledDateTime - now) / (1000 * 60);
+    console.log('⏰ Scheduled:', scheduledDateTime);
+    console.log('⏰ Now:', now);
+    console.log('⏰ Difference (minutes):', diffMinutes);
 
     console.log('📝 Booking request:', { patientId, doctorId, scheduledDate, scheduledTime, durationMinutes, consultationFee });
 
@@ -64,6 +70,13 @@ router.post('/book', authenticatePatient, (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'All fields are required'
+      });
+      
+    }
+    if (scheduledDateTime < now) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot book a slot in the past'
       });
     }
 
@@ -146,7 +159,15 @@ router.post('/book', authenticatePatient, (req, res) => {
               success: false,
               message: 'This time slot is already booked. Please select another time.'
             });
+
           }
+          if (diffMinutes <= 5) {
+            return res.status(400).json({
+              success: false,
+              message: 'Cannot book consultation in the past or too close to current time'
+            });
+          }
+          
 
           // Step 4: Create consultation booking
           const insertSql = `
