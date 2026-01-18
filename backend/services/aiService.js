@@ -5,7 +5,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 class AIService {
   constructor() {
     // Fix: Use correct model name - gemini-1.5-flash or gemini-pro
-    this.model = genAI.getGenerativeModel({ 
+    this.model = genAI.getGenerativeModel({
       model: "gemini-3-flash-preview",
       generationConfig: {
         temperature: 0.7,
@@ -51,7 +51,7 @@ User's question: ${userMessage}`;
       if (!reportData || typeof reportData !== 'string') {
         throw new Error('Invalid report data provided');
       }
-  
+
       const languageInstructions = {
         hindi: 'Respond in Hindi (हिंदी में जवाब दें)',
         marathi: 'Respond in Marathi (मराठीत उत्तर द्या)',
@@ -60,7 +60,7 @@ User's question: ${userMessage}`;
         telugu: 'Respond in Telugu (తెలుగులో సమాధానం ఇవ్వండి)',
         english: 'Respond in English'
       };
-  
+
       const prompt = `${languageInstructions[language] || languageInstructions.english}
   
   Analyze this medical/lab report and provide insights:
@@ -76,17 +76,17 @@ User's question: ${userMessage}`;
   
   Format your response clearly with headings and bullet points.
   IMPORTANT: This is general guidance only, not a medical diagnosis.`;
-  
+
       console.log('📊 Analyzing report with Gemini AI in', language);
       const result = await this.model.generateContent(prompt);
       const response = await result.response;
       const text = response.text();
-      
+
       console.log('✅ Report analysis successful');
       return text;
     } catch (error) {
       console.error('Report Analysis Error:', error);
-      
+
       // Provide more specific error messages
       if (error.message.includes('API key')) {
         throw new Error('AI service configuration error. Please check API key.');
@@ -140,7 +140,7 @@ Consider factors:
       const result = await this.model.generateContent(prompt);
       const response = await result.response;
       const text = response.text();
-      
+
       // Extract JSON from response (handle markdown code blocks)
       let jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
       if (!jsonMatch) {
@@ -148,13 +148,13 @@ Consider factors:
       } else {
         jsonMatch[0] = jsonMatch[1];
       }
-      
+
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
         console.log('✅ Risk score calculated:', parsed);
         return parsed;
       }
-      
+
       throw new Error('Invalid AI response format');
     } catch (error) {
       console.error('Risk Score Calculation Error:', error);
@@ -196,7 +196,7 @@ Use clear medical language but keep it concise and actionable.`;
       const result = await this.model.generateContent(prompt);
       const response = await result.response;
       const text = response.text();
-      
+
       console.log('✅ Medical insights generated');
       return text;
     } catch (error) {

@@ -1,5 +1,5 @@
 const { v2: cloudinary } = require("cloudinary");
-const { CloudinaryStorage } = require("multer-storage-cloudinary");
+const CloudinaryStorage = require('multer-storage-cloudinary');
 const multer = require("multer");
 
 // Cloudinary config
@@ -12,14 +12,14 @@ cloudinary.config({
 // ==============================
 // Profile Image Storage
 // ==============================
-const profileStorage = new CloudinaryStorage({
-  cloudinary,
-  params: {
-    folder: "patient_profiles",
-    allowed_formats: ["jpg", "jpeg", "png"],
-    transformation: [{ width: 500, height: 500, crop: "limit" }],
-    public_id: (req) => `patient_${req.params.patientId}_${Date.now()}`
-  },
+const profileStorage = CloudinaryStorage({
+  cloudinary: cloudinary,
+  folder: "patient_profiles",
+  allowedFormats: ["jpg", "jpeg", "png"],
+  transformation: [{ width: 500, height: 500, crop: "limit" }],
+  filename: function (req, file, cb) {
+    cb(null, `patient_${req.params.patientId || 'unknown'}_${Date.now()}`);
+  }
 });
 
 const uploadProfile = multer({
@@ -30,14 +30,14 @@ const uploadProfile = multer({
 // ==============================
 // Document Storage
 // ==============================
-const documentStorage = new CloudinaryStorage({
-  cloudinary,
-  params: {
-    folder: "patient_documents",
-    allowed_formats: ["jpg", "jpeg", "png", "pdf", "gif"],
-    resource_type: "auto",
-    public_id: (req) => `patient_${req.body.patientId}_${Date.now()}`
-  },
+const documentStorage = CloudinaryStorage({
+  cloudinary: cloudinary,
+  folder: "patient_documents",
+  allowedFormats: ["jpg", "jpeg", "png", "pdf", "gif"],
+  resource_type: "auto",
+  filename: function (req, file, cb) {
+    cb(null, `patient_${req.body.patientId || 'unknown'}_${Date.now()}`);
+  }
 });
 
 const uploadDocument = multer({

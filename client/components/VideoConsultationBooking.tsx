@@ -720,7 +720,7 @@ export function VideoConsultationBooking({ patientId }: VideoConsultationBooking
       <VideoCallRoom
         consultationId={activeConsultation.id}
         userId={patientId}
-        role="patient"
+        role="patient"  
         doctorName={activeConsultation.doctor_name}
         duration={activeConsultation.duration_minutes}
         onEndCall={handleEndCall}

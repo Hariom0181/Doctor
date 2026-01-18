@@ -1,17 +1,23 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../config/db");
-const { uploadProfile } = require("../config/cloudinary");
 const { uploadDocument, cloudinary } = require("../config/cloudinary");
 const CloudinaryStorage = require('multer-storage-cloudinary').CloudinaryStorage;
+const path = require('path');
+const multer = require('multer'); 
 // const { uploadDocument, cloudinary } = require("../config/cloudinary");
+// const { uploadProfile } = require("../config/cloudinary");
 
 
 
 // Configure multer for document upload
 
 
-
+const storageMemory = multer.memoryStorage();
+const uploadMemory = multer({ 
+    storage: storageMemory,
+    limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+});
 
 
 
@@ -177,37 +183,31 @@ router.get("/patient/:patientId", (req, res) => {
 });
 // Extract text WITHOUT saving to database (for analysis only)
 // Extract text WITHOUT saving (for AI analysis)
-router.post("/extract-only", uploadDocument.single("document"), async (req, res) => {
-
+router.post("/extract-only", uploadMemory.single("document"), async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: "No file uploaded"
-      });
+      return res.status(400).json({ success: false, message: "No file uploaded" });
     }
 
-    const cloudinaryUrl = req.file.path;
+    // Access buffer directly from memory
+    const fileBuffer = req.file.buffer;
+    const base64Data = fileBuffer.toString('base64');
     const fileExt = path.extname(req.file.originalname).toLowerCase();
 
-    // Fetch from Cloudinary
-    const axios = require('axios');
-    const response = await axios.get(cloudinaryUrl, { responseType: 'arraybuffer' });
-    const fileData = Buffer.from(response.data);
-    const base64Data = fileData.toString('base64');
-
-    const { GoogleGenerativeAI } = require("@google/generative-ai");
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-
+    // Determine Mime Type
     let mimeType;
     if (fileExt === '.pdf') mimeType = 'application/pdf';
     else if (fileExt === '.png') mimeType = 'image/png';
     else if (['.jpg', '.jpeg'].includes(fileExt)) mimeType = 'image/jpeg';
-    else mimeType = 'image/gif';
+    else return res.status(400).json({ success: false, message: "Unsupported file format" });
+
+    // Initialize Gemini
+    const { GoogleGenerativeAI } = require("@google/generative-ai");
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" }); // Recommend 1.5-flash for speed/pdf
 
     const result = await model.generateContent([
-      "Extract all text and values from this medical report. Return the complete data in a structured format.",
+      "Extract all text and key medical values from this medical report. Return the data in a clean, structured text format.",
       {
         inlineData: {
           data: base64Data,
@@ -219,23 +219,16 @@ router.post("/extract-only", uploadDocument.single("document"), async (req, res)
     const aiResponse = await result.response;
     const extractedText = aiResponse.text();
 
-    // Delete from Cloudinary (temporary file)
-    const publicIdMatch = cloudinaryUrl.match(/\/patient_documents\/([^\.]+)/);
-    if (publicIdMatch) {
-      const publicId = `patient_documents/${publicIdMatch[1]}`;
-      await cloudinary.uploader.destroy(publicId, { resource_type: 'auto' });
-    }
-
     res.json({
       success: true,
       extractedText: extractedText
     });
 
   } catch (error) {
-    console.error("Text extraction error:", error);
+    console.error("Extraction error:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Error extracting text"
+      message: "Failed to process document. Ensure the file is a readable PDF or Image."
     });
   }
 });

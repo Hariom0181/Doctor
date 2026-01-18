@@ -10,6 +10,8 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { PublicRoute, PatientRoute, DoctorRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
+
+
 import PatientLogin from "./pages/PatientLogin";
 import PatientRegister from "./pages/PatientRegister";
 import PatientDashboard from "./pages/PatientDashboard";

@@ -4,46 +4,14 @@ const db = require("../config/db");
 const { body, validationResult } = require("express-validator");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const { uploadProfile } = require("../config/cloudinary");
 
-const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
 
 // Configure multer for doctor profile upload
-const doctorStorage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    const uploadDir = path.join(__dirname, "../uploads/doctors_profile");
-    
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    
-    cb(null, uploadDir);
-  },
-  name: function (req, file, cb) {
-    const uniqueName = `doctor_${req.params.doctorId}_${Date.now()}${path.extname(file.originalname)}`;
-    cb(null, uniqueName);
-  }
-});
-
-const fileFilter = (req, file, cb) => {
-  const allowedTypes = /jpeg|jpg|png|gif|webp/;
-  const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-  const mimetype = allowedTypes.test(file.mimetype);
-
-  if (mimetype && extname) {
-    return cb(null, true);
-  } else {
-    cb(new Error("Only image files (JPEG, JPG, PNG, GIF, WEBP) are allowed!"));
-  }
-};
 
 
-const doctorUpload = multer({
-  storage: doctorStorage,
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: fileFilter
-});
+
+
 
 
 
@@ -146,8 +114,9 @@ router.get("/:doctorId/recent-activities", (req, res) => {
 });
 
 // Calculate patient risk score
-router.get("/:doctorId/patients/risk-assessment", (req, res) => {
+router.get("/:doctorId/patients/risk-assessment", (req, res) => {    // WHO USES THIS ROUTE 
   const { doctorId } = req.params;
+  console.log("from calculation of riskscore doctorId: ",doctorId);
 
   const sql = `
     SELECT 
@@ -223,7 +192,7 @@ router.get("/:doctorId/patients/risk-assessment", (req, res) => {
       // Diagnosis keywords
       const criticalKeywords = ['critical', 'severe', 'emergency', 'acute', 'urgent'];
       const warningKeywords = ['elevated', 'high', 'low', 'irregular', 'abnormal'];
-      
+
       if (patient.latest_diagnosis) {
         const diagnosisLower = patient.latest_diagnosis.toLowerCase();
         if (criticalKeywords.some(keyword => diagnosisLower.includes(keyword))) {
@@ -269,81 +238,66 @@ router.get("/:doctorId/patients/risk-assessment", (req, res) => {
   });
 });
 
-router.post("/:doctorId/upload-profile", doctorUpload.single("profileImage"), async (req, res) => {
-  try {
-    const doctorId = req.params.doctorId;
-
-    if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: "No file uploaded"
-      });
-    }
-
-    const profileImagePath = `/uploads/doctors_profile/${req.file.filename}`;
-
-    // Delete old image if exists
-    const getOldImageSql = "SELECT profile_img FROM doctors WHERE id = ?";
-    db.query(getOldImageSql, [doctorId], (err, results) => {
+router.post(
+  "/:doctorId/upload-profile",
+   (req, res, next) => {
+    uploadProfile.single("profileImage")(req, res, (err) => {
       if (err) {
-        console.error("Error checking old image:", err);
-      } else if (results.length > 0 && results[0].profile_img) {
-        const oldImagePathStr = typeof results[0].profile_img === 'string' 
-          ? results[0].profile_img 
-          : results[0].profile_img.toString();
-        
-        if (oldImagePathStr && oldImagePathStr.startsWith('/')) {
-          const oldImagePath = path.join(__dirname, "..", oldImagePathStr);
-          if (fs.existsSync(oldImagePath)) {
-            try {
-              fs.unlinkSync(oldImagePath);
-              console.log('✅ Old doctor profile image deleted');
-            } catch (deleteErr) {
-              console.error('Error deleting old image:', deleteErr);
-            }
-          }
-        }
-      }
-    });
-
-    // Update database
-    const updateSql = "UPDATE doctors SET profile_img = ? WHERE id = ?";
-    db.query(updateSql, [profileImagePath, doctorId], (err, result) => {
-      if (err) {
-        console.error("Error updating profile image:", err);
-        return res.status(500).json({
+        return res.status(400).json({
           success: false,
-          message: "Error updating profile image"
+          message: err.message || "File upload failed"
         });
       }
+      next();
+    });
+  },
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: "No file uploaded"
+        });
+      }
+      const { doctorId } = req.params;
+      const cloudinaryUrl = req.file.path;
+      const sql = "UPDATE doctors SET profile_img = ? WHERE id = ?";
 
-      res.json({
-        success: true,
-        message: "Doctor profile image uploaded successfully",
-        profileImagePath: profileImagePath
+      db.query(sql, [cloudinaryUrl, doctorId], (err) => {
+        if (err) {
+          return res.status(500).json({
+            success: false,
+            message: "Error updating profile picture"
+          });
+        }
+        res.json({
+          success: true,
+          profileImagePath: cloudinaryUrl
+        });
       });
-    });
-
-  } catch (error) {
-    console.error("Upload error:", error);
-    res.status(500).json({
-      success: false,
-      message: error.message || "Error uploading profile image"
-    });
+    }
+    catch (error) {
+      console.error("Profile upload failed:", error);
+      res.status(500).json({
+        success: false,
+        message: "Profile upload failed"
+      });
+    }
   }
-});
+    );
+
+      
 
 // Get doctor profile image
 router.get("/:doctorId/profile-image", (req, res) => {
-  const doctorId = req.params.doctorId;
+  const {doctorId} = req.params;
 
   const sql = "SELECT profile_img FROM doctors WHERE id = ?";
   db.query(sql, [doctorId], (err, results) => {
     if (err) {
-      console.error("Error fetching profile image:", err);
       return res.status(500).json({
         success: false,
-        message: "Error fetching profile image"
+        message: "Error fetching profile"
       });
     }
 
@@ -749,7 +703,7 @@ router.post(
         }
 
         const doctor = results[0];
-        console.log("This is doctor id saved into JWT",doctor.id);
+        console.log("This is doctor id saved into JWT", doctor.id);
 
 
         try {

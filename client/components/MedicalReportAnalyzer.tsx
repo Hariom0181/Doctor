@@ -99,57 +99,60 @@ export function MedicalReportAnalyzer({ patientId }: MedicalReportAnalyzerProps)
   };
 
   // Upload and Extract Text
+  // Upload and Extract Text
   const handleUploadAndExtract = async () => {
-    if (!selectedFile) {
-      toast({
-        title: "No File Selected",
-        description: "Please select a file first",
-        variant: "destructive"
-      });
-      return;
-    }
+    if (!selectedFile) return;
   
     setIsExtracting(true);
+    // Reset any previous data to avoid confusion
+    setReportData(''); 
   
     try {
-      // Create FormData for temporary upload (analysis only, no DB save)
       const formData = new FormData();
       formData.append('document', selectedFile);
-  
+      // Note: We don't need patientId for extract-only as we aren't saving to DB
+    
       const uploadResponse = await fetch('http://localhost:5000/api/documents/extract-only', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${localStorage.getItem('patientToken')}`
-          // ----------------------------------------------------------------------------------------------------
         },
         body: formData
       });
-  
-      if (!uploadResponse.ok) {
-        const error = await uploadResponse.json();
-        throw new Error(error.message || 'Upload failed');
-      }
-  
+    
       const result = await uploadResponse.json();
-      setReportData(result.extractedText);
-      setSelectedFile(null);
-      setIsUploadDialogOpen(false);
+      
+      if (!uploadResponse.ok || !result.success) {
+        throw new Error(result.message || "Extraction failed");
+      }
+
+      // SAFETY CHECK: Ensure extractedText exists
+      setReportData(result.extractedText || "No text could be extracted.");
       
       toast({
         title: "Success",
-        description: "Text extracted (file not saved)"
+        description: "Report text extracted successfully."
       });
       
+      // Close dialog on success
+      setIsUploadDialogOpen(false); 
+      setSelectedFile(null);
+
     } catch (error: any) {
+      console.error(error);
       toast({
-        title: "Error",
-        description: error.message || "Failed to process file",
+        title: "Extraction Failed",
+        description: error.message || "Could not process the file.",
         variant: "destructive"
       });
     } finally {
       setIsExtracting(false);
     }
   };
+  
+
+
+
   // Load from existing records
   const handleLoadFromRecords = async () => {
     if (!selectedDocId) {
@@ -184,7 +187,7 @@ export function MedicalReportAnalyzer({ patientId }: MedicalReportAnalyzerProps)
 
   // Analyze Report
   const handleAnalyze = async () => {
-    if (!reportData.trim()) {
+    if (!reportData || !reportData.trim()) {
       toast({
         title: "Input Required",
         description: "Please provide report data to analyze",
@@ -299,20 +302,6 @@ Blood Pressure: 145/95 mmHg (High)`;
                   <FileText className="w-4 h-4 mr-2" />
                   Load Sample
                 </Button>
-
-                {/* <Select value={selectedDocId} onValueChange={setSelectedDocId}>
-                  <SelectTrigger>
-                    <FolderOpen className="w-4 h-4 mr-2" />
-                    <SelectValue placeholder="My Records" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {patientDocuments.map(doc => (
-                      <SelectItem key={doc.id} value={doc.id.toString()}>
-                        {doc.document_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select> */}
               </div>
 
               {/* Load from Records Button */}

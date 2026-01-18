@@ -299,7 +299,8 @@ router.post('/medical-insights/:patientId', authenticateDoctor, async (req, res)
 // Calculate and SAVE Risk Score
 router.post('/risk-score-save/:patientId', authenticateDoctor, async (req, res) => {
   try {
-    const { patientId } = req.params;
+    const { patientId } = req.params; // coming from frontend 
+    const { doctorID } = req.params; //not coming from frontend 
     const doctorId = req.doctor.id;
 
     // Get patient data
@@ -383,6 +384,12 @@ router.post('/risk-score-save/:patientId', authenticateDoctor, async (req, res) 
               (insertErr) => {
                 if (insertErr) {
                   console.error('Error saving risk score:', insertErr);
+                  console.error('The doctorID id is: ', doctorID);
+                  console.error('The patient id is: ', patientId);
+                  console.error('from the doctorId req.user.is: ', doctorId);
+                  
+
+
                   return res.status(500).json({
                     success: false,
                     message: 'Failed to save risk score'
@@ -490,14 +497,13 @@ router.post('/medical-insights-save/:patientId', authenticateDoctor, async (req,
 });
 
 // Get Critical Patients for Doctor Dashboard
-router.get('/critical-patients/:doctorId', authenticateDoctor, async (req, res) => {
+router.get('/critical-patients/', authenticateDoctor, async (req, res) => {
   try {
-    const { doctorId } = req.params;
-
+    const doctorId = req.doctor.id;
     const sql = `
       SELECT 
         p.id,
-        CONCAT(p.first_name, ' ', p.last_name) as name,
+        CONCAT(p.firstName, ' ', p.lastName) as name,
         p.phone,
         prs.risk_score,
         prs.risk_level,
@@ -510,13 +516,14 @@ router.get('/critical-patients/:doctorId', authenticateDoctor, async (req, res) 
       AND prs.id = (
         SELECT id FROM patient_risk_scores 
         WHERE patient_id = p.id 
-        ORDER BY calculated_at DESC 
+        ORDER BY calculated_at DESC , id DESC
         LIMIT 1
       )
+      AND prs.calculated_by = ?
       ORDER BY prs.risk_score DESC
     `;
 
-    db.query(sql, (err, results) => {
+    db.query(sql,[doctorId], (err, results) => {
       if (err) {
         console.error('Error fetching critical patients:', err);
         return res.status(500).json({

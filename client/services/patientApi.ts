@@ -332,21 +332,20 @@ class PatientApiService {
   async getProfileImage(patientId: number): Promise<string | null> {
     try {
       const response = await fetch(`${API_BASE_URL}/patients/${patientId}/profile-image`);
-
+  
       if (!response.ok) {
         if (response.status === 404) {
-          return null; // No profile image found
+          return null;
         }
         throw new Error('Failed to fetch profile image');
       }
-
+  
       const result = await response.json();
-
+  
       if (result.success && result.profileImagePath) {
-        // Return full URL to the image
-        success: result.success;
+        return result.profileImagePath; // ✅ Cloudinary URL is already complete
       }
-
+  
       return null;
     } catch (error) {
       console.error('Error fetching profile image:', error);

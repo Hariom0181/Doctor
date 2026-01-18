@@ -8,8 +8,8 @@ export interface VideoConsultation {
   scheduled_date: string;
   scheduled_time: string;
   duration_minutes: number;
-  consultation_fee: number | string; // ✅ Allow both types
-  status: 'pending_approval' | 'confirmed' | 'rejected' | 'in_progress' | 'completed' | 'cancelled_by_patient' | 'cancelled_by_doctor';
+  consultation_fee: number | string;
+  status: 'pending_approval' | 'approved' | 'confirmed' | 'rejected' | 'in_progress' | 'completed' | 'cancelled_by_patient' | 'cancelled_by_doctor' | 'no_show';
   payment_status: 'pending' | 'paid' | 'refunded' | 'partial_refund';
   doctor_name?: string;
   doctor_specialization?: string;

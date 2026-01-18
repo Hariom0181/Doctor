@@ -21,6 +21,8 @@ import { DoctorConsultationRequests } from '@/components/DoctorConsultationReque
 import { getAuthToken } from 'src/utils/auth';
 import { aiApiService } from '@/services/aiApi';
 import { PatientAIAnalysis } from '@/components/PatientAIAnalysis'
+// import { useToast } from '@/hooks/use-toast';
+
 
 import {
   Heart,
@@ -124,11 +126,17 @@ const todayAppointments = [
   }
 ];
 
+
 export default function DoctorDashboard() {
-  const [activeTab, setActiveTab] = useState("overview");
+
+  type TabKey = 'overview' | 'patients' | 'appointments' | 'records';
+  const [activeTab, setActiveTab] = useState<TabKey>('overview');
+
+
   const [selectedPatient, setSelectedPatient] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddRecordOpen, setIsAddRecordOpen] = useState(false);
+  // const [activeTabView, setActiveTabView] = useState<'patients' | 'critical'>('management');
 
   const [isAddPatientOpen, setIsAddPatientOpen] = useState(false);
   const [isPatientViewOpen, setIsPatientViewOpen] = useState(false);
@@ -151,8 +159,12 @@ export default function DoctorDashboard() {
   const [loading, setLoading] = useState(true);
 
   const [showImageUpload, setShowImageUpload] = useState(false);
+
   const [uploadingImage, setUploadingImage] = useState(false);
-  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null); //for doctor already working
+
+  const [profileImageUrlPatients, setProfileImageUrlPatients] = useState<string | null>(null); // newly created by me 
+
   const [imageUploadError, setImageUploadError] = useState<string | null>(null);
   const [isPrescriptionOpen, setIsPrescriptionOpen] = useState(false);
   const [prescribingMedication, setPrescribingMedication] = useState(false);
@@ -170,8 +182,10 @@ export default function DoctorDashboard() {
   const [processingAction, setProcessingAction] = useState(false);
   const [recentActivities, setRecentActivities] = useState<any[]>([]);
   const [isLoadingActivities, setIsLoadingActivities] = useState(false);
+
   const [viewingPatient, setViewingPatient] = useState<any>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+
   const [loadingPatientDetails, setLoadingPatientDetails] = useState(false);
   const [showAllRecords, setShowAllRecords] = useState(false);
   const [recordSearchQuery, setRecordSearchQuery] = useState('');
@@ -297,22 +311,24 @@ export default function DoctorDashboard() {
   const handleViewPatient = async (patientId: number) => {
     try {
       setLoadingPatientDetails(true);
+
+
+      setActiveTab('patients');
+
       setIsViewDialogOpen(true);
 
       const details = await patientApiService.getPatientDetails(patientId);
       setViewingPatient(details);
     } catch (error) {
       console.error('Error loading patient details:', error);
-      // toast({
-      //   title: "Error",
-      //   description: "Failed to load patient details",
-      //   variant: "destructive"
-      // });
       setIsViewDialogOpen(false);
     } finally {
       setLoadingPatientDetails(false);
     }
   };
+
+
+
   // Load recent activities
   const loadRecentActivities = async (doctorId?: number) => {
     const id = doctorId || doctorData?.id;
@@ -367,10 +383,7 @@ export default function DoctorDashboard() {
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
 
-    // toast({
-    //   title: "Success",
-    //   description: "Medical record exported successfully"
-    // });
+
   };
 
   // Add this function to handle edit
@@ -388,14 +401,17 @@ export default function DoctorDashboard() {
       // });
     }
   };
+
+
+
   const loadCriticalPatients = async () => {
     setLoadingCritical(true);
     try {
-      const doctorData = localStorage.getItem('doctorData');
+      const doctorData = localStorage.getItem('doctorData'); // 
       const doctorId = doctorData ? JSON.parse(doctorData).id : null;
 
       if (doctorId) {
-        const patients = await aiApiService.getCriticalPatients(doctorId);
+        const patients = await aiApiService.getCriticalPatients();
         setCriticalPatients(patients);
       }
     } catch (error) {
@@ -404,6 +420,16 @@ export default function DoctorDashboard() {
       setLoadingCritical(false);
     }
   };
+
+  useEffect(() => {
+    if (activeTab === 'overview') {
+      loadCriticalPatients();
+    }
+  }, [activeTab]);
+  
+
+
+
   // Add this function to save edited record
   const handleSaveEditedRecord = async () => {
     if (!editingRecord) return;
@@ -1090,6 +1116,22 @@ export default function DoctorDashboard() {
       console.error('Error loading profile image:', error);
     }
   };
+  // for patients 
+  const loadProfileImagePatients = async (patientId: number) => {
+    try {
+      const imageUrlPatients = await patientApiService.getProfileImage(patientId);
+      if (imageUrlPatients) {
+        setProfileImageUrlPatients(imageUrlPatients);
+      }
+    } catch (error) {
+      console.error('Error loading patient profile image:', error);
+    }
+  };
+  useEffect(() => {
+    if (viewingPatient?.id) {
+      loadProfileImagePatients(viewingPatient.id);
+    }
+  }, [viewingPatient]);
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -1114,18 +1156,14 @@ export default function DoctorDashboard() {
     try {
       const result = await doctorApiService.uploadDoctorProfileImage(doctorData.id, file);
 
+      // In DoctorDashboard handleImageUpload:
       if (result.success) {
-        // Update profile image URL
-        const newImageUrl = `http://localhost:5000${result.profileImagePath}`;
-        setProfileImageUrl(newImageUrl);
-
-        // Update patient data
+        setProfileImageUrl(result.profileImagePath); // ✅ No localhost prefix
         setDoctorData({
           ...doctorData,
-          profilePicture: newImageUrl
+          profilePicture: result.profileImagePath
         });
-
-        // console.log('✅ Profile image uploaded successfully');
+        console.log('✅ Profile image uploaded successfully');
       }
     } catch (error) {
       console.error('Error uploading image:', error);
@@ -1135,31 +1173,6 @@ export default function DoctorDashboard() {
     }
   };
 
-
-
-
-
-
-
-  // Validate required fields based on metric type
-
-
-
-
-  // const handlePrescribeMedication = () => {
-  //   console.log("Prescribing medication:", newMedication);
-  //   // Here you would typically send this to your backend
-  //   alert(`Medication prescribed successfully for patient ${newMedication.patientId}!`);
-  //   setNewMedication({
-  //     patientId: "",
-  //     medicationName: "",
-  //     dosage: "",
-  //     frequency: "",
-  //     duration: "",
-  //     instructions: ""
-  //   });
-  //   setIsPrescriptionOpen(false);
-  // };
 
   const filteredPatients = linkedPatients.filter(patient => {
     if (!searchQuery.trim()) return true; // Show all if no search query
@@ -1402,8 +1415,6 @@ export default function DoctorDashboard() {
                 <DialogTrigger asChild>
                   <Button onClick={(e) => {
                     e.preventDefault();
-                    // console.log("Add Medical Record clicked");
-                    // alert("Add Medical Record clicked!");
                     setIsAddRecordOpen(true);
                   }}>
                     <Plus className="w-4 h-4 mr-2" />
@@ -1960,7 +1971,7 @@ export default function DoctorDashboard() {
         </div>
 
         {/* Main Dashboard Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabKey)} className="space-y-6">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="patients">Patient Management</TabsTrigger>
@@ -2224,6 +2235,8 @@ export default function DoctorDashboard() {
                             <Phone className="w-4 h-4 mr-1" />
                             Call
                           </Button>
+
+
                           <Button
                             size="sm"
                             variant="outline"
@@ -2232,6 +2245,9 @@ export default function DoctorDashboard() {
                             <Eye className="w-4 h-4 mr-1" />
                             View
                           </Button>
+
+
+
                         </div>
                       </div>
                     ))
@@ -2332,15 +2348,16 @@ export default function DoctorDashboard() {
             </Dialog>
           </TabsContent>
 
+
+
           <TabsContent value="patients" className="pt-6 space-y-6">
+
             <Card>
+
               <CardHeader>
                 <CardTitle>Patient Management</CardTitle>
                 <CardDescription>View and manage all your patients</CardDescription>
               </CardHeader>
-
-
-
 
               <CardContent>
                 {isLoadingPatients ? (
@@ -2439,16 +2456,7 @@ export default function DoctorDashboard() {
                                     <Eye className="w-4 h-4 mr-1" />
                                     View
                                   </Button>
-                                  {/* <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => {
-                                      alert(`Edit form for ${patient.name} would open here`);
-                                    }}
-                                  >
-                                    <Edit className="w-4 h-4 mr-1" />
-                                    Edit
-                                  </Button> */}
+
                                   <Button
                                     size="sm"
                                     variant="outline"
@@ -2476,130 +2484,7 @@ export default function DoctorDashboard() {
 
             </Card>
 
-            <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Patient Details</DialogTitle>
-                </DialogHeader>
 
-                {loadingPatientDetails ? (
-                  <div className="flex justify-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                  </div>
-                ) : viewingPatient ? (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-
-                    {/* LEFT COLUMN: Patient Details (Spans 2 columns) */}
-                    <div className="md:col-span-2 space-y-6">
-
-                      {/* Profile Header */}
-                      <div className="flex items-start space-x-4 pb-4 border-b">
-                        <Avatar className="w-20 h-20">
-                          {viewingPatient.profilePicture || viewingPatient.profile_img ? (
-                            <img
-                              src={viewingPatient.profilePicture || `http://localhost:5000${viewingPatient.profile_img}`}
-                              alt={viewingPatient.name}
-                            />
-                          ) : (
-                            <AvatarFallback className="text-2xl">
-                              {viewingPatient.firstName?.[0]}{viewingPatient.lastName?.[0]}
-                            </AvatarFallback>
-                          )}
-                        </Avatar>
-                        <div>
-                          <h3 className="text-xl font-semibold">
-                            {viewingPatient.name || `${viewingPatient.firstName} ${viewingPatient.lastName}`}
-                          </h3>
-                          <p className="text-sm text-gray-600">Patient ID: {viewingPatient.id}</p>
-                          <div className="flex flex-wrap gap-2 mt-2">
-                            {viewingPatient.gender && <Badge>{viewingPatient.gender}</Badge>}
-                            {viewingPatient.age && (
-                              <Badge variant="outline">{viewingPatient.age} years</Badge>
-                            )}
-                            {viewingPatient.bloodGroup && (
-                              <Badge variant="outline">Blood: {viewingPatient.bloodGroup}</Badge>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Personal Information */}
-                      <div>
-                        <h4 className="font-semibold mb-3 flex items-center">
-                          <User className="w-4 h-4 mr-2" /> Personal Information
-                        </h4>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <p className="text-sm text-gray-600">Email</p>
-                            <p className="font-medium">{viewingPatient.email}</p>
-                          </div>
-                          <div>
-                            <p className="text-sm text-gray-600">Phone</p>
-                            <p className="font-medium">{viewingPatient.phone || 'N/A'}</p>
-                          </div>
-                          <div>
-                            <p className="text-sm text-gray-600">Date of Birth</p>
-                            <p className="font-medium">
-                              {viewingPatient.dateOfBirth
-                                ? new Date(viewingPatient.dateOfBirth).toLocaleDateString()
-                                : 'N/A'}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Address & Emergency (Combined for brevity in example, keep your original logic if preferred) */}
-                      {(viewingPatient.address || viewingPatient.city) && (
-                        <div>
-                          <h4 className="font-semibold mb-3 flex items-center">
-                            <MapPin className="w-4 h-4 mr-2" /> Address
-                          </h4>
-                          <p className="text-gray-700">
-                            {viewingPatient.address}<br />
-                            {viewingPatient.city}, {viewingPatient.state} {viewingPatient.pincode}
-                          </p>
-                        </div>
-                      )}
-
-                      {/* Medical Information */}
-                      <div>
-                        <h4 className="font-semibold mb-3 flex items-center">
-                          <FileText className="w-4 h-4 mr-2" /> Medical Information
-                        </h4>
-                        <div className="bg-slate-50 p-4 rounded-lg space-y-3 border">
-                          <div>
-                            <p className="text-sm text-gray-600">Allergies</p>
-                            <p className="font-medium">{viewingPatient.allergies || 'None reported'}</p>
-                          </div>
-                          <div>
-                            <p className="text-sm text-gray-600">Medical History</p>
-                            <p className="font-medium">{viewingPatient.medicalHistory || 'No history recorded'}</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* RIGHT COLUMN: AI Analysis (Spans 1 column) */}
-                    <div className="md:col-span-3">
-                      <div className="sticky top-0">
-                        <PatientAIAnalysis
-                          patientId={viewingPatient.id}
-                          patientName={viewingPatient.name || `${viewingPatient.firstName} ${viewingPatient.lastName}`}
-                        />
-
-                        {/* Optional: Add a quick actions or notes section below the AI card if needed */}
-                        <div className="mt-4 text-xs text-gray-500 text-center">
-                          AI analysis is based on available medical records and history.
-                        </div>
-                      </div>
-                    </div>
-
-                  </div>
-                ) : null}
-              </DialogContent>
-
-              {/* ------------------------------------- */}
-            </Dialog>
 
 
           </TabsContent>
@@ -3348,8 +3233,6 @@ export default function DoctorDashboard() {
                   )}
                   {doctorData?.id && (
                     <DoctorAvailabilitySettings doctorId={doctorData?.id} />
-
-
                   )}
                 </CardContent>
               </Card>
@@ -3357,7 +3240,137 @@ export default function DoctorDashboard() {
           </TabsContent>
 
         </Tabs>
+        <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Patient Details</DialogTitle>
+            </DialogHeader>
+
+            {loadingPatientDetails ? (
+              <div className="flex justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              </div>
+            ) : viewingPatient ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+                {/* LEFT COLUMN: Patient Details (Spans 2 columns) */}
+                <div className="md:col-span-2 space-y-6">
+
+                  {/* Profile Header */}
+                  <div className="flex items-start space-x-4 pb-4 border-b">
+                    <Avatar className="w-20 h-20">
+
+
+                      {profileImageUrlPatients ? (
+                        <img
+                          src={profileImageUrlPatients}
+                          alt={viewingPatient.name}
+                        />
+                      ) : (
+                        <AvatarFallback className="text-2xl">
+                          {viewingPatient.firstName?.[0]}
+                          {viewingPatient.lastName?.[0]}
+                        </AvatarFallback>
+                      )}
+
+
+                    </Avatar>
+                    <div>
+                      <h3 className="text-xl font-semibold">
+                        {viewingPatient.name || `${viewingPatient.firstName} ${viewingPatient.lastName}`}
+                      </h3>
+                      <p className="text-sm text-gray-600">Patient ID: {viewingPatient.id}</p>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {viewingPatient.gender && <Badge>{viewingPatient.gender}</Badge>}
+                        {viewingPatient.age && (
+                          <Badge variant="outline">{viewingPatient.age} years</Badge>
+                        )}
+                        {viewingPatient.bloodGroup && (
+                          <Badge variant="outline">Blood: {viewingPatient.bloodGroup}</Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Personal Information */}
+                  <div>
+                    <h4 className="font-semibold mb-3 flex items-center">
+                      <User className="w-4 h-4 mr-2" /> Personal Information
+                    </h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm text-gray-600">Email</p>
+                        <p className="font-medium">{viewingPatient.email}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Phone</p>
+                        <p className="font-medium">{viewingPatient.phone || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Date of Birth</p>
+                        <p className="font-medium">
+                          {viewingPatient.dateOfBirth
+                            ? new Date(viewingPatient.dateOfBirth).toLocaleDateString()
+                            : 'N/A'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Address & Emergency (Combined for brevity in example, keep your original logic if preferred) */}
+                  {(viewingPatient.address || viewingPatient.city) && (
+                    <div>
+                      <h4 className="font-semibold mb-3 flex items-center">
+                        <MapPin className="w-4 h-4 mr-2" /> Address
+                      </h4>
+                      <p className="text-gray-700">
+                        {viewingPatient.address}<br />
+                        {viewingPatient.city}, {viewingPatient.state} {viewingPatient.pincode}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Medical Information */}
+                  <div>
+                    <h4 className="font-semibold mb-3 flex items-center">
+                      <FileText className="w-4 h-4 mr-2" /> Medical Information
+                    </h4>
+                    <div className="bg-slate-50 p-4 rounded-lg space-y-3 border">
+                      <div>
+                        <p className="text-sm text-gray-600">Allergies</p>
+                        <p className="font-medium">{viewingPatient.allergies || 'None reported'}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Medical History</p>
+                        <p className="font-medium">{viewingPatient.medicalHistory || 'No history recorded'}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* RIGHT COLUMN: AI Analysis (Spans 1 column) */}
+                <div className="md:col-span-3">
+                  <div className="sticky top-0">
+                    <PatientAIAnalysis
+                      patientId={viewingPatient.id}
+                      patientName={viewingPatient.name || `${viewingPatient.firstName} ${viewingPatient.lastName}`}
+                    />
+
+                    {/* Optional: Add a quick actions or notes section below the AI card if needed */}
+                    <div className="mt-4 text-xs text-gray-500 text-center">
+                      AI analysis is based on available medical records and history.
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            ) : null}
+          </DialogContent>
+
+          {/* ------------------------------------- */}
+        </Dialog>
       </div>
     </div>
   );
+
 }

@@ -1,13 +1,13 @@
 export function getAuthToken(): string | null {
   return (
-    localStorage.getItem('patientToken') ||
-    localStorage.getItem('doctorToken')
+    localStorage.getItem('PatientToken') ||
+    localStorage.getItem('DoctorToken')
   );
 }
 
 export function getCurrentUserRole(): 'patient' | 'doctor' | null {
-  if (localStorage.getItem('patientToken')) return 'patient';
-  if (localStorage.getItem('doctorToken')) return 'doctor';
+  if (localStorage.getItem('PatientToken')) return 'patient';
+  if (localStorage.getItem('DoctorToken')) return 'doctor';
   return null;
 }
 

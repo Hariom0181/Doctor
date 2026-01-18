@@ -371,7 +371,7 @@ class DoctorApiService {
       const result = await response.json();
       
       if (result.success && result.profileImagePath) {
-        return `http://localhost:5000${result.profileImagePath}`;
+        return result.profileImagePath; // ✅ Return directly (already Cloudinary URL)
       }
   
       return null;

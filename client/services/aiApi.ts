@@ -26,10 +26,10 @@ class AIApiService {
   }
   private getDoctorAuthHeaders(): HeadersInit {
     // This matches your auth.ts precisely
-    const token = localStorage.getItem('doctorToken'); 
+    const token = localStorage.getItem('DoctorToken'); 
     
     if (!token) {
-      console.error("Auth Error: doctorToken not found in localStorage");
+      console.error("Auth Error: DoctorToken not found in localStorage");
       throw new Error('Doctor not authenticated. Please login again.');
     }
 
@@ -110,7 +110,7 @@ class AIApiService {
 
       const response = await fetch(`${API_BASE_URL}/ai/risk-score-save/${patientId}`, {
         method: 'POST',
-        headers: this.getPatientAuthHeaders()
+        headers: this.getDoctorAuthHeaders()
       });
 
       if (!response.ok) {
@@ -151,10 +151,12 @@ class AIApiService {
     }
   }
 
+
+
   // Get critical patients
-  async getCriticalPatients(doctorId: number): Promise<any[]> {
+  async getCriticalPatients(): Promise<any[]> {
     try {
-      const response = await fetch(`${API_BASE_URL}/ai/critical-patients/${doctorId}`, {
+      const response = await fetch(`${API_BASE_URL}/ai/critical-patients/`, {
         headers: this.getDoctorAuthHeaders()
       });
 
@@ -169,6 +171,9 @@ class AIApiService {
       throw error;
     }
   }
+
+
+
   // Feature 3: Calculate Risk Score
   async calculateRiskScore(patientId: number): Promise<RiskScoreData> {
     try {

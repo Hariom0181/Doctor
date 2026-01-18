@@ -560,6 +560,8 @@ export default function PatientDashboard() {
       console.error('Error loading profile image:', error);
     }
   };
+
+  
   const openAppointmentDialog = (appointmentType: string) => {
     setAppointmentForm({
       ...appointmentForm,
@@ -713,37 +715,32 @@ export default function PatientDashboard() {
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-
-    // Validate file type
+  
     const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
     if (!validTypes.includes(file.type)) {
-      setImageUploadError('Please upload a valid image file (JPEG, PNG, GIF, or WebP)');
+      setImageUploadError('Please upload a valid image file');
       return;
     }
-
-    // Validate file size (5MB)
+  
     if (file.size > 5 * 1024 * 1024) {
       setImageUploadError('Image size must be less than 5MB');
       return;
     }
-
+  
     setUploadingImage(true);
     setImageUploadError(null);
-
+  
     try {
       const result = await patientApiService.uploadProfileImage(patientData.id, file);
-
+  
       if (result.success) {
-        // Update profile image URL
-        const newImageUrl = `http://localhost:5000${result.profileImagePath}`;
-        setProfileImageUrl(newImageUrl);
-
-        // Update patient data
+        // ✅ Use Cloudinary URL directly (no localhost prefix)
+        setProfileImageUrl(result.profileImagePath);
         setPatientData({
           ...patientData,
-          profilePicture: newImageUrl
+          profilePicture: result.profileImagePath
         });
-
+  
         console.log('✅ Profile image uploaded successfully');
       }
     } catch (error) {
@@ -2584,11 +2581,13 @@ export default function PatientDashboard() {
         <Card className="mt-8 border-red-200 bg-red-50">
           <CardContent className="p-4">
             <div className="flex items-center space-x-3">
-              <AlertCircle className="w-6 h-6 text-red-600" />
+            <Phone className="w-6 h-6 text-red-600" />
               <div className="flex-1">
                 <h3 className="font-medium text-red-800">Emergency Helpline</h3>
                 <p className="text-sm text-red-700">
-                  For medical emergencies, call: <strong>+91 1800-123-4567</strong> (24/7 available)
+                Medical Advice Service, Govt. of Maharashtra <strong>104</strong> (24/7 available) <br />
+                Women Crisis Response Center <strong>1091</strong> (24/7 available) <br />
+                
                 </p>
               </div>
               <Button variant="outline" className="border-red-300 text-red-700 hover:bg-red-100">

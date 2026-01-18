@@ -87,31 +87,60 @@ export function DoctorConsultationRequests({ doctorId }: DoctorConsultationReque
       description: "Consultation has been completed"
     });
   };
+
   const loadUpcomingConsultations = async () => {
     try {
-      // ✅ Get ALL consultations without status filter
-      const allData = await bookingApiService.getDoctorConsultations(doctorId); // Remove status parameter
+      // Get ALL consultations
+      const allData = await bookingApiService.getDoctorConsultations(doctorId);
 
-      // Filter for future consultations that are pending or confirmed
-      // const upcoming = allData.filter(c => {
-      //   const consultDate = new Date(`${c.scheduled_date}T${c.scheduled_time}`);
-      //   const now = new Date();
-      //   const isFuture = consultDate > now;
-      //   const isRelevant = ['pending_approval', 'confirmed'].includes(c.status);
+      // Filter: EXCLUDE pending_approval (they're already in the top card)
+      // ONLY show: confirmed, approved, in_progress
+      const upcoming = allData.filter(c => {
+        const consultDate = new Date(`${c.scheduled_date}T${c.scheduled_time}`);
+        const now = new Date();
+        const isPastDate = consultDate < now;
 
-      //   return isFuture && isRelevant;
-      // });
+        // ❌ Exclude these statuses
+        if (
+          c.status === 'completed' ||
+          c.status === 'cancelled_by_patient' ||
+          c.status === 'cancelled_by_doctor' ||
+          c.status === 'no_show' ||
+          c.status === 'rejected' ||
+          c.status === 'pending_approval' // ✅ NEW: Don't duplicate pending here
+        ) {
+          return false;
+        }
 
-      // console.log('📅 Total consultations fetched:', allData.length);
-      // console.log('📅 Upcoming (pending + confirmed):', upcoming.length);
-      console.log('📅 Upcoming consultations:', allData);
+        // Show in_progress
+        if (c.status === 'in_progress') {
+          return true;
+        }
 
-      setUpcomingConsultations(allData);
+        // For confirmed/approved - only show future or recent past (within 1 hour)
+        if (c.status === 'confirmed' || c.status === 'approved') {
+          const hoursPast = (now.getTime() - consultDate.getTime()) / (1000 * 60 * 60);
+          return !isPastDate || hoursPast < 1;
+        }
+
+        return false;
+      });
+
+      // Sort by date and time (earliest first)
+      upcoming.sort((a, b) => {
+        const dateA = new Date(`${a.scheduled_date}T${a.scheduled_time}`);
+        const dateB = new Date(`${b.scheduled_date}T${b.scheduled_time}`);
+        return dateA.getTime() - dateB.getTime();
+      });
+
+      console.log('📅 Total consultations fetched:', allData.length);
+      console.log('📅 Filtered upcoming consultations:', upcoming.length);
+
+      setUpcomingConsultations(upcoming);
     } catch (error) {
       console.error('Error loading upcoming consultations:', error);
     }
   };
-
   // Add at the top with other helper functions
   const canJoinMeeting = (scheduledDate: string, scheduledTime: string, isDemoMode: boolean = false) => {
     if (isDemoMode) return true;
@@ -390,7 +419,7 @@ export function DoctorConsultationRequests({ doctorId }: DoctorConsultationReque
                 <Badge className="bg-green-500">{upcomingConsultations.length}</Badge>
               )}
             </CardTitle>
-            <CardDescription>Your scheduled consultations (pending approval & confirmed)</CardDescription>
+            <CardDescription>Your confirmed and approved scheduled consultations</CardDescription>
           </CardHeader>
           <CardContent className="max-h-45 overflow-y-auto">
             {upcomingConsultations.length === 0 ? (
@@ -450,61 +479,25 @@ export function DoctorConsultationRequests({ doctorId }: DoctorConsultationReque
                       </div>
 
                       <div className="flex flex-col gap-2 ml-4">
-                        {consultation.status === 'confirmed' ? (
-                          <>
-                            {/* Demo Mode - Always available */}
-                            <Button
-                              size="sm"
-                              className="bg-purple-600 hover:bg-purple-700"
-                              onClick={() => handleStartMeeting(consultation, true)}
-                            >
-                              <Video className="w-4 h-4 mr-1" />
-                              Start (Demo)
-                            </Button>
+                        {/* Demo Mode - Always available */}
+                        <Button
+                          size="sm"
+                          className="bg-purple-600 hover:bg-purple-700"
+                          onClick={() => handleStartMeeting(consultation, true)}
+                        >
+                          <Video className="w-4 h-4 mr-1" />
+                          Start (Demo)
+                        </Button>
 
-                            {/* Real Mode - Time-based */}
-                            <Button
-                              size="sm"
-                              disabled={!canJoinMeeting(consultation.scheduled_date, consultation.scheduled_time, false)}
-                              onClick={() => handleStartMeeting(consultation, false)}
-                            >
-                              <Video className="w-4 h-4 mr-1" />
-                              {getMeetingStatus(consultation.scheduled_date, consultation.scheduled_time)}
-                            </Button>
-                          </>
-                        ) : (
-                          <>
-                            {/* Pending - Show approve/reject */}
-                            <Button
-                              size="sm"
-                              className="bg-green-600 hover:bg-green-700"
-                              onClick={() => handleApprove(consultation.id)}
-                              disabled={processingId === consultation.id}
-                            >
-                              {processingId === consultation.id ? (
-                                <>
-                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                  Processing...
-                                </>
-                              ) : (
-                                <>
-                                  <CheckCircle2 className="w-4 h-4 mr-1" />
-                                  Approve
-                                </>
-                              )}
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="border-red-600 text-red-600 hover:bg-red-50"
-                              onClick={() => openRejectDialog(consultation)}
-                              disabled={processingId === consultation.id}
-                            >
-                              <XCircle className="w-4 h-4 mr-1" />
-                              Reject
-                            </Button>
-                          </>
-                        )}
+                        {/* Real Mode - Time-based */}
+                        <Button
+                          size="sm"
+                          disabled={!canJoinMeeting(consultation.scheduled_date, consultation.scheduled_time, false)}
+                          onClick={() => handleStartMeeting(consultation, false)}
+                        >
+                          <Video className="w-4 h-4 mr-1" />
+                          {getMeetingStatus(consultation.scheduled_date, consultation.scheduled_time)}
+                        </Button>
                       </div>
                     </div>
                   </div>
@@ -573,15 +566,15 @@ export function DoctorConsultationRequests({ doctorId }: DoctorConsultationReque
         </DialogContent>
       </Dialog>
       {isInCall && activeConsultation && (
-      <VideoCallRoom
-        consultationId={activeConsultation.id}
-        userId={doctorId}
-        role="doctor"
-        patientName={activeConsultation.patient_name}
-        duration={activeConsultation.duration_minutes}
-        onEndCall={handleEndCall}
-      />
-    )}
+        <VideoCallRoom
+          consultationId={activeConsultation.id}
+          userId={doctorId}
+          role="doctor"
+          patientName={activeConsultation.patient_name}
+          duration={activeConsultation.duration_minutes}
+          onEndCall={handleEndCall}
+        />
+      )}
     </>
   );
 }
