@@ -47,12 +47,16 @@ export function VideoConsultationBooking({ patientId }: VideoConsultationBooking
   useEffect(() => {
     if (patientId) {
       loadConsultations();
+      expireOldConsultations();
     }
   }, [patientId]);
+
+
   const loadConsultations = async () => {
     try {
       setLoadingConsultations(true);
       const data = await bookingApiService.getPatientConsultations(patientId);
+
       setConsultations(data);
     } catch (error) {
       console.error('Error loading consultations:', error);
@@ -60,6 +64,34 @@ export function VideoConsultationBooking({ patientId }: VideoConsultationBooking
       setLoadingConsultations(false);
     }
   };
+
+  const expireOldConsultations = async () => {
+    try {
+      await fetch('http://localhost:5000/api/bookings/expire-old-consultations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('PatientToken')}`
+        }
+      });
+    } catch (error) {
+      console.error('Error expiring consultations:', error);
+    }
+  };
+
+  const sortedConsultations = [...consultations].sort((a, b) => {
+    // Priority: confirmed first
+    if (a.status === 'confirmed' && b.status !== 'confirmed') return -1;
+    if (a.status !== 'confirmed' && b.status === 'confirmed') return 1;
+
+    // If both have the same priority (both confirmed or both not confirmed), sort by datetime
+    const dateA = new Date(`${a.scheduled_date}T${a.scheduled_time}`);
+    const dateB = new Date(`${b.scheduled_date}T${b.scheduled_time}`);
+    return dateB.getTime() - dateA.getTime(); // latest first
+  });
+
+  const latestThree = sortedConsultations.slice(0, 3);
+
   const handleJoinMeeting = (consultation: VideoConsultation, isDemoMode: boolean = false) => {
     if (!isDemoMode) {
       // Check time for real mode
@@ -147,14 +179,21 @@ export function VideoConsultationBooking({ patientId }: VideoConsultationBooking
   };
   // Helper to check if meeting can be joined
   const canJoinMeeting = (scheduledDate: string, scheduledTime: string, isDemoMode: boolean = false) => {
-    if (isDemoMode) return true; // ✅ Demo mode: always allow
+    if (isDemoMode) return true;
 
     const consultDateTime = new Date(`${scheduledDate}T${scheduledTime}`);
     const now = new Date();
-    const timeDiff = (consultDateTime.getTime() - now.getTime()) / (1000 * 60); // Minutes until meeting
+    const timeDiff = (consultDateTime.getTime() - now.getTime()) / (1000 * 60);
 
-    // Can join 15 minutes before OR if meeting time has passed (for 1 hour window)
+    // Can join 15 minutes before until 1 hour after start time
     return timeDiff <= 15 && timeDiff >= -60;
+  };
+  const isMeetingExpired = (scheduledDate: string, scheduledTime: string, durationMinutes: number) => {
+    const consultDateTime = new Date(`${scheduledDate}T${scheduledTime}`);
+    const endDateTime = new Date(consultDateTime.getTime() + durationMinutes * 60000);
+    const now = new Date();
+
+    return now > endDateTime; // Meeting has completely expired
   };
 
   // Helper to get meeting status message
@@ -412,7 +451,9 @@ export function VideoConsultationBooking({ patientId }: VideoConsultationBooking
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="max-h-40 overflow-y-auto">
+        <CardContent className="max-h-80 overflow-y-auto">
+
+
           {loadingConsultations ? (
             <div className="text-center py-8 ">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
@@ -426,7 +467,7 @@ export function VideoConsultationBooking({ patientId }: VideoConsultationBooking
             </div>
           ) : (
             <div className="space-y-3">
-              {consultations.map((consultation) => (
+              {latestThree.map((consultation) => (
                 <div key={consultation.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -463,9 +504,9 @@ export function VideoConsultationBooking({ patientId }: VideoConsultationBooking
 
                     <div className="flex flex-col gap-2 ml-4">
                       {/* Join Meeting Button (Confirmed consultations only) */}
-                      {consultation.status === 'confirmed' && (
+                      {consultation.status === 'confirmed' && !isMeetingExpired(consultation.scheduled_date, consultation.scheduled_time, consultation.duration_minutes) && (
                         <>
-                          {/* Demo Mode Button - Always enabled */}
+                          {/* Demo Mode Button */}
                           <Button
                             size="sm"
                             className="bg-purple-600 hover:bg-purple-700"
@@ -475,7 +516,7 @@ export function VideoConsultationBooking({ patientId }: VideoConsultationBooking
                             Join (Demo)
                           </Button>
 
-                          {/* Real Mode Button - Time-based */}
+                          {/* Real Mode Button */}
                           <Button
                             size="sm"
                             disabled={!canJoinMeeting(consultation.scheduled_date, consultation.scheduled_time, false)}
@@ -485,6 +526,13 @@ export function VideoConsultationBooking({ patientId }: VideoConsultationBooking
                             {getMeetingStatus(consultation.scheduled_date, consultation.scheduled_time)}
                           </Button>
                         </>
+                      )}
+
+                      {/* Show expired message if meeting has passed */}
+                      {consultation.status === 'confirmed' && isMeetingExpired(consultation.scheduled_date, consultation.scheduled_time, consultation.duration_minutes) && (
+                        <Badge variant="outline" className="text-gray-500">
+                          Expired
+                        </Badge>
                       )}
 
                       {/* Pending Approval */}

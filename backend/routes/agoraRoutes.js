@@ -81,7 +81,16 @@ router.post('/generate-token/:consultationId', async (req, res) => {
       }
 
       const consultation = results[0];
+      const scheduledDateTime = new Date(`${consultation.scheduled_date}T${consultation.scheduled_time}`);
+      const endDateTime = new Date(scheduledDateTime.getTime() + consultation.duration_minutes * 60000);
+      const now = new Date();
 
+      if (now > endDateTime) {
+        return res.status(400).json({
+          success: false,
+          message: 'This consultation has expired'
+        });
+      }
       // Agora credentials
       const appId = process.env.AGORA_APP_ID;
       const appCertificate = process.env.AGORA_APP_CERTIFICATE;
@@ -157,28 +166,28 @@ router.post('/start/:consultationId', authenticateDoctor, (req, res) => {
   try {
     const { consultationId } = req.params;
     const doctorId = req.doctor.id;
+    const isDemoMode = req.body.demoMode || false;
 
-    console.log('▶️ Starting consultation:', consultationId);
-
-    // Verify consultation
+    // Fetch consultation
     const consultationSql = `
       SELECT * FROM video_consultations
-      WHERE id = ? AND doctor_id = ? AND status = 'in_progress'
+      WHERE id = ? AND doctor_id = ? AND status = 'confirmed'
     `;
 
     db.query(consultationSql, [consultationId, doctorId], (err, results) => {
-      if (err) {
-        console.error('Error fetching consultation:', err);
-        return res.status(500).json({
-          success: false,
-          message: 'Error validating consultation'
-        });
-      }
+      if (err) return res.status(500).json({ success: false, message: 'Error fetching consultation' });
+      if (results.length === 0) return res.status(404).json({ success: false, message: 'Consultation not found or not confirmed' });
 
-      if (results.length === 0) {
-        return res.status(404).json({
+      const consultation = results[0];
+      const scheduledDateTime = new Date(`${consultation.scheduled_date}T${consultation.scheduled_time}`);
+      const now = new Date();
+      const minutesDiff = (scheduledDateTime - now) / (1000 * 60);
+
+      // Block if not demo mode and too early
+      if (!isDemoMode && minutesDiff > 15) {
+        return res.status(400).json({
           success: false,
-          message: 'Consultation not found or not confirmed'
+          message: 'Cannot start consultation yet. You can start 15 minutes before scheduled time.'
         });
       }
 
@@ -188,32 +197,17 @@ router.post('/start/:consultationId', authenticateDoctor, (req, res) => {
         SET status = 'in_progress', meeting_started_at = NOW()
         WHERE id = ?
       `;
-
       db.query(updateSql, [consultationId], (updateErr) => {
-        if (updateErr) {
-          console.error('Error starting consultation:', updateErr);
-          return res.status(500).json({
-            success: false,
-            message: 'Error starting consultation'
-          });
-        }
-
-        console.log('✅ Consultation started');
-
-        res.json({
-          success: true,
-          message: 'Consultation started successfully'
-        });
+        if (updateErr) return res.status(500).json({ success: false, message: 'Error starting consultation' });
+        res.json({ success: true, message: 'Consultation started successfully' });
       });
     });
   } catch (error) {
-    console.error('Server error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error'
-    });
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
+
 
 // End Video Consultation (with refund calculation)
 router.post('/end/:consultationId', authenticateDoctor, (req, res) => {
@@ -225,9 +219,10 @@ router.post('/end/:consultationId', authenticateDoctor, (req, res) => {
 
     // Get consultation details
     const consultationSql = `
-      SELECT * FROM video_consultations
-      WHERE id = ? AND doctor_id = ? AND status = 'in_progress'
-    `;
+    SELECT * FROM video_consultations
+    WHERE id = ? AND status IN ('in_progress', 'confirmed')
+  `;
+
 
     db.query(consultationSql, [consultationId, doctorId], (err, results) => {
       if (err) {

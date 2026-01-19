@@ -260,6 +260,35 @@ router.get('/patient/:patientId', authenticatePatient, (req, res) => {
     });
   }
 });
+// Auto-expire old consultations (call this periodically or on page load)
+router.post('/expire-old-consultations', async (req, res) => {
+  try {
+    const now = new Date();
+    
+    const expireSql = `
+      UPDATE video_consultations
+      SET status = 'expired', 
+          cancellation_reason = 'Meeting time expired - no one joined'
+      WHERE status = 'confirmed'
+      AND CONCAT(scheduled_date, ' ', scheduled_time) < ?
+      AND meeting_started_at IS NULL
+    `;
+    
+    db.query(expireSql, [now], (err, result) => {
+      if (err) {
+        return res.status(500).json({ success: false, message: 'Error expiring consultations' });
+      }
+      
+      res.json({
+        success: true,
+        message: `${result.affectedRows} consultations expired`,
+        expiredCount: result.affectedRows
+      });
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
 
 // Cancel Consultation (Patient)
 router.delete('/:consultationId/cancel', authenticatePatient, (req, res) => {

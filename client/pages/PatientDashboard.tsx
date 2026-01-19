@@ -17,13 +17,13 @@ import { VideoConsultationBooking } from '@/components/VideoConsultationBooking'
 import { getAuthToken } from 'src/utils/auth';
 import { MedicalReportAnalyzer } from '@/components/MedicalReportAnalyzer';
 import { Brain } from 'lucide-react';
+import { NearbyHospitalsMap } from '@/components/NearbyHospitalsMap';
+import { useRef } from "react";
 
 import {
 
-  // ... existing imports ...
-  ChevronDown,  // ✅ ADD THIS
-  ChevronUp,    // ✅ ADD THIS
-  // ... rest of imports
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 import {
@@ -228,7 +228,8 @@ export default function PatientDashboard() {
 
 
 
-
+  
+  const tabsRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const loadPatientData = async () => {
@@ -561,7 +562,7 @@ export default function PatientDashboard() {
     }
   };
 
-  
+
   const openAppointmentDialog = (appointmentType: string) => {
     setAppointmentForm({
       ...appointmentForm,
@@ -715,24 +716,24 @@ export default function PatientDashboard() {
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-  
+
     const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
     if (!validTypes.includes(file.type)) {
       setImageUploadError('Please upload a valid image file');
       return;
     }
-  
+
     if (file.size > 5 * 1024 * 1024) {
       setImageUploadError('Image size must be less than 5MB');
       return;
     }
-  
+
     setUploadingImage(true);
     setImageUploadError(null);
-  
+
     try {
       const result = await patientApiService.uploadProfileImage(patientData.id, file);
-  
+
       if (result.success) {
         // ✅ Use Cloudinary URL directly (no localhost prefix)
         setProfileImageUrl(result.profileImagePath);
@@ -740,7 +741,7 @@ export default function PatientDashboard() {
           ...patientData,
           profilePicture: result.profileImagePath
         });
-  
+
         console.log('✅ Profile image uploaded successfully');
       }
     } catch (error) {
@@ -995,16 +996,23 @@ export default function PatientDashboard() {
                 onClick={(e) => {
                   e.preventDefault();
                   setActiveTab("overview");
+                  tabsRef.current?.scrollIntoView({
+                    behavior: "smooth",
+                    block: "start",
+                  });
                 }}
                 className={`font-medium transition-colors ${activeTab === "overview" ? "text-primary" : "text-gray-700 hover:text-primary"}`}
               >
-                Dashboard
+                Overview
               </button>
               <button
                 onClick={(e) => {
                   e.preventDefault();
-                  // console.log("Clicking Records button");
                   setActiveTab("records");
+                  tabsRef.current?.scrollIntoView({
+                    behavior: "smooth",
+                    block: "start",
+                  });
                 }}
                 className={`font-medium transition-colors ${activeTab === "records" ? "text-primary" : "text-gray-700 hover:text-primary"}`}
               >
@@ -1015,6 +1023,10 @@ export default function PatientDashboard() {
                   e.preventDefault();
                   // console.log("Clicking Appointments button");
                   setActiveTab("appointments");
+                  tabsRef.current?.scrollIntoView({
+                    behavior: "smooth",
+                    block: "start",
+                  });
                 }}
                 className={`font-medium transition-colors ${activeTab === "appointments" ? "text-primary" : "text-gray-700 hover:text-primary"}`}
               >
@@ -1025,18 +1037,16 @@ export default function PatientDashboard() {
                 onClick={(e) => {
                   e.preventDefault();
                   setActiveTab("medications")
+                  tabsRef.current?.scrollIntoView({
+                    behavior: "smooth",
+                    block: "start",
+                  });
                 }}
-                className={`font-medium transition-colors ${activeTab === "records" ? "text-primary" : "text-gray-700 hover:text-primary"}`}
+                className={`font-medium transition-colors ${activeTab === "medications" ? "text-primary" : "text-gray-700 hover:text-primary"}`}
               >
                 Medications
               </button>
               <div className="flex items-center space-x-3 ml-6 border-l pl-6">
-                {/* <Button variant="ghost" size="sm">
-                  <Bell className="w-4 h-4" />
-                </Button>
-                <Button variant="ghost" size="sm">
-                  <Settings className="w-4 h-4" />
-                </Button> */}
                 <Button
                   variant="outline"
                   size="sm"
@@ -1483,14 +1493,15 @@ export default function PatientDashboard() {
 
 
         </div>
-
+        <div ref={tabsRef}>
         {/* Main Dashboard Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="records">Medical Records</TabsTrigger>
             <TabsTrigger value="appointments">Appointments</TabsTrigger>
             <TabsTrigger value="medications">Medications</TabsTrigger>
+            <TabsTrigger value="map">📍 Nearby Hospitals</TabsTrigger>
             <TabsTrigger value="profile">Profile</TabsTrigger>
           </TabsList>
 
@@ -1498,7 +1509,7 @@ export default function PatientDashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Recent Medical Records */}
               <Card>
-                <CardHeader>
+                <CardHeader>  
                   <CardTitle className="flex items-center">
                     <FileText className="w-5 h-5 mr-2" />
                     Recent Medical Records
@@ -2407,6 +2418,19 @@ export default function PatientDashboard() {
             </Card>
           </TabsContent>
 
+          <TabsContent value="map">
+            <NearbyHospitalsMap
+              linkedDoctor={linkedDoctors[0] ? {
+                id: linkedDoctors[0].id,
+                name: linkedDoctors[0].name,
+                specialization: linkedDoctors[0].specialization,
+                hospital: linkedDoctors[0].hospital,
+                latitude: 19.0760, // TODO: Get from database
+                longitude: 72.8777
+              } : undefined}
+            />
+          </TabsContent>
+
           <TabsContent value="profile" className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <Card>
@@ -2576,18 +2600,19 @@ export default function PatientDashboard() {
           )
           }
         </Tabs>
+        </div>
 
         {/* Emergency Banner */}
         <Card className="mt-8 border-red-200 bg-red-50">
           <CardContent className="p-4">
             <div className="flex items-center space-x-3">
-            <Phone className="w-6 h-6 text-red-600" />
+              <Phone className="w-6 h-6 text-red-600" />
               <div className="flex-1">
                 <h3 className="font-medium text-red-800">Emergency Helpline</h3>
                 <p className="text-sm text-red-700">
-                Medical Advice Service, Govt. of Maharashtra <strong>104</strong> (24/7 available) <br />
-                Women Crisis Response Center <strong>1091</strong> (24/7 available) <br />
-                
+                  Medical Advice Service, Govt. of Maharashtra <strong>104</strong> (24/7 available) <br />
+                  Women Crisis Response Center <strong>1091</strong> (24/7 available) <br />
+
                 </p>
               </div>
               <Button variant="outline" className="border-red-300 text-red-700 hover:bg-red-100">

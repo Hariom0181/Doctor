@@ -10,6 +10,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { PublicRoute, PatientRoute, DoctorRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
+import React from "react";
 
 
 import PatientLogin from "./pages/PatientLogin";
@@ -46,12 +47,13 @@ const App = () => (
 );
 
 // Ensure we only create the root once
-const rootElement = document.getElementById("root")!;
-let root = (rootElement as any)._reactRoot;
+const rootElement = document.getElementById("root");
+if (!rootElement) throw new Error("Failed to find the root element");
 
-if (!root) {
-  root = createRoot(rootElement);
-  (rootElement as any)._reactRoot = root;
-}
-
-root.render(<App />);
+// Standard Vite/React 18 rendering
+const root = createRoot(rootElement);
+root.render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
