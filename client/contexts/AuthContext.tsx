@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useReducer, ReactNode } from 'react';
 
 // Types
 export interface User {
@@ -53,6 +53,9 @@ interface AuthContextType extends AuthState {
   updateProfile: (updates: Partial<Patient | Doctor>) => void;
 }
 
+const AUTH_TOKEN_KEY = 'authToken';
+const AUTH_USER_KEY = 'authUser';
+
 // Initial state
 const initialState: AuthState = {
   user: null,
@@ -106,6 +109,23 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
+  useEffect(() => {
+    const storedToken = localStorage.getItem(AUTH_TOKEN_KEY);
+    const storedUser = localStorage.getItem(AUTH_USER_KEY);
+
+    if (!storedToken || !storedUser) {
+      return;
+    }
+
+    try {
+      const parsedUser = JSON.parse(storedUser) as Patient | Doctor;
+      dispatch({ type: 'LOGIN_SUCCESS', payload: parsedUser });
+    } catch (error) {
+      localStorage.removeItem(AUTH_TOKEN_KEY);
+      localStorage.removeItem(AUTH_USER_KEY);
+    }
+  }, []);
+
   const login = async (email: string, password: string, role: 'patient' | 'doctor') => {
     dispatch({ type: 'LOGIN_START' });
     
@@ -122,7 +142,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (response.ok) {
         const userData = await response.json();
         dispatch({ type: 'LOGIN_SUCCESS', payload: userData });
-        localStorage.setItem('authToken', userData.token);
+        localStorage.setItem(AUTH_TOKEN_KEY, userData.token);
+        localStorage.setItem(AUTH_USER_KEY, JSON.stringify(userData));
       } else {
         throw new Error('Login failed');
       }
@@ -155,7 +176,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
-    localStorage.removeItem('authToken');
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+    localStorage.removeItem(AUTH_USER_KEY);
     dispatch({ type: 'LOGOUT' });
   };
 

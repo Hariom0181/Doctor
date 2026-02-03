@@ -32,10 +32,10 @@ const App = () => (
             <Route path="/" element={<PublicRoute><Index /></PublicRoute>} />
             <Route path="/patient/login" element={<PublicRoute><PatientLogin /></PublicRoute>} />
             <Route path="/patient/register" element={<PublicRoute><PatientRegister /></PublicRoute>} />
-            <Route path="/patient/dashboard" element={<PatientDashboard />} />
+            <Route path="/patient/dashboard" element={<PatientRoute><PatientDashboard /></PatientRoute>} />
             <Route path="/doctor/login" element={<PublicRoute><DoctorLogin /></PublicRoute>} />
             <Route path="/doctor/register" element={<PublicRoute><DoctorRegister /></PublicRoute>} />
-            <Route path="/doctor/dashboard" element={<DoctorDashboard />} />
+            <Route path="/doctor/dashboard" element={<DoctorRoute><DoctorDashboard /></DoctorRoute>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
