@@ -39,18 +39,18 @@ interface AuthState {
   isAuthenticated: boolean;
 }
 
-type AuthAction = 
+type AuthAction =
   | { type: 'LOGIN_START' }
   | { type: 'LOGIN_SUCCESS'; payload: Patient | Doctor }
   | { type: 'LOGIN_FAILURE' }
   | { type: 'LOGOUT' }
-  | { type: 'UPDATE_PROFILE'; payload: Partial<Patient | Doctor> };
+  | { type: 'UPDATE_PROFILE'; payload: Partial<Patient> | Partial<Doctor> };
 
 interface AuthContextType extends AuthState {
   login: (email: string, password: string, role: 'patient' | 'doctor') => Promise<void>;
   logout: () => void;
   register: (userData: any, role: 'patient' | 'doctor') => Promise<void>;
-  updateProfile: (updates: Partial<Patient | Doctor>) => void;
+  updateProfile: (updates: Partial<Patient> | Partial<Doctor>) => void;
 }
 
 const AUTH_TOKEN_KEY = 'authToken';
@@ -93,9 +93,28 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
         isLoading: false,
       };
     case 'UPDATE_PROFILE':
+      if (!state.user) {
+        return state;
+      }
+
+      if (state.user.role === 'patient') {
+        return {
+          ...state,
+          user: {
+            ...state.user,
+            ...action.payload,
+            role: 'patient',
+          } as Patient,
+        };
+      }
+
       return {
         ...state,
-        user: state.user ? { ...state.user, ...action.payload } : null,
+        user: {
+          ...state.user,
+          ...action.payload,
+          role: 'doctor',
+        } as Doctor,
       };
     default:
       return state;
@@ -181,7 +200,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'LOGOUT' });
   };
 
-  const updateProfile = (updates: Partial<Patient | Doctor>) => {
+  const updateProfile = (updates: Partial<Patient> | Partial<Doctor>) => {
     dispatch({ type: 'UPDATE_PROFILE', payload: updates });
   };
 
