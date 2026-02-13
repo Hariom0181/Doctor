@@ -92,7 +92,18 @@ export function VideoConsultationBooking({ patientId }: VideoConsultationBooking
 
   const latestThree = sortedConsultations.slice(0, 3);
 
+
+
   const handleJoinMeeting = (consultation: VideoConsultation, isDemoMode: boolean = false) => {
+
+    if (isInCall) {
+      toast({
+        title: "Already in call",
+        description: "Please end the current call first",
+        variant: "destructive"
+      });
+      return;
+    }
     if (!isDemoMode) {
       // Check time for real mode
       const canJoin = canJoinMeeting(consultation.scheduled_date, consultation.scheduled_time, false);
@@ -104,6 +115,7 @@ export function VideoConsultationBooking({ patientId }: VideoConsultationBooking
         });
         return;
       }
+
     }
 
     setActiveConsultation(consultation);
@@ -395,6 +407,8 @@ export function VideoConsultationBooking({ patientId }: VideoConsultationBooking
         return <Badge className="bg-yellow-500"><AlertCircle className="w-3 h-3 mr-1" />Pending Approval</Badge>;
       case 'confirmed':
         return <Badge className="bg-green-500"><CheckCircle2 className="w-3 h-3 mr-1" />Confirmed</Badge>;
+      case 'in_progress':  // ✅ ADD THIS
+        return <Badge className="bg-blue-500 animate-pulse"><Video className="w-3 h-3 mr-1" />In Progress</Badge>;
       case 'rejected':
         return <Badge variant="destructive"><XCircle className="w-3 h-3 mr-1" />Rejected</Badge>;
       case 'cancelled_by_patient':
@@ -504,34 +518,38 @@ export function VideoConsultationBooking({ patientId }: VideoConsultationBooking
 
                     <div className="flex flex-col gap-2 ml-4">
                       {/* Join Meeting Button (Confirmed consultations only) */}
-                      {consultation.status === 'confirmed' && !isMeetingExpired(consultation.scheduled_date, consultation.scheduled_time, consultation.duration_minutes) && (
-                        <>
-                          {/* Demo Mode Button */}
-                          <Button
-                            size="sm"
-                            className="bg-purple-600 hover:bg-purple-700"
-                            onClick={() => handleJoinMeeting(consultation, true)}
-                          >
-                            <Video className="w-4 h-4 mr-1" />
-                            Join (Demo)
-                          </Button>
+                      {/* Join Meeting Button - Allow join for both 'confirmed' and 'in_progress' */}
+                      {(consultation.status === 'confirmed' || consultation.status === 'in_progress') &&
+                        !isMeetingExpired(consultation.scheduled_date, consultation.scheduled_time, consultation.duration_minutes) && (
+                          <>
+                            {/* Demo Mode Button */}
+                            <Button
+                              size="sm"
+                              className="bg-purple-600 hover:bg-purple-700"
+                              onClick={() => handleJoinMeeting(consultation, true)}
+                            >
+                              <Video className="w-4 h-4 mr-1" />
+                              Join (Demo)
+                            </Button>
 
-                          {/* Real Mode Button */}
-                          <Button
-                            size="sm"
-                            disabled={!canJoinMeeting(consultation.scheduled_date, consultation.scheduled_time, false)}
-                            onClick={() => handleJoinMeeting(consultation, false)}
-                          >
-                            <Video className="w-4 h-4 mr-1" />
-                            {getMeetingStatus(consultation.scheduled_date, consultation.scheduled_time)}
-                          </Button>
-                        </>
-                      )}
+                            {/* Real Mode Button */}
+                            <Button
+                              size="sm"
+                              disabled={!canJoinMeeting(consultation.scheduled_date, consultation.scheduled_time, false)}
+                              onClick={() => handleJoinMeeting(consultation, false)}
+                            >
+                              <Video className="w-4 h-4 mr-1" />
+                              {getMeetingStatus(consultation.scheduled_date, consultation.scheduled_time)}
+                            </Button>
+                          </>
+                        )}
 
                       {/* Show expired message if meeting has passed */}
-                      {consultation.status === 'confirmed' && isMeetingExpired(consultation.scheduled_date, consultation.scheduled_time, consultation.duration_minutes) && (
-                        <Badge variant="outline" className="text-gray-500">
-                          Expired
+                      {/* Show "In Progress" badge */}
+                      {consultation.status === 'in_progress' && (
+                        <Badge className="bg-blue-500 animate-pulse">
+                          <Video className="w-3 h-3 mr-1" />
+                          In Progress
                         </Badge>
                       )}
 

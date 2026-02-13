@@ -2,15 +2,8 @@ const express = require("express");
 const router = express.Router();
 const db = require("../config/db");
 const { uploadDocument, cloudinary } = require("../config/cloudinary");
-const CloudinaryStorage = require('multer-storage-cloudinary').CloudinaryStorage;
 const path = require('path');
 const multer = require('multer'); 
-// const { uploadDocument, cloudinary } = require("../config/cloudinary");
-// const { uploadProfile } = require("../config/cloudinary");
-
-
-
-// Configure multer for document upload
 
 
 const storageMemory = multer.memoryStorage();
@@ -26,9 +19,15 @@ const uploadMemory = multer({
 router.post("/upload", uploadDocument.single("document"), (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({
+      return res.status(400).json({ success: false, message: "No file uploaded" });
+    }
+
+    const fileUrl = req.file.secure_url; // ✅ ALWAYS exists
+
+    if (!fileUrl) {
+      return res.status(500).json({
         success: false,
-        message: "No file uploaded"
+        message: "Cloudinary upload failed (no file URL)"
       });
     }
 
@@ -40,42 +39,46 @@ router.post("/upload", uploadDocument.single("document"), (req, res) => {
       notes
     } = req.body;
 
-    const filePath = req.file.path; // ✅ Cloudinary URL
-    const documentName = req.file.originalname;
-
     const sql = `
-      INSERT INTO patient_documents 
+      INSERT INTO patient_documents
       (patient_id, document_type, document_name, file_path, document_date, hospital_name, notes)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `;
 
     db.query(
       sql,
-      [patientId, documentType, documentName, filePath, documentDate, hospitalName, notes],
+      [
+        patientId,
+        documentType,
+        req.file.originalname,
+        fileUrl,            // ✅ FIXED
+        documentDate,
+        hospitalName,
+        notes
+      ],
       (err, result) => {
         if (err) {
-          return res.status(500).json({
-            success: false,
-            message: "Error saving document"
-          });
+          console.error("Error saving document:", err);
+          return res.status(500).json({ success: false, message: "Error saving document" });
         }
 
         res.status(201).json({
           success: true,
-          message: "Document uploaded successfully",
           documentId: result.insertId,
-          filePath
+          filePath: fileUrl
         });
       }
     );
 
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Document upload failed"
-    });
+    console.error("Upload failed:", error);
+    res.status(500).json({ success: false, message: "Document upload failed" });
   }
 });
+
+
+
+
 // tract text from document using Google Vision API
 // Extract text from Cloudinary document
 router.post("/extract-text/:documentId", async (req, res) => {

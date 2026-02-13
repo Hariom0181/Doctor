@@ -332,20 +332,20 @@ class PatientApiService {
   async getProfileImage(patientId: number): Promise<string | null> {
     try {
       const response = await fetch(`${API_BASE_URL}/patients/${patientId}/profile-image`);
-  
+
       if (!response.ok) {
         if (response.status === 404) {
           return null;
         }
         throw new Error('Failed to fetch profile image');
       }
-  
+
       const result = await response.json();
-  
+
       if (result.success && result.profileImagePath) {
         return result.profileImagePath; // ✅ Cloudinary URL is already complete
       }
-  
+
       return null;
     } catch (error) {
       console.error('Error fetching profile image:', error);
@@ -512,28 +512,24 @@ class PatientApiService {
   }
 
   async getPatientDocuments(patientId: number): Promise<any[]> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/documents/patient/${patientId}`, {
-        method: 'GET',
-        headers: this.getAuthHeaders()
-      });
+    const response = await fetch(`${API_BASE_URL}/documents/patient/${patientId}`, {
+      method: 'GET',
+      headers: this.getAuthHeaders()
+    });
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch documents');
-      }
-
-      const result = await response.json();
-
-      if (!result.success) {
-        throw new Error(result.message);
-      }
-
-      return result.data;
-    } catch (error) {
-      console.error('Error fetching documents:', error);
-      throw error;
+    if (!response.ok) {
+      throw new Error('Failed to fetch documents');
     }
+
+    const result = await response.json();
+
+    if (!result.success) {
+      throw new Error(result.message);
+    }
+
+    return result.data; // this contains file_path, document_name, etc.
   }
+
 
   async deletePatientDocument(documentId: number): Promise<boolean> {
     try {

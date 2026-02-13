@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import AgoraRTC, {
   IAgoraRTCClient,
   ICameraVideoTrack,
@@ -26,7 +26,7 @@ interface VideoCallRoomProps {
   role: 'doctor' | 'patient';
   patientName?: string;
   doctorName?: string;
-  duration: number; // in minutes
+  duration: number;
   onEndCall: () => void;
 }
 
@@ -49,13 +49,10 @@ export function VideoCallRoom({
   const [remoteUsers, setRemoteUsers] = useState<number[]>([]);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isEnding, setIsEnding] = useState(false);
-
-  useEffect(() => {
-    initializeAgora();
-    return () => {
-      leaveChannel();
-    };
-  }, []);
+  
+  // ✅ CRITICAL: Prevent double-joining in React StrictMode
+  const hasJoinedRef = useRef(false);
+  const isJoiningRef = useRef(false);
 
   // Timer effect
   useEffect(() => {
@@ -67,14 +64,34 @@ export function VideoCallRoom({
     }
   }, [isJoined]);
 
+  // ✅ SINGLE useEffect for joining
+  useEffect(() => {
+    // Prevent double-joining
+    if (hasJoinedRef.current || isJoiningRef.current) {
+      console.log('🚫 Already joined or joining, skipping...');
+      return;
+    }
+
+    hasJoinedRef.current = true;
+    isJoiningRef.current = true;
+
+    initializeAgora();
+
+    return () => {
+      console.log('🧹 Cleanup: Leaving channel');
+      leaveChannel();
+      hasJoinedRef.current = false;
+      isJoiningRef.current = false;
+    };
+  }, []); // ✅ Empty deps - only run once
+
   const initializeAgora = async () => {
     try {
-      console.log('🎥 Initializing Agora...');
+      console.log('🎥 Initializing Agora for', role, 'userId:', userId);
 
-      // Create Agora client
+      // ✅ Create Agora client ONCE
       const agoraClient = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
-      setClient(agoraClient);
-
+      
       // Set up event listeners
       agoraClient.on('user-published', async (user, mediaType) => {
         console.log('👤 User published:', user.uid, mediaType);
@@ -111,18 +128,28 @@ export function VideoCallRoom({
         setRemoteUsers((prev) => prev.filter((uid) => uid !== user.uid));
       });
 
-      // Get Agora credentials
+      // ✅ Get Agora credentials
       const credentials = await agoraApiService.generateToken(consultationId, userId, role);
 
-      // Join channel
+      console.log('🔑 Credentials received:', {
+        appId: credentials.appId,
+        channel: credentials.channelName,
+        uid: credentials.uid,
+        role: role
+      });
+
+      // ✅ Join channel with generated UID
       await agoraClient.join(
         credentials.appId,
         credentials.channelName,
         credentials.token,
-        userId
+        credentials.uid
       );
 
-      console.log('✅ Joined channel:', credentials.channelName);
+      console.log('✅ Joined channel:', credentials.channelName, 'as UID:', credentials.uid);
+      
+      // Store client AFTER successful join
+      setClient(agoraClient);
 
       // Create and publish local tracks
       const videoTrack = await AgoraRTC.createCameraVideoTrack();
@@ -142,6 +169,7 @@ export function VideoCallRoom({
       console.log('✅ Published local tracks');
 
       setIsJoined(true);
+      isJoiningRef.current = false; // ✅ Mark joining complete
 
       // If doctor, mark consultation as started
       if (role === 'doctor') {
@@ -154,6 +182,9 @@ export function VideoCallRoom({
       });
     } catch (error: any) {
       console.error('❌ Error initializing Agora:', error);
+      hasJoinedRef.current = false; // ✅ Reset on error
+      isJoiningRef.current = false;
+      
       toast({
         title: 'Connection Error',
         description: error.message || 'Failed to join video call',
@@ -177,26 +208,32 @@ export function VideoCallRoom({
   };
 
   const leaveChannel = async () => {
-    if (localVideoTrack) {
-      localVideoTrack.stop();
-      localVideoTrack.close();
+    try {
+      if (localVideoTrack) {
+        localVideoTrack.stop();
+        localVideoTrack.close();
+        setLocalVideoTrack(null);
+      }
+      if (localAudioTrack) {
+        localAudioTrack.stop();
+        localAudioTrack.close();
+        setLocalAudioTrack(null);
+      }
+      if (client && isJoined) {
+        await client.leave();
+        setClient(null);
+      }
+      setIsJoined(false);
+      setRemoteUsers([]);
+    } catch (error) {
+      console.error('Error leaving channel:', error);
     }
-    if (localAudioTrack) {
-      localAudioTrack.stop();
-      localAudioTrack.close();
-    }
-    if (client) {
-      await client.leave();
-    }
-    setIsJoined(false);
-    setRemoteUsers([]);
   };
 
   const handleEndCall = async () => {
     if (isEnding) return;
 
     if (role === 'doctor') {
-      // Only doctor can end the call
       if (!confirm('Are you sure you want to end this consultation?')) {
         return;
       }
@@ -204,7 +241,6 @@ export function VideoCallRoom({
       try {
         setIsEnding(true);
 
-        // End consultation on backend (calculates refund)
         const result = await agoraApiService.endConsultation(consultationId);
 
         toast({
@@ -225,7 +261,6 @@ export function VideoCallRoom({
         setIsEnding(false);
       }
     } else {
-      // Patient leaving
       await leaveChannel();
       onEndCall();
     }
@@ -265,7 +300,6 @@ export function VideoCallRoom({
 
       {/* Video Grid */}
       <div className="flex-1 flex items-center justify-center p-4 gap-4">
-        {/* Remote Video (Large) */}
         {remoteUsers.length > 0 ? (
           <div className="relative w-full max-w-4xl h-full bg-gray-800 rounded-lg overflow-hidden">
             {remoteUsers.map((uid) => (
@@ -289,7 +323,7 @@ export function VideoCallRoom({
           </Card>
         )}
 
-        {/* Local Video (Small - Picture in Picture) */}
+        {/* Local Video */}
         <div className="absolute bottom-24 right-8 w-64 h-48 bg-gray-800 rounded-lg overflow-hidden border-2 border-gray-600 shadow-lg">
           <div
             id="local-player"
@@ -347,7 +381,6 @@ export function VideoCallRoom({
         </Button>
       </div>
 
-      {/* Warning for doctor */}
       {role === 'doctor' && (
         <div className="bg-yellow-900 text-yellow-100 px-4 py-2 text-sm text-center">
           ⚠️ Only you can end this consultation. Ending early will automatically refund unused time to the patient.

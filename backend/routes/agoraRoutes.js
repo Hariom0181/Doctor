@@ -94,6 +94,9 @@ router.post('/generate-token/:consultationId', async (req, res) => {
       // Agora credentials
       const appId = process.env.AGORA_APP_ID;
       const appCertificate = process.env.AGORA_APP_CERTIFICATE;
+      console.log('🔑 Agora App ID:', appId);
+      console.log('🔑 Agora App Certificate:', appCertificate);
+
 
       if (!appId || !appCertificate) {
         console.error('❌ Agora credentials not configured');
@@ -107,7 +110,21 @@ router.post('/generate-token/:consultationId', async (req, res) => {
       const channelName = `consultation_${consultationId}`;
 
       // User ID (unique identifier)
-      const uid = userId || 0; // 0 = Agora will auto-generate
+    let uid;
+
+if (role === 'doctor') {
+  uid = 100000 + Number(userId);
+} else if (role === 'patient') {
+  uid = 200000 + Number(userId);
+} else {
+  return res.status(400).json({
+    success: false,
+    message: 'Invalid role'
+  });
+}
+
+console.log(`🔑 Generated UID for ${role}:`, uid);
+      // 0 = Agora will auto-generate
 
       // Token role (publisher = can send/receive, subscriber = can only receive)
       const agoraRole = RtcRole.PUBLISHER;
@@ -123,9 +140,10 @@ router.post('/generate-token/:consultationId', async (req, res) => {
         appCertificate,
         channelName,
         uid,
-        agoraRole,
+        RtcRole.PUBLISHER,
         privilegeExpiredTs
       );
+
 
       console.log('✅ Agora token generated successfully');
 

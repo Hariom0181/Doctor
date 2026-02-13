@@ -11,13 +11,16 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Camera, X } from 'lucide-react';
+import { Camera, Wallet, X } from 'lucide-react';
 import { WalletCard } from '@/components/WalletCard';
 import { VideoConsultationBooking } from '@/components/VideoConsultationBooking';
 import { getAuthToken } from 'src/utils/auth';
-import { MedicalReportAnalyzer } from '@/components/MedicalReportAnalyzer';
+
+import { FloatingHealthAssistant } from '@/components/FloatingHealthAssistant';
+
 import { Brain } from 'lucide-react';
 import { NearbyHospitalsMap } from '@/components/NearbyHospitalsMap';
+import { FloatingMapButton } from "@/components/FloatingMapButton";
 import { useRef } from "react";
 
 import {
@@ -52,6 +55,7 @@ import {
   Loader2
 } from "lucide-react";
 import { patientApiService, HealthMetric, LinkedDoctor, AvailableDoctor, PatientMedicalRecord, PatientProfile } from "@/services/patientApi";
+
 
 // ------------------------------
 // Hardcoded initial data (unchanged)
@@ -206,6 +210,9 @@ export default function PatientDashboard() {
   // Prescriptions/Medications state
   const [prescriptions, setPrescriptions] = useState<any[]>([]);
   const [isLoadingPrescriptions, setIsLoadingPrescriptions] = useState(false);
+  const [openMap, setOpenMap] = useState(false);
+  const [openChat, setOpenChat] = useState(false);
+
 
   // Document upload form
   const [documentForm, setDocumentForm] = useState({
@@ -228,7 +235,7 @@ export default function PatientDashboard() {
 
 
 
-  
+
   const tabsRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -1481,705 +1488,115 @@ export default function PatientDashboard() {
               )}
             </CardContent>
           </Card>
-          {patientData?.id && (
+          {/* {patientData?.id && (
             <WalletCard patientId={patientData.id} />
-          )}
-          {patientData?.id && (
+          )} */}
+          {/* {patientData?.id && (
             <VideoConsultationBooking patientId={patientData?.id} />
-          )}
-          {patientData?.id && (
+          )} */}
+          {/* {patientData?.id && (
             <MedicalReportAnalyzer patientId={patientData?.id} />
           )}
-
+ */}
 
         </div>
         <div ref={tabsRef}>
-        {/* Main Dashboard Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="records">Medical Records</TabsTrigger>
-            <TabsTrigger value="appointments">Appointments</TabsTrigger>
-            <TabsTrigger value="medications">Medications</TabsTrigger>
-            <TabsTrigger value="map">📍 Nearby Hospitals</TabsTrigger>
-            <TabsTrigger value="profile">Profile</TabsTrigger>
-          </TabsList>
+          {/* Main Dashboard Tabs */}
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+            <TabsList className="grid w-full grid-cols-6">
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="records">Medical Records</TabsTrigger>
+              <TabsTrigger value="appointments">Appointments</TabsTrigger>
+              <TabsTrigger value="medications">Medications</TabsTrigger>
+              <TabsTrigger value="wallet">Video Consultation</TabsTrigger>
+              <TabsTrigger value="profile">Profile</TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="overview" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Recent Medical Records */}
-              <Card>
-                <CardHeader>  
-                  <CardTitle className="flex items-center">
-                    <FileText className="w-5 h-5 mr-2" />
-                    Recent Medical Records
-                  </CardTitle>
-                  <CardDescription>Your latest health checkups and diagnoses</CardDescription>
-                </CardHeader>
-                <CardContent className="max-h-60 overflow-y-auto">
-                  {isLoadingRecentRecords ? (
-                    <div className="text-center py-4">Loading recent records...</div>
-                  ) : recentRecords && recentRecords.length > 0 ? (
-                    recentRecords.slice(0, 3).map((record) => (
-                      <div key={record.id} className="border rounded-lg p-4 bg-white">
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-2 mb-1">
-                              <h4 className="font-medium">{record.type}</h4>
-                              <Badge className={getStatusColor(record.status)}>
-                                {record.status}
-                              </Badge>
-                            </div>
-                            <p className="text-sm text-gray-600">
-                              {record.doctor} • {record.currentHospital} {/* Fixed: removed "Dr." prefix since it's already in record.doctor */}
-                            </p>
-                            <p className="text-sm text-gray-800 mt-1">{record.diagnosis}</p>
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {new Date(record.date).toLocaleDateString()}
-                          </div>
-                        </div>
-                        {record.nextCheckup && (
-                          <p className="text-sm text-primary font-medium">
-                            Next checkup: {new Date(record.nextCheckup).toLocaleDateString()}
-                          </p>
-                        )}
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-4 text-gray-500">No recent records available</div>
-                  )}
-                  {/* <Button variant="outline" className="w-full">
-                    View All Records
-                  </Button> */}
-                </CardContent>
-              </Card>
+            <TabsContent value="overview" className="space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Recent Medical Records */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <FileText className="w-5 h-5 mr-2" />
+                      Recent Medical Records
+                    </CardTitle>
+                    <CardDescription>Your latest health checkups and diagnoses</CardDescription>
+                  </CardHeader>
+                  <CardContent className="max-h-60 overflow-y-auto">
+                    {isLoadingRecentRecords ? (
+                      <div className="text-center py-4">Loading recent records...</div>
+                    ) : recentRecords && recentRecords.length > 0 ? (
 
-              {/* Upcoming Appointments */}
-              <CardContent className="max-h-60 overflow-y-auto">
-                {isLoadingAppointments ? (
-                  <div className="text-center py-6">
-                    <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
-                    <p className="text-xs text-gray-500 mt-2">Loading appointments...</p>
-                  </div>
-                ) : upcomingAppointments.length === 0 ? (
-                  <div className="text-center py-6">
-                    <Calendar className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-                    <p className="text-sm text-gray-600 mb-3">No upcoming appointments</p>
-                    <Button
-                      size="sm"
-                      onClick={() => setIsAppointmentDialogOpen(true)}
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Book Appointment
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {upcomingAppointments.slice(0, 3).map((appointment) => (
-                      <div key={appointment.id} className="border rounded-lg p-4 bg-white hover:shadow-sm transition-shadow">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <h4 className="font-medium">{appointment.appointment_type}</h4>
-                            <p className="text-sm text-gray-600">{appointment.doctor_name}</p>
-                            <p className="text-sm text-gray-600">{appointment.current_hospital}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-sm font-medium">
-                              {new Date(appointment.appointment_date).toLocaleDateString('en-IN', {
-                                month: 'short',
-                                day: 'numeric'
-                              })}
-                            </p>
-                            <p className="text-sm text-gray-500">{appointment.appointment_time}</p>
-                            <Badge
-                              variant={getAppointmentStatusBadge(appointment.status)}
-                              className="mt-1"
-                            >
-                              {getStatusLabel(appointment.status)}
-                            </Badge>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-
-                    {upcomingAppointments.length > 3 && (
-                      <p className="text-xs text-center text-gray-500 pt-2">
-                        +{upcomingAppointments.length - 3} more appointments
-                      </p>
-                    )}
-
-                    <Button
-                      className="w-full mt-3"
-                      variant="outline"
-                      onClick={() => setActiveTab('appointments')}
-                    >
-                      View All Appointments
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </div>
-
-            {/* Active Medications */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Pill className="w-5 h-5 mr-2" />
-                  Active Medications
-                </CardTitle>
-                <CardDescription>Current medications and reminders</CardDescription>
-              </CardHeader>
-              <CardContent className="max-h-60 overflow-y-auto">
-                {isLoadingPrescriptions ? (
-                  <div className="text-center py-6">
-                    <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
-                    <p className="text-xs text-gray-500 mt-2">Loading medications...</p>
-                  </div>
-                ) : prescriptions.length === 0 ? (
-                  <div className="text-center py-6">
-                    <Pill className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-                    <p className="text-sm text-gray-600">No active medications</p>
-                    <p className="text-xs text-gray-500">Your prescribed medications will appear here</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {prescriptions.slice(0, 4).map((med) => (
-                      <div key={med.id} className="border rounded-lg p-4 bg-white hover:shadow-sm transition-shadow">
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="flex-1">
-                            <h4 className="font-medium text-base">{med.medication_name}</h4>
-                            <p className="text-sm text-gray-600">{med.dosage}</p>
-                          </div>
-                          <Badge className="bg-green-100 text-green-800">
-                            Active
-                          </Badge>
-                        </div>
-                        <div className="text-sm text-gray-600 space-y-1">
-                          <p><strong>Frequency:</strong> {formatFrequency(med.frequency)}</p>
-                          <p><strong>Duration:</strong> {med.duration}</p>
-                          <p className="text-xs text-gray-500 mt-2">
-                            Prescribed by {med.doctor_name}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {prescriptions.length > 4 && (
-                  <Button
-                    variant="outline"
-                    className="w-full mt-4"
-                    onClick={() => setActiveTab('medications')}
-                  >
-                    View All Medications ({prescriptions.length})
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="records" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Complete Medical Records</CardTitle>
-                    <CardDescription>All your medical history and test results</CardDescription>
-                  </div>
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    {/* Upload Documents Dialog */}
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button variant="outline" size="sm">
-                          <Upload className="w-4 h-4 mr-2" />
-                          Upload Documents
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                        <DialogHeader className="space-y-3 pb-6">
-                          <DialogTitle className="text-xl font-semibold text-gray-900">
-                            Upload Medical Documents
-                          </DialogTitle>
-                          <DialogDescription className="text-gray-600">
-                            Upload lab reports, prescriptions, or other medical documents you've received from healthcare providers
-                          </DialogDescription>
-                        </DialogHeader>
-
-                        <form className="space-y-8">
-                          {/* Document Information Section */}
-                          <div className="space-y-6">
-                            <div className="border-b border-gray-200 pb-4">
-                              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                                📋 Document Information
-                              </h3>
-                              <p className="text-sm text-gray-600">
-                                Provide details about the medical document you're uploading
-                              </p>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                              <div className="space-y-3">
-                                <Label htmlFor="doc-type" className="text-sm font-medium text-gray-700">
-                                  Document Type <span className="text-red-500">*</span>
-                                </Label>
-                                <Select>
-                                  <SelectTrigger id="doc-type" className="w-full h-11">
-                                    <SelectValue placeholder="Choose document type" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="lab-report">���� Lab Report</SelectItem>
-                                    <SelectItem value="prescription">💊 Prescription</SelectItem>
-                                    <SelectItem value="xray">📷 X-Ray/Scan</SelectItem>
-                                    <SelectItem value="discharge">📋 Discharge Summary</SelectItem>
-                                    <SelectItem value="vaccination">💉 Vaccination Record</SelectItem>
-                                    <SelectItem value="other">📄 Other Medical Document</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-
-                              <div className="space-y-3">
-                                <Label htmlFor="doc-date" className="text-sm font-medium text-gray-700">
-                                  Date of Test/Visit <span className="text-red-500">*</span>
-                                </Label>
-                                <Input
-                                  id="doc-date"
-                                  type="date"
-                                  className="w-full h-11"
-                                  max={new Date().toISOString().split('T')[0]}
-                                />
-                              </div>
-                            </div>
-
-                            <div className="space-y-3">
-                              <Label htmlFor="hospital-name" className="text-sm font-medium text-gray-700">
-                                Hospital/Lab/Clinic Name <span className="text-red-500">*</span>
-                              </Label>
-                              <Input
-                                id="hospital-name"
-                                placeholder="Enter the name of the healthcare facility"
-                                className="w-full h-11"
-                              />
-                            </div>
-                          </div>
-
-                          {/* File Upload Section */}
-                          <div className="space-y-6">
-                            <div className="border-b border-gray-200 pb-4">
-                              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                                📎 Upload Files
-                              </h3>
-                              <p className="text-sm text-gray-600">
-                                Select the documents you want to upload
-                              </p>
-                            </div>
-
-                            <div className="border-2 border-dashed border-primary/30 rounded-xl p-12 text-center hover:border-primary/50 transition-all duration-200 bg-primary/5">
-                              <div className="flex flex-col items-center space-y-4">
-                                <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
-                                  <Upload className="w-8 h-8 text-primary" />
-                                </div>
-                                <div className="space-y-2">
-                                  <p className="text-lg font-medium text-gray-900">
-                                    Drop files here or click to browse
-                                  </p>
-                                  <p className="text-sm text-gray-500 max-w-sm mx-auto">
-                                    Supported formats: PDF, JPG, JPEG, PNG • Maximum size: 10MB per file
-                                  </p>
-                                </div>
-                                <Button type="button" variant="outline" className="mt-4">
-                                  Choose Files
-                                </Button>
-                                <Input
-                                  type="file"
-                                  className="hidden"
-                                  multiple
-                                  accept=".pdf,.jpg,.jpeg,.png"
-                                  aria-label="Upload medical documents"
-                                />
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Additional Notes Section */}
-                          <div className="space-y-6">
-                            <div className="border-b border-gray-200 pb-4">
-                              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                                📝 Additional Information
-                              </h3>
-                              <p className="text-sm text-gray-600">
-                                Add any relevant notes or context (optional)
-                              </p>
-                            </div>
-
-                            <div className="space-y-3">
-                              <Label htmlFor="doc-notes" className="text-sm font-medium text-gray-700">
-                                Notes
-                              </Label>
-                              <Textarea
-                                id="doc-notes"
-                                placeholder="Add any relevant notes about this document, symptoms experienced, or additional context that might help your doctor..."
-                                className="min-h-[120px] resize-none"
-                              />
-                            </div>
-                          </div>
-
-                          {/* Submit Section */}
-                          <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200">
-                            <Button type="submit" className="flex-1 h-11">
-                              <Upload className="w-4 h-4 mr-2" />
-                              Upload Documents
-                            </Button>
-                            <Button type="button" variant="outline" className="flex-1 h-11">
-                              Cancel
-                            </Button>
-                          </div>
-                        </form>
-                      </DialogContent>
-                    </Dialog>
-                  </div>
-                </div>
-              </CardHeader>
-
-              <CardContent className="space-y-8">
-                {/* Doctor Records */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">
-                    👨‍⚕️ Doctor Records
-                  </h3>
-
-                  {/* Loading State */}
-                  {isLoadingMedicalRecords && (
-                    <div className="text-center py-8">
-                      <p className="text-gray-600">Loading your medical records...</p>
-                    </div>
-                  )}
-
-                  {/* Error State */}
-                  {medicalRecordsError && (
-                    <div className="text-center py-8">
-                      <p className="text-red-600">Error loading records: {medicalRecordsError}</p>
-                      <Button
-                        variant="outline"
-                        onClick={fetchMedicalRecords}
-                        className="mt-2"
-                      >
-                        Try Again
-                      </Button>
-                    </div>
-                  )}
-
-                  {/* No Records State */}
-                  {!isLoadingMedicalRecords && !medicalRecordsError && medicalRecords.length === 0 && (
-                    <div className="text-center py-12">
-                      <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                        <FileText className="w-8 h-8 text-gray-400" />
-                      </div>
-                      <p className="text-gray-600 font-medium">No medical records found</p>
-                      <p className="text-sm text-gray-500 mt-1">Your medical records will appear here when doctors add them.</p>
-                    </div>
-                  )}
-
-                  {/* Medical Records List */}
-                  {/* Medical Records List */}
-                  {!isLoadingMedicalRecords && !medicalRecordsError && medicalRecords.length > 0 && (
-                    <div className="space-y-4">
-                      <div className="max-h-96 overflow-y-auto space-y-4">
-                        {(showAllDoctorRecords ? medicalRecords : medicalRecords.slice(0, 3)).map((record) => (
-                          <div key={record.id} className="border rounded-lg p-6 bg-white hover:shadow-md transition-shadow">
-                            <div className="flex items-start justify-between mb-4">
-                              <div className="flex-1">
-                                <div className="flex items-center space-x-3 mb-3">
-                                  <h4 className="font-semibold text-lg">{formatExaminationType(record.examinationType)}</h4>
-                                  <Badge className={getStatusColor(getRecordStatus(record))}>
-                                    {getRecordStatus(record)}
-                                  </Badge>
-                                  <Badge variant="secondary" className="bg-blue-100 text-blue-800">Doctor Added</Badge>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600 mb-4">
-                                  <div className="space-y-1">
-                                    <p><span className="font-medium">Doctor:</span> {record.doctorName || `Dr. ${record.doctorId}`}</p>
-                                    <p><span className="font-medium">Specialization:</span> {record.doctorSpecialization || 'General Medicine'}</p>
-                                  </div>
-                                  <div className="space-y-1">
-                                    <p><span className="font-medium">Date:</span> {new Date(record.createdAt).toLocaleDateString()}</p>
-                                    {record.nextCheckupDate && (
-                                      <p><span className="font-medium">Next Checkup:</span> {new Date(record.nextCheckupDate).toLocaleDateString()}</p>
-                                    )}
-                                  </div>
-                                </div>
-
-                                <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                                  <p className="text-sm"><span className="font-medium">Diagnosis:</span> {record.diagnosis}</p>
-                                  {record.prescription && (
-                                    <p className="text-sm mt-2"><span className="font-medium">Prescription:</span> {record.prescription}</p>
-                                  )}
-                                  {record.additionalNotes && (
-                                    <p className="text-sm mt-2"><span className="font-medium">Notes:</span> {record.additionalNotes}</p>
-                                  )}
-                                </div>
-
-                                <div className="flex flex-wrap gap-2">
-                                  <Button variant="outline" size="sm">
-                                    <Download className="w-3 h-3 mr-1" />
-                                    Medical Report
-                                  </Button>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* View All / Show Less Button */}
-                      {medicalRecords.length > 3 && (
-                        <div className="text-center pt-4">
-                          <Button
-                            variant="outline"
-                            onClick={() => setShowAllDoctorRecords(!showAllDoctorRecords)}
-                          >
-                            {showAllDoctorRecords ? (
-                              <>
-                                Show Less
-                                <ChevronUp className="w-4 h-4 ml-2" />
-                              </>
-                            ) : (
-                              <>
-                                View All {medicalRecords.length} Records
-                                <ChevronDown className="w-4 h-4 ml-2" />
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-
-                </div>
-
-                {/* Patient Records */}
-                {/* Patient Records */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">
-                    📤 My Health Documents
-                  </h3>
-
-                  {/* Upload Form */}
-                  <Card className="bg-blue-50/50 border-blue-200">
-                    <CardHeader>
-                      <CardTitle className="text-lg">Upload Your Medical Document</CardTitle>
-                      <CardDescription>
-                        Upload lab reports, X-rays, prescriptions, or other medical documents
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <form onSubmit={handleDocumentUpload} className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {/* Document Type */}
-                          <div className="space-y-2">
-                            <Label htmlFor="doc-type">
-                              Document Type <span className="text-red-500">*</span>
-                            </Label>
-                            <Select
-                              value={documentForm.documentType}
-                              onValueChange={(value) => setDocumentForm({ ...documentForm, documentType: value })}
-                              required
-                            >
-                              <SelectTrigger id="doc-type">
-                                <SelectValue placeholder="Select type" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="lab_report">🧪 Lab Report</SelectItem>
-                                <SelectItem value="xray">📷 X-Ray/Scan</SelectItem>
-                                <SelectItem value="prescription">💊 Prescription</SelectItem>
-                                <SelectItem value="discharge_summary">📋 Discharge Summary</SelectItem>
-                                <SelectItem value="vaccination">💉 Vaccination Record</SelectItem>
-                                <SelectItem value="other">📄 Other Document</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-
-                          {/* Document Date */}
-                          <div className="space-y-2">
-                            <Label htmlFor="doc-date">
-                              Document Date <span className="text-red-500">*</span>
-                            </Label>
-                            <Input
-                              id="doc-date"
-                              type="date"
-                              value={documentForm.documentDate}
-                              onChange={(e) => setDocumentForm({ ...documentForm, documentDate: e.target.value })}
-                              max={new Date().toISOString().split('T')[0]}
-                              required
-                            />
-                          </div>
-                        </div>
-
-                        {/* Hospital Name */}
-                        <div className="space-y-2">
-                          <Label htmlFor="hospital">Hospital/Clinic Name (Optional)</Label>
-                          <Input
-                            id="hospital"
-                            placeholder="Enter hospital or clinic name"
-                            value={documentForm.hospitalName}
-                            onChange={(e) => setDocumentForm({ ...documentForm, hospitalName: e.target.value })}
-                          />
-                        </div>
-
-                        {/* File Upload */}
-                        <div className="space-y-2">
-                          <Label htmlFor="document-upload">
-                            Upload File <span className="text-red-500">*</span>
-                          </Label>
-                          <div className="flex items-center space-x-2">
-                            <Input
-                              id="document-upload"
-                              type="file"
-                              accept=".pdf,.jpg,.jpeg,.png,.gif"
-                              onChange={handleFileSelect}
-                              required
-                              className="flex-1"
-                            />
-                            {selectedFile && (
-                              <Badge variant="secondary">
-                                {selectedFile.name}
-                              </Badge>
-                            )}
-                          </div>
-                          <p className="text-xs text-gray-500">
-                            Supported: PDF, JPG, PNG, GIF (Max 10MB)
-                          </p>
-                        </div>
-
-                        {/* Notes */}
-                        <div className="space-y-2">
-                          <Label htmlFor="doc-notes">Additional Notes (Optional)</Label>
-                          <Textarea
-                            id="doc-notes"
-                            placeholder="Add any relevant notes..."
-                            value={documentForm.notes}
-                            onChange={(e) => setDocumentForm({ ...documentForm, notes: e.target.value })}
-                            rows={3}
-                          />
-                        </div>
-
-                        {/* Submit Button */}
-                        <Button
-                          type="submit"
-                          className="w-full"
-                          disabled={uploadingDocument}
+                      recentRecords.slice(0, 3).map((record) => (
+                        <div
+                          key={record.id}
+                          className="
+    relative
+    border rounded-lg
+    px-4 py-3
+    bg-white
+    hover:bg-muted/30
+    transition
+  "
                         >
-                          {uploadingDocument ? (
-                            <>
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              Uploading...
-                            </>
-                          ) : (
-                            <>
-                              <Upload className="w-4 h-4 mr-2" />
-                              Upload Document
-                            </>
-                          )}
-                        </Button>
-                      </form>
-                    </CardContent>
-                  </Card>
-
-                  {/* Uploaded Documents List */}
-                  <div className="space-y-3">
-                    <h4 className="font-medium text-gray-700">Your Uploaded Documents ({patientDocuments.length})</h4>
-
-                    {isLoadingDocuments ? (
-                      <div className="text-center py-6">
-                        <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
-                        <p className="text-sm text-gray-500 mt-2">Loading documents...</p>
-                      </div>
-                    ) : patientDocuments.length === 0 ? (
-                      <div className="text-center py-8 border-2 border-dashed rounded-lg">
-                        <FileText className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-                        <p className="text-gray-500">No documents uploaded yet</p>
-                        <p className="text-sm text-gray-400">Upload your first medical document above</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-3 max-h-96 overflow-y-auto">
-                        {patientDocuments.map((doc) => (
-                          <div key={doc.id} className="border border-green-200 rounded-lg p-4 bg-green-50/50 hover:shadow-md transition-shadow">
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center space-x-2 mb-2">
-                                  <h4 className="font-semibold">{formatDocumentType(doc.document_type)}</h4>
-                                  <Badge className="bg-green-100 text-green-800">Self-Uploaded</Badge>
-                                </div>
-                                <p className="text-sm text-gray-600 mb-1">
-                                  <strong>File:</strong> {doc.document_name}
-                                </p>
-                                <p className="text-sm text-gray-600 mb-1">
-                                  <strong>Date:</strong> {new Date(doc.document_date).toLocaleDateString()}
-                                </p>
-                                {doc.hospital_name && (
-                                  <p className="text-sm text-gray-600 mb-1">
-                                    <strong>Hospital:</strong> {doc.hospital_name}
-                                  </p>
-                                )}
-                                {doc.notes && (
-                                  <p className="text-sm text-gray-500 mt-2 italic">{doc.notes}</p>
-                                )}
-                                <p className="text-xs text-gray-400 mt-2">
-                                  Uploaded: {new Date(doc.uploaded_at).toLocaleDateString()}
-                                </p>
+                          {/* Top row */}
+                          <div className="flex items-start justify-between gap-3">
+                            {/* LEFT — text container (CRITICAL FIX) */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h4 className="font-semibold text-base truncate">
+                                  {record.type}
+                                </h4>
+                                <Badge className={getStatusColor(record.status)}>
+                                  {record.status}
+                                </Badge>
                               </div>
 
-                              <div className="flex flex-col space-y-2 ml-4">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => window.open(doc.file_path, '_blank')}
-                                >
-                                  <Download className="w-3 h-3 mr-1" />
-                                  View
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleDeleteDocument(doc.id, doc.document_name)}
-                                  className="text-red-600 hover:bg-red-50"
-                                >
-                                  <X className="w-3 h-3 mr-1" />
-                                  Delete
-                                </Button>
-                              </div>
+                              <p className="text-sm text-gray-600 truncate">
+                                {record.doctor} • {record.currentHospital}
+                              </p>
+
+                              <p className="text-sm text-gray-800 mt-1 line-clamp-2">
+                                {record.diagnosis}
+                              </p>
+                            </div>
+
+                            {/* RIGHT — date (FIXED WIDTH) */}
+                            <div className="text-sm text-gray-500 shrink-0 whitespace-nowrap">
+                              {new Date(record.date).toLocaleDateString()}
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
 
-          <TabsContent value="appointments" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Upcoming Appointments</CardTitle>
-                  <CardDescription>Your scheduled visits</CardDescription>
-                </CardHeader>
+                          {/* Bottom row */}
+                          {record.nextCheckup && (
+                            <p className="mt-2 text-sm text-primary font-medium">
+                              Next checkup:{" "}
+                              {new Date(record.nextCheckup).toLocaleDateString()}
+                            </p>
+                          )}
+                        </div>
+
+                      )
+
+                      )
+                    ) : (
+                      <div className="text-center py-4 text-gray-500">No recent records available</div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Upcoming Appointments */}
                 <CardContent className="max-h-60 overflow-y-auto">
                   {isLoadingAppointments ? (
-                    <div className="text-center py-8">
-                      <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2 text-primary" />
-                      <p className="text-sm text-gray-600">Loading appointments...</p>
+                    <div className="text-center py-6">
+                      <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
+                      <p className="text-xs text-gray-500 mt-2">Loading appointments...</p>
                     </div>
                   ) : upcomingAppointments.length === 0 ? (
-                    <div className="text-center py-8">
-                      <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                      <h3 className="font-medium text-gray-800 mb-2">No Upcoming Appointments</h3>
-                      <p className="text-sm text-gray-600 mb-4">You don't have any scheduled appointments.</p>
+                    <div className="text-center py-6">
+                      <Calendar className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                      <p className="text-sm text-gray-600 mb-3">No upcoming appointments</p>
                       <Button
                         size="sm"
                         onClick={() => setIsAppointmentDialogOpen(true)}
@@ -2190,417 +1607,1068 @@ export default function PatientDashboard() {
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      {upcomingAppointments.map((appointment) => (
-                        <div key={appointment.id} className="border rounded-lg p-4 bg-white hover:shadow-md transition-shadow">
-                          <div className="flex items-center justify-between mb-3">
+                      {upcomingAppointments.slice(0, 3).map((appointment) => (
+                        <div key={appointment.id} className="border rounded-lg p-4 bg-white hover:shadow-sm transition-shadow">
+                          <div className="flex items-center justify-between">
                             <div className="flex-1">
-                              <div className="flex items-center space-x-2 mb-2">
-                                <h4 className="font-medium">{appointment.appointment_type}</h4>
-                                <Badge variant={getAppointmentStatusBadge(appointment.status)}>
-                                  {getStatusLabel(appointment.status)}
-                                </Badge>
-                              </div>
-                              <p className="text-sm text-gray-600 flex items-center mt-1">
-                                <Stethoscope className="w-4 h-4 mr-1" />
-                                {appointment.doctor_name}
-                              </p>
-                              <p className="text-sm text-gray-600 flex items-center mt-1">
-                                <MapPin className="w-4 h-4 mr-1" />
-                                {appointment.current_hospital}
-                              </p>
-                              <p className="text-sm text-gray-600 flex items-center mt-1">
-                                <Clock className="w-4 h-4 mr-1" />
+                              <h4 className="font-medium">{appointment.appointment_type}</h4>
+                              <p className="text-sm text-gray-600">{appointment.doctor_name}</p>
+                              <p className="text-sm text-gray-600">{appointment.current_hospital}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-medium">
                                 {new Date(appointment.appointment_date).toLocaleDateString('en-IN', {
-                                  weekday: 'short',
-                                  year: 'numeric',
                                   month: 'short',
                                   day: 'numeric'
-                                })} at {appointment.appointment_time}
+                                })}
                               </p>
-                              {appointment.reason && (
-                                <p className="text-xs text-gray-500 mt-2 italic">
-                                  Reason: {appointment.reason}
+                              <p className="text-sm text-gray-500">{appointment.appointment_time}</p>
+                              <Badge
+                                variant={getAppointmentStatusBadge(appointment.status)}
+                                className="mt-1"
+                              >
+                                {getStatusLabel(appointment.status)}
+                              </Badge>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+
+                      {upcomingAppointments.length > 3 && (
+                        <p className="text-xs text-center text-gray-500 pt-2">
+                          +{upcomingAppointments.length - 3} more appointments
+                        </p>
+                      )}
+
+                      <Button
+                        className="w-full mt-3"
+                        variant="outline"
+                        onClick={() => setActiveTab('appointments')}
+                      >
+                        View All Appointments
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </div>
+
+              {/* Active Medications */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Pill className="w-5 h-5 mr-2" />
+                    Active Medications
+                  </CardTitle>
+                  <CardDescription>Current medications and reminders</CardDescription>
+                </CardHeader>
+                <CardContent className="max-h-60 overflow-y-auto">
+                  {isLoadingPrescriptions ? (
+                    <div className="text-center py-6">
+                      <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
+                      <p className="text-xs text-gray-500 mt-2">Loading medications...</p>
+                    </div>
+                  ) : prescriptions.length === 0 ? (
+                    <div className="text-center py-6">
+                      <Pill className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                      <p className="text-sm text-gray-600">No active medications</p>
+                      <p className="text-xs text-gray-500">Your prescribed medications will appear here</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {prescriptions.slice(0, 4).map((med) => (
+                        <div
+                          key={med.id}
+                          className="
+                                    border rounded-md px-3 py-2
+                                    bg-white
+                                    flex items-center justify-between
+                                    hover:bg-muted/40 transition
+                                   "
+                        >
+                          {/* Left: Medication info */}
+                          <div className="flex-1">
+                            <p className="font-medium text-sm text-gray-900 leading-tight">
+                              {med.medication_name}
+                            </p>
+                            <p className="text-sm text-gray-600">
+                              {med.dosage} • {formatFrequency(med.frequency)}
+                            </p>
+                          </div>
+
+                          {/* Right: Status */}
+                          <Badge className="bg-green-100 text-green-800 text-xs px-2 py-0.5">
+                            Active
+                          </Badge>
+                        </div>
+                      ))}
+
+                    </div>
+                  )}
+
+                  {prescriptions.length > 4 && (
+                    <Button
+                      variant="outline"
+                      className="w-full mt-4"
+                      onClick={() => setActiveTab('medications')}
+                    >
+                      View All Medications ({prescriptions.length})
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="records" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Complete Medical Records</CardTitle>
+                      <CardDescription>All your medical history and test results</CardDescription>
+                    </div>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      {/* Upload Documents Dialog */}
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" size="sm">
+                            <Upload className="w-4 h-4 mr-2" />
+                            Upload Documents
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                          <DialogHeader className="space-y-3 pb-6">
+                            <DialogTitle className="text-xl font-semibold text-gray-900">
+                              Upload Medical Documents
+                            </DialogTitle>
+                            <DialogDescription className="text-gray-600">
+                              Upload lab reports, prescriptions, or other medical documents you've received from healthcare providers
+                            </DialogDescription>
+                          </DialogHeader>
+
+                          <form className="space-y-8">
+                            {/* Document Information Section */}
+                            <div className="space-y-6">
+                              <div className="border-b border-gray-200 pb-4">
+                                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                                  📋 Document Information
+                                </h3>
+                                <p className="text-sm text-gray-600">
+                                  Provide details about the medical document you're uploading
+                                </p>
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-3">
+                                  <Label htmlFor="doc-type" className="text-sm font-medium text-gray-700">
+                                    Document Type <span className="text-red-500">*</span>
+                                  </Label>
+                                  <Select>
+                                    <SelectTrigger id="doc-type" className="w-full h-11">
+                                      <SelectValue placeholder="Choose document type" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="lab-report">🧪 Lab Report</SelectItem>
+                                      <SelectItem value="prescription">💊 Prescription</SelectItem>
+                                      <SelectItem value="xray">📷 X-Ray/Scan</SelectItem>
+                                      <SelectItem value="discharge">📋 Discharge Summary</SelectItem>
+                                      <SelectItem value="vaccination">💉 Vaccination Record</SelectItem>
+                                      <SelectItem value="other">📄 Other Medical Document</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+
+                                <div className="space-y-3">
+                                  <Label htmlFor="doc-date" className="text-sm font-medium text-gray-700">
+                                    Date of Test/Visit <span className="text-red-500">*</span>
+                                  </Label>
+                                  <Input
+                                    id="doc-date"
+                                    type="date"
+                                    className="w-full h-11"
+                                    max={new Date().toISOString().split('T')[0]}
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="space-y-3">
+                                <Label htmlFor="hospital-name" className="text-sm font-medium text-gray-700">
+                                  Hospital/Lab/Clinic Name <span className="text-red-500">*</span>
+                                </Label>
+                                <Input
+                                  id="hospital-name"
+                                  placeholder="Enter the name of the healthcare facility"
+                                  className="w-full h-11"
+                                />
+                              </div>
+                            </div>
+
+                            {/* File Upload Section */}
+                            <div className="space-y-6">
+                              <div className="border-b border-gray-200 pb-4">
+                                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                                  📎 Upload Files
+                                </h3>
+                                <p className="text-sm text-gray-600">
+                                  Select the documents you want to upload
+                                </p>
+                              </div>
+
+                              <div className="border-2 border-dashed border-primary/30 rounded-xl p-8 text-center hover:border-primary/50 transition-all duration-200 bg-primary/5">
+                                <div className="flex flex-col items-center space-y-4">
+                                  <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
+                                    <Upload className="w-8 h-8 text-primary" />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <p className="text-lg font-medium text-gray-900">
+                                      Drop files here or click to browse
+                                    </p>
+                                    <p className="text-sm text-gray-500 max-w-sm mx-auto">
+                                      Supported formats: PDF, JPG, JPEG, PNG • Maximum size: 10MB per file
+                                    </p>
+                                  </div>
+                                  <Button type="button" variant="outline" className="mt-4">
+                                    Choose Files
+                                  </Button>
+                                  <Input
+                                    type="file"
+                                    className="hidden"
+                                    multiple
+                                    accept=".pdf,.jpg,.jpeg,.png"
+                                    aria-label="Upload medical documents"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Additional Notes Section */}
+                            <div className="space-y-6">
+                              <div className="border-b border-gray-200 pb-4">
+                                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                                  📝 Additional Information
+                                </h3>
+                                <p className="text-sm text-gray-600">
+                                  Add any relevant notes or context (optional)
+                                </p>
+                              </div>
+
+                              <div className="space-y-3">
+                                <Label htmlFor="doc-notes" className="text-sm font-medium text-gray-700">
+                                  Notes
+                                </Label>
+                                <Textarea
+                                  id="doc-notes"
+                                  placeholder="Add any relevant notes about this document, symptoms experienced, or additional context that might help your doctor..."
+                                  className="min-h-[120px] resize-none"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Submit Section */}
+                            <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200">
+                              <Button type="submit" className="flex-1 h-11">
+                                <Upload className="w-4 h-4 mr-2" />
+                                Upload Documents
+                              </Button>
+                              <Button type="button" variant="outline" className="flex-1 h-11">
+                                Cancel
+                              </Button>
+                            </div>
+                          </form>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+
+                <CardContent className="space-y-8">
+                  {/* Doctor Records */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">
+                      👨‍⚕️ Doctor Records
+                    </h3>
+
+                    {/* Loading State */}
+                    {isLoadingMedicalRecords && (
+                      <div className="text-center py-8">
+                        <p className="text-gray-600">Loading your medical records...</p>
+                      </div>
+                    )}
+
+                    {/* Error State */}
+                    {medicalRecordsError && (
+                      <div className="text-center py-8">
+                        <p className="text-red-600">Error loading records: {medicalRecordsError}</p>
+                        <Button
+                          variant="outline"
+                          onClick={fetchMedicalRecords}
+                          className="mt-2"
+                        >
+                          Try Again
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* No Records State */}
+                    {!isLoadingMedicalRecords && !medicalRecordsError && medicalRecords.length === 0 && (
+                      <div className="text-center py-12">
+                        <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                          <FileText className="w-8 h-8 text-gray-400" />
+                        </div>
+                        <p className="text-gray-600 font-medium">No medical records found</p>
+                        <p className="text-sm text-gray-500 mt-1">Your medical records will appear here when doctors add them.</p>
+                      </div>
+                    )}
+
+                    {/* Medical Records List */}
+                    {/* Medical Records List */}
+                    {!isLoadingMedicalRecords && !medicalRecordsError && medicalRecords.length > 0 && (
+                      <div className="space-y-4">
+                        <div className="max-h-96 overflow-y-auto space-y-4">
+                          {(showAllDoctorRecords ? medicalRecords : medicalRecords.slice(0, 3)).map((record) => (
+                            <div key={record.id} className="border rounded-lg p-4 bg-white hover:shadow-sm transition-shadow">
+
+                              <div className="flex items-start justify-between mb-4">
+                                <div className="flex-1">
+                                  <div className="flex items-center space-x-3 mb-3">
+                                    <h4 className="font-semibold text-lg">{formatExaminationType(record.examinationType)}</h4>
+                                    <Badge className={getStatusColor(getRecordStatus(record))}>
+                                      {getRecordStatus(record)}
+                                    </Badge>
+                                    <Badge variant="secondary" className="bg-blue-100 text-blue-800">Doctor Added</Badge>
+                                  </div>
+
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600 mb-4">
+                                    <div className="space-y-1">
+                                      <p><span className="font-medium">Doctor:</span> {record.doctorName || `Dr. ${record.doctorId}`}</p>
+                                      <p><span className="font-medium">Specialization:</span> {record.doctorSpecialization || 'General Medicine'}</p>
+                                    </div>
+                                    <div className="space-y-1">
+                                      <p><span className="font-medium">Date:</span> {new Date(record.createdAt).toLocaleDateString()}</p>
+                                      {record.nextCheckupDate && (
+                                        <p><span className="font-medium">Next Checkup:</span> {new Date(record.nextCheckupDate).toLocaleDateString()}</p>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                                    <p className="text-sm"><span className="font-medium">Diagnosis:</span> {record.diagnosis}</p>
+                                    {record.prescription && (
+                                      <p className="text-sm mt-2"><span className="font-medium">Prescription:</span> {record.prescription}</p>
+                                    )}
+                                    {record.additionalNotes && (
+                                      <p className="text-sm mt-2"><span className="font-medium">Notes:</span> {record.additionalNotes}</p>
+                                    )}
+                                  </div>
+
+                                  <div className="flex flex-wrap gap-2">
+                                    <Button variant="outline" size="sm">
+                                      <Download className="w-3 h-3 mr-1" />
+                                      Medical Report
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* View All / Show Less Button */}
+                        {medicalRecords.length > 3 && (
+                          <div className="text-center pt-4">
+                            <Button
+                              variant="outline"
+                              onClick={() => setShowAllDoctorRecords(!showAllDoctorRecords)}
+                            >
+                              {showAllDoctorRecords ? (
+                                <>
+                                  Show Less
+                                  <ChevronUp className="w-4 h-4 ml-2" />
+                                </>
+                              ) : (
+                                <>
+                                  View All {medicalRecords.length} Records
+                                  <ChevronDown className="w-4 h-4 ml-2" />
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+
+                  </div>
+
+                  {/* Patient Records */}
+                  {/* Patient Records */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">
+                      📤 My Health Documents
+                    </h3>
+
+                    {/* Upload Form */}
+                    <Card className="bg-blue-50/50 border-blue-200">
+                      <CardHeader>
+                        <CardTitle className="text-lg">Upload Your Medical Document</CardTitle>
+                        <CardDescription>
+                          Upload lab reports, X-rays, prescriptions, or other medical documents
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <form onSubmit={handleDocumentUpload} className="space-y-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Document Type */}
+                            <div className="space-y-2">
+                              <Label htmlFor="doc-type">
+                                Document Type <span className="text-red-500">*</span>
+                              </Label>
+                              <Select
+                                value={documentForm.documentType}
+                                onValueChange={(value) => setDocumentForm({ ...documentForm, documentType: value })}
+                                required
+                              >
+                                <SelectTrigger id="doc-type">
+                                  <SelectValue placeholder="Select type" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="lab_report">🧪 Lab Report</SelectItem>
+                                  <SelectItem value="xray">📷 X-Ray/Scan</SelectItem>
+                                  <SelectItem value="prescription">💊 Prescription</SelectItem>
+                                  <SelectItem value="discharge_summary">📋 Discharge Summary</SelectItem>
+                                  <SelectItem value="vaccination">💉 Vaccination Record</SelectItem>
+                                  <SelectItem value="other">📄 Other Document</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            {/* Document Date */}
+                            <div className="space-y-2">
+                              <Label htmlFor="doc-date">
+                                Document Date <span className="text-red-500">*</span>
+                              </Label>
+                              <Input
+                                id="doc-date"
+                                type="date"
+                                value={documentForm.documentDate}
+                                onChange={(e) => setDocumentForm({ ...documentForm, documentDate: e.target.value })}
+                                max={new Date().toISOString().split('T')[0]}
+                                required
+                              />
+                            </div>
+                          </div>
+
+                          {/* Hospital Name */}
+                          <div className="space-y-2">
+                            <Label htmlFor="hospital">Hospital/Clinic Name (Optional)</Label>
+                            <Input
+                              id="hospital"
+                              placeholder="Enter hospital or clinic name"
+                              value={documentForm.hospitalName}
+                              onChange={(e) => setDocumentForm({ ...documentForm, hospitalName: e.target.value })}
+                            />
+                          </div>
+
+                          {/* File Upload */}
+                          <div className="space-y-2">
+                            <Label htmlFor="document-upload">
+                              Upload File <span className="text-red-500">*</span>
+                            </Label>
+                            <div className="flex items-center space-x-2">
+                              <Input
+                                id="document-upload"
+                                type="file"
+                                accept=".pdf,.jpg,.jpeg,.png,.gif"
+                                onChange={handleFileSelect}
+                                required
+                                className="flex-1"
+                              />
+                              {selectedFile && (
+                                <Badge variant="secondary">
+                                  {selectedFile.name}
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-500">
+                              Supported: PDF, JPG, PNG, GIF (Max 10MB)
+                            </p>
+                          </div>
+
+                          {/* Notes */}
+                          <div className="space-y-2">
+                            <Label htmlFor="doc-notes">Additional Notes (Optional)</Label>
+                            <Textarea
+                              id="doc-notes"
+                              placeholder="Add any relevant notes..."
+                              value={documentForm.notes}
+                              onChange={(e) => setDocumentForm({ ...documentForm, notes: e.target.value })}
+                              rows={3}
+                            />
+                          </div>
+
+                          {/* Submit Button */}
+                          <Button
+                            type="submit"
+                            className="w-full"
+                            disabled={uploadingDocument}
+                          >
+                            {uploadingDocument ? (
+                              <>
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                Uploading...
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="w-4 h-4 mr-2" />
+                                Upload Document
+                              </>
+                            )}
+                          </Button>
+                        </form>
+                      </CardContent>
+                    </Card>
+
+                    {/* Uploaded Documents List */}
+                    <div className="space-y-3">
+                      <h4 className="font-medium text-gray-700">Your Uploaded Documents ({patientDocuments.length})</h4>
+
+                      {isLoadingDocuments ? (
+                        <div className="text-center py-6">
+                          <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
+                          <p className="text-sm text-gray-500 mt-2">Loading documents...</p>
+                        </div>
+                      ) : patientDocuments.length === 0 ? (
+                        <div className="text-center py-8 border-2 border-dashed rounded-lg">
+                          <FileText className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                          <p className="text-gray-500">No documents uploaded yet</p>
+                          <p className="text-sm text-gray-400">Upload your first medical document above</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3 max-h-96 overflow-y-auto">
+                          {patientDocuments.map((doc) => (
+                            <div key={doc.id} className="border border-green-200 rounded-lg p-4 bg-green-50/50 hover:shadow-md transition-shadow">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center space-x-2 mb-2">
+                                    <h4 className="font-semibold">{formatDocumentType(doc.document_type)}</h4>
+                                    <Badge className="bg-green-100 text-green-800">Self-Uploaded</Badge>
+                                  </div>
+                                  <p className="text-sm text-gray-600 mb-1">
+                                    <strong>File:</strong> {doc.document_name}
+                                  </p>
+                                  <p className="text-sm text-gray-600 mb-1">
+                                    <strong>Date:</strong> {new Date(doc.document_date).toLocaleDateString()}
+                                  </p>
+                                  {doc.hospital_name && (
+                                    <p className="text-sm text-gray-600 mb-1">
+                                      <strong>Hospital:</strong> {doc.hospital_name}
+                                    </p>
+                                  )}
+                                  {doc.notes && (
+                                    <p className="text-sm text-gray-500 mt-2 italic">{doc.notes}</p>
+                                  )}
+                                  <p className="text-xs text-gray-400 mt-2">
+                                    Uploaded: {new Date(doc.uploaded_at).toLocaleDateString()}
+                                  </p>
+                                </div>
+
+                                <div className="flex flex-col space-y-2 ml-4">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      const viewUrl = doc.file_path.replace('/image/upload/', '/raw/upload/');
+                                      window.open(viewUrl, '_blank');
+                                    }}
+                                  >
+                                    <Download className="w-3 h-3 mr-1" />
+                                    View
+                                  </Button>
+
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleDeleteDocument(doc.id, doc.document_name)}
+                                    className="text-red-600 hover:bg-red-50"
+                                  >
+                                    <X className="w-3 h-3 mr-1" />
+                                    Delete
+                                  </Button>
+                                </div>
+
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="appointments" className="space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Upcoming Appointments</CardTitle>
+                    <CardDescription>Your scheduled visits</CardDescription>
+                  </CardHeader>
+                  <CardContent className="max-h-60 overflow-y-auto">
+                    {isLoadingAppointments ? (
+                      <div className="text-center py-8">
+                        <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2 text-primary" />
+                        <p className="text-sm text-gray-600">Loading appointments...</p>
+                      </div>
+                    ) : upcomingAppointments.length === 0 ? (
+                      <div className="text-center py-8">
+                        <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                        <h3 className="font-medium text-gray-800 mb-2">No Upcoming Appointments</h3>
+                        <p className="text-sm text-gray-600 mb-4">You don't have any scheduled appointments.</p>
+                        <Button
+                          size="sm"
+                          onClick={() => setIsAppointmentDialogOpen(true)}
+                        >
+                          <Plus className="w-4 h-4 mr-2" />
+                          Book Appointment
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {upcomingAppointments.map((appointment) => (
+                          <div key={appointment.id} className="border rounded-lg p-4 bg-white hover:shadow-md transition-shadow">
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex-1">
+                                <div className="flex items-center space-x-2 mb-2">
+                                  <h4 className="font-medium">{appointment.appointment_type}</h4>
+                                  <Badge variant={getAppointmentStatusBadge(appointment.status)}>
+                                    {getStatusLabel(appointment.status)}
+                                  </Badge>
+                                </div>
+                                <p className="text-sm text-gray-600 flex items-center mt-1">
+                                  <Stethoscope className="w-4 h-4 mr-1" />
+                                  {appointment.doctor_name}
+                                </p>
+                                <p className="text-sm text-gray-600 flex items-center mt-1">
+                                  <MapPin className="w-4 h-4 mr-1" />
+                                  {appointment.current_hospital}
+                                </p>
+                                <p className="text-sm text-gray-600 flex items-center mt-1">
+                                  <Clock className="w-4 h-4 mr-1" />
+                                  {new Date(appointment.appointment_date).toLocaleDateString('en-IN', {
+                                    weekday: 'short',
+                                    year: 'numeric',
+                                    month: 'short',
+                                    day: 'numeric'
+                                  })} at {appointment.appointment_time}
+                                </p>
+                                {appointment.reason && (
+                                  <p className="text-xs text-gray-500 mt-2 italic">
+                                    Reason: {appointment.reason}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex space-x-2">
+                              {appointment.status === 'pending' || appointment.status === 'confirmed' ? (
+                                <>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled
+                                    className="opacity-50 cursor-not-allowed"
+                                  >
+                                    Reschedule
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleCancelAppointment(appointment.id)}
+                                  >
+                                    Cancel
+                                  </Button>
+                                </>
+                              ) : (
+                                <p className="text-xs text-gray-500">
+                                  {appointment.status === 'cancelled' && 'This appointment was cancelled'}
+                                  {appointment.status === 'completed' && 'This appointment is completed'}
                                 </p>
                               )}
                             </div>
                           </div>
-                          <div className="flex space-x-2">
-                            {appointment.status === 'pending' || appointment.status === 'confirmed' ? (
-                              <>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  disabled
-                                  className="opacity-50 cursor-not-allowed"
-                                >
-                                  Reschedule
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleCancelAppointment(appointment.id)}
-                                >
-                                  Cancel
-                                </Button>
-                              </>
-                            ) : (
-                              <p className="text-xs text-gray-500">
-                                {appointment.status === 'cancelled' && 'This appointment was cancelled'}
-                                {appointment.status === 'completed' && 'This appointment is completed'}
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Book New Appointment</CardTitle>
+                    <CardDescription>Schedule your next visit</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-4">
+                      <Button
+                        className="w-full justify-start"
+                        variant="outline"
+                        onClick={() => openAppointmentDialog('General Checkup')}
+                      >
+                        <Calendar className="w-4 h-4 mr-2" />
+                        General Checkup
+                      </Button>
+                      <Button
+                        className="w-full justify-start"
+                        variant="outline"
+                        onClick={() => openAppointmentDialog('Lab Tests')}
+                      >
+                        <TestTube className="w-4 h-4 mr-2" />
+                        Lab Tests
+                      </Button>
+                      <Button
+                        className="w-full justify-start"
+                        variant="outline"
+                        onClick={() => openAppointmentDialog('Specialist Consultation')}
+                      >
+                        <Heart className="w-4 h-4 mr-2" />
+                        Specialist Consultation
+                      </Button>
+                      <Button
+                        className="w-full justify-start"
+                        variant="outline"
+                        onClick={() => openAppointmentDialog('Follow-up Visit')}
+                      >
+                        <Clipboard className="w-4 h-4 mr-2" />
+                        Follow-up Visit
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+
+
+
+              </div>
+            </TabsContent>
+
+            <TabsContent value="medications" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Current Medications</CardTitle>
+                  <CardDescription>Manage your active prescriptions</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {isLoadingPrescriptions ? (
+                    <div className="text-center py-8">
+                      <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary mb-2" />
+                      <p className="text-gray-600">Loading your medications...</p>
+                    </div>
+                  ) : prescriptions.length === 0 ? (
+                    <div className="text-center py-12">
+                      <Pill className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                      <h3 className="font-medium text-gray-800 mb-2">No Active Medications</h3>
+                      <p className="text-sm text-gray-600">
+                        Your prescribed medications will appear here when doctors add them
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {prescriptions.map((med) => (
+                        <div
+                          key={med.id}
+                          className="border rounded-lg p-4 bg-white hover:shadow-sm transition"
+                        >
+                          {/* Header */}
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h4 className="font-semibold text-base flex items-center gap-2">
+                                <Pill className="w-4 h-4 text-primary" />
+                                {med.medication_name}
+                              </h4>
+                              <p className="text-sm text-gray-600 mt-1">
+                                {med.dosage} · {formatFrequency(med.frequency)}
                               </p>
-                            )}
+                            </div>
+
+                            <Badge className="bg-green-100 text-green-800 text-xs px-3 py-1">
+                              {med.status === "active" ? "Active" : med.status}
+                            </Badge>
                           </div>
+
+                          {/* Meta info */}
+                          <div className="flex flex-wrap gap-4 text-xs text-gray-500 mt-3">
+                            <span>🗓 {med.duration}</span>
+                            <span>👨‍⚕️ {med.doctor_name}</span>
+                            <span>
+                              📅 Started{" "}
+                              {new Date(med.start_date).toLocaleDateString("en-IN", {
+                                day: "numeric",
+                                month: "short",
+                              })}
+                            </span>
+                          </div>
+
+                          {/* Instructions (compact) */}
+                          {med.instructions && (
+                            <div className="mt-3 bg-blue-50 rounded-md p-3 text-sm text-blue-800">
+                              <span className="font-medium">Instructions:</span>{" "}
+                              {med.instructions}
+                            </div>
+                          )}
                         </div>
-                      ))}
+                      )
+
+
+                      )}
                     </div>
                   )}
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            {/* <TabsContent value="map">
+              <NearbyHospitalsMap
+                linkedDoctor={linkedDoctors[0] ? {
+                  id: linkedDoctors[0].id,
+                  name: linkedDoctors[0].name,
+                  specialization: linkedDoctors[0].specialization,
+                  hospital: linkedDoctors[0].hospital,
+                  latitude: 19.0760, // TODO: Get from database
+                  longitude: 72.8777
+                } : undefined}
+              />
+            </TabsContent> */}
+            <TabsContent value="wallet">
+              <div></div>
+
+              {patientData?.id && (
+                <WalletCard patientId={patientData.id} />
+              )}
+              {patientData?.id && (
+                <VideoConsultationBooking patientId={patientData?.id} />
+              )}
+
+            </TabsContent>
+
+            <TabsContent value="profile" className="space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Personal Information</CardTitle>
+                    <CardDescription>Your basic details and contact information</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+
+                    <Button className="w-full">Edit Profile</Button>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Address & Emergency Contact</CardTitle>
+                    <CardDescription>Your location and emergency information</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-3">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">Address</p>
+                        <p className="text-sm">{/*patientData.address*/}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">Emergency Contact</p>
+                        <p className="text-sm">{/*patientData.emergencyContact*/}</p>
+                      </div>
+                    </div>
+
+                    {/* 👨‍⚕️ Select Doctors */}
+                    <div className="space-y-3">
+                      <Label htmlFor="select-doctor" className="text-sm font-medium text-gray-700">
+                        Select Doctor
+                      </Label>
+
+                      {/* Show current doctor if linked */}
+                      {linkedDoctors.length > 0 && (
+                        <div className="bg-blue-50 p-3 rounded-lg mb-3">
+                          <p className="text-sm font-medium text-blue-800">Current Doctor:</p>
+                          <p className="text-sm text-blue-700">
+                            {linkedDoctors[0].name} - {linkedDoctors[0].specialization}
+                          </p>
+                          <p className="text-xs text-blue-600">
+                            Linked since: {new Date(linkedDoctors[0].linkedDate).toLocaleDateString()}
+                          </p>
+                        </div>
+                      )}
+
+                      <div className="flex space-x-2">
+                        <Select value={selectedDoctor} onValueChange={setSelectedDoctor}>
+                          <SelectTrigger id="select-doctor" className="flex-1 h-11">
+                            <SelectValue placeholder="Choose a doctor" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {isLoadingAvailableDoctors ? (
+                              <SelectItem value="" disabled>Loading doctors...</SelectItem>
+                            ) : doctorsList.length > 0 ? (
+                              <>
+                                {/* {console.log('🎯 Rendering doctors in dropdown:', doctorsList)} */}
+                                {doctorsList.map((doctor) => (
+                                  <SelectItem key={doctor.id} value={doctor.id}>
+                                    {doctor.name} - {doctor.specialization}
+                                  </SelectItem>
+                                ))}
+                              </>
+                            ) : (
+                              <>
+                                {/* {console.log('⚠️ No doctors in doctorsList state, length:', doctorsList.length)} */}
+                                <SelectItem value="" disabled>No doctors available</SelectItem>
+                              </>
+                            )}
+                          </SelectContent>
+                        </Select>
+                        {selectedDoctor && (
+                          <Button
+                            onClick={() => handleDoctorSelection(selectedDoctor)}
+                            className="h-11 px-4"
+                          >
+                            Update
+                          </Button>
+                        )}
+                      </div>
+                      {selectedDoctor && (
+                        <p className="text-xs text-gray-500">
+                          Click Update to change your doctor
+                        </p>
+                      )}
+                    </div>
 
 
-
+                    <div className="pt-4 border-t">
+                      <h4 className="font-medium mb-3">Quick Actions</h4>
+                      <div className="space-y-2">
+                        <Button variant="outline" className="w-full justify-start">
+                          <Download className="w-4 h-4 mr-2" />
+                          Download Health Summary
+                        </Button>
+                        <Button variant="outline" className="w-full justify-start">
+                          <Phone className="w-4 h-4 mr-2" />
+                          Emergency Contacts
+                        </Button>
+                        <Button variant="outline" className="w-full justify-start">
+                          <Settings className="w-4 h-4 mr-2" />
+                          Privacy Settings
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+            {/* AI Analysis Card */}
+            {linkedDoctors.length > 0 ? (
               <Card>
                 <CardHeader>
-                  <CardTitle>Book New Appointment</CardTitle>
-                  <CardDescription>Schedule your next visit</CardDescription>
+                  <CardTitle className="flex items-center gap-2">
+                    <Brain className="w-5 h-5" />
+                    AI Health Analysis
+                  </CardTitle>
+                  <CardDescription>
+                    Get AI-powered insights about your health status
+                  </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-4">
-                    <Button
-                      className="w-full justify-start"
-                      variant="outline"
-                      onClick={() => openAppointmentDialog('General Checkup')}
-                    >
-                      <Calendar className="w-4 h-4 mr-2" />
-                      General Checkup
-                    </Button>
-                    <Button
-                      className="w-full justify-start"
-                      variant="outline"
-                      onClick={() => openAppointmentDialog('Lab Tests')}
-                    >
-                      <TestTube className="w-4 h-4 mr-2" />
-                      Lab Tests
-                    </Button>
-                    <Button
-                      className="w-full justify-start"
-                      variant="outline"
-                      onClick={() => openAppointmentDialog('Specialist Consultation')}
-                    >
-                      <Heart className="w-4 h-4 mr-2" />
-                      Specialist Consultation
-                    </Button>
-                    <Button
-                      className="w-full justify-start"
-                      variant="outline"
-                      onClick={() => openAppointmentDialog('Follow-up Visit')}
-                    >
-                      <Clipboard className="w-4 h-4 mr-2" />
-                      Follow-up Visit
-                    </Button>
+                <CardContent className="space-y-3">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <p className="text-sm text-blue-800">
+                      <strong>About AI Analysis:</strong> Our AI analyzes your complete medical history,
+                      recent visits, diagnoses, and vital signs to calculate a comprehensive health risk score
+                      and provide personalized insights.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-semibold">What's Analyzed:</h4>
+                    <ul className="text-sm text-gray-600 space-y-1">
+                      <li>• Age and medical history</li>
+                      <li>• Recent diagnoses and prescriptions</li>
+                      <li>• Visit frequency (last 3 months)</li>
+                      <li>• Identified health patterns</li>
+                      <li>• Chronic conditions and allergies</li>
+                    </ul>
+                  </div>
+
+                  <div className="pt-2">
+                    <p className="text-xs text-yellow-800 bg-yellow-50 border border-yellow-200 rounded p-2">
+                      <strong>Note:</strong> Your doctor needs to trigger this analysis.
+                      Contact Dr. {linkedDoctors[0].name} to request an AI health assessment.
+                    </p>
                   </div>
                 </CardContent>
               </Card>
+            ) : (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Brain className="w-5 h-5" />
+                    AI Health Analysis
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-gray-600">
+                    Please link with a doctor first to access AI health analysis.
+                  </p>
+                </CardContent>
+              </Card>
+            )
+            }
+          </Tabs>
+        </div>
+
+        {patientData?.id && (
+          <FloatingHealthAssistant patientId={patientData.id} />
+        )}
+
+        <FloatingMapButton onClick={() => setOpenMap(true)} />
 
 
-
-            </div>
-          </TabsContent>
-
-          <TabsContent value="medications" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Current Medications</CardTitle>
-                <CardDescription>Manage your active prescriptions</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {isLoadingPrescriptions ? (
-                  <div className="text-center py-8">
-                    <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary mb-2" />
-                    <p className="text-gray-600">Loading your medications...</p>
-                  </div>
-                ) : prescriptions.length === 0 ? (
-                  <div className="text-center py-12">
-                    <Pill className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                    <h3 className="font-medium text-gray-800 mb-2">No Active Medications</h3>
-                    <p className="text-sm text-gray-600">
-                      Your prescribed medications will appear here when doctors add them
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {prescriptions.map((med) => (
-                      <div key={med.id} className="border rounded-lg p-6 bg-white hover:shadow-md transition-shadow">
-                        <div className="flex items-start justify-between mb-4">
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-3 mb-3">
-                              <h4 className="font-semibold text-xl">{med.medication_name}</h4>
-                              <Badge className="bg-green-100 text-green-800">
-                                {med.status === 'active' ? 'Active' : med.status}
-                              </Badge>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                              <div className="space-y-2">
-                                <div className="flex items-start">
-                                  <span className="font-medium text-gray-700 w-24">Dosage:</span>
-                                  <span className="text-gray-900">{med.dosage}</span>
-                                </div>
-                                <div className="flex items-start">
-                                  <span className="font-medium text-gray-700 w-24">Frequency:</span>
-                                  <span className="text-gray-900">{formatFrequency(med.frequency)}</span>
-                                </div>
-                                <div className="flex items-start">
-                                  <span className="font-medium text-gray-700 w-24">Duration:</span>
-                                  <span className="text-gray-900">{med.duration}</span>
-                                </div>
-                              </div>
-
-                              <div className="space-y-2">
-                                <div className="flex items-start">
-                                  <span className="font-medium text-gray-700 w-32">Start Date:</span>
-                                  <span className="text-gray-900">
-                                    {new Date(med.start_date).toLocaleDateString('en-IN', {
-                                      year: 'numeric',
-                                      month: 'long',
-                                      day: 'numeric'
-                                    })}
-                                  </span>
-                                </div>
-                                {med.end_date && (
-                                  <div className="flex items-start">
-                                    <span className="font-medium text-gray-700 w-32">End Date:</span>
-                                    <span className="text-gray-900">
-                                      {new Date(med.end_date).toLocaleDateString('en-IN', {
-                                        year: 'numeric',
-                                        month: 'long',
-                                        day: 'numeric'
-                                      })}
-                                    </span>
-                                  </div>
-                                )}
-                                <div className="flex items-start">
-                                  <span className="font-medium text-gray-700 w-32">Prescribed by:</span>
-                                  <span className="text-gray-900">{med.doctor_name}</span>
-                                </div>
-                                <div className="flex items-start">
-                                  <span className="font-medium text-gray-700 w-32">Specialization:</span>
-                                  <span className="text-gray-600 text-sm">{med.specialization}</span>
-                                </div>
-                              </div>
-                            </div>
-
-                            {med.instructions && (
-                              <div className="bg-blue-50 border-l-4 border-blue-400 p-4 rounded">
-                                <p className="font-medium text-blue-900 mb-1">📋 Instructions:</p>
-                                <p className="text-sm text-blue-800">{med.instructions}</p>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="pt-4 border-t">
-                          <p className="text-xs text-gray-500">
-                            Prescribed on: {new Date(med.created_at).toLocaleDateString('en-IN', {
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="map">
+        <Dialog open={openMap} onOpenChange={setOpenMap}>
+          <DialogContent className="max-w-5xl p-0 overflow-hidden">
             <NearbyHospitalsMap
               linkedDoctor={linkedDoctors[0] ? {
                 id: linkedDoctors[0].id,
                 name: linkedDoctors[0].name,
                 specialization: linkedDoctors[0].specialization,
                 hospital: linkedDoctors[0].hospital,
-                latitude: 19.0760, // TODO: Get from database
+                latitude: 19.0760,
                 longitude: 72.8777
               } : undefined}
             />
-          </TabsContent>
+          </DialogContent>
+        </Dialog>
 
-          <TabsContent value="profile" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Personal Information</CardTitle>
-                  <CardDescription>Your basic details and contact information</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
+        {/* 
+        <Dialog open={openMap} onOpenChange={setOpenMap}>
+          <NearbyHospitalsMap
+            linkedDoctor={linkedDoctors[0] ? {
+              id: linkedDoctors[0].id,
+              name: linkedDoctors[0].name,
+              specialization: linkedDoctors[0].specialization,
+              hospital: linkedDoctors[0].hospital,
+              latitude: 19.0760,
+              longitude: 72.8777
+            } : undefined}
+          />
+        </Dialog> */}
 
-                  <Button className="w-full">Edit Profile</Button>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Address & Emergency Contact</CardTitle>
-                  <CardDescription>Your location and emergency information</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-3">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Address</p>
-                      <p className="text-sm">{/*patientData.address*/}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Emergency Contact</p>
-                      <p className="text-sm">{/*patientData.emergencyContact*/}</p>
-                    </div>
-                  </div>
-
-                  {/* 👨‍⚕️ Select Doctors */}
-                  <div className="space-y-3">
-                    <Label htmlFor="select-doctor" className="text-sm font-medium text-gray-700">
-                      Select Doctor
-                    </Label>
-
-                    {/* Show current doctor if linked */}
-                    {linkedDoctors.length > 0 && (
-                      <div className="bg-blue-50 p-3 rounded-lg mb-3">
-                        <p className="text-sm font-medium text-blue-800">Current Doctor:</p>
-                        <p className="text-sm text-blue-700">
-                          {linkedDoctors[0].name} - {linkedDoctors[0].specialization}
-                        </p>
-                        <p className="text-xs text-blue-600">
-                          Linked since: {new Date(linkedDoctors[0].linkedDate).toLocaleDateString()}
-                        </p>
-                      </div>
-                    )}
-
-                    <div className="flex space-x-2">
-                      <Select value={selectedDoctor} onValueChange={setSelectedDoctor}>
-                        <SelectTrigger id="select-doctor" className="flex-1 h-11">
-                          <SelectValue placeholder="Choose a doctor" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {isLoadingAvailableDoctors ? (
-                            <SelectItem value="" disabled>Loading doctors...</SelectItem>
-                          ) : doctorsList.length > 0 ? (
-                            <>
-                              {/* {console.log('🎯 Rendering doctors in dropdown:', doctorsList)} */}
-                              {doctorsList.map((doctor) => (
-                                <SelectItem key={doctor.id} value={doctor.id}>
-                                  {doctor.name} - {doctor.specialization}
-                                </SelectItem>
-                              ))}
-                            </>
-                          ) : (
-                            <>
-                              {/* {console.log('⚠️ No doctors in doctorsList state, length:', doctorsList.length)} */}
-                              <SelectItem value="" disabled>No doctors available</SelectItem>
-                            </>
-                          )}
-                        </SelectContent>
-                      </Select>
-                      {selectedDoctor && (
-                        <Button
-                          onClick={() => handleDoctorSelection(selectedDoctor)}
-                          className="h-11 px-4"
-                        >
-                          Update
-                        </Button>
-                      )}
-                    </div>
-                    {selectedDoctor && (
-                      <p className="text-xs text-gray-500">
-                        Click Update to change your doctor
-                      </p>
-                    )}
-                  </div>
+        {/* <Dialog open={openChat} onOpenChange={setOpenChat}>
+          <DialogContent className="max-w-3xl h-[85vh] p-0 overflow-hidden">
+            <MedicalReportAnalyzer patientId={patientData.id} />
+          </DialogContent>
+        </Dialog>
 
 
-                  <div className="pt-4 border-t">
-                    <h4 className="font-medium mb-3">Quick Actions</h4>
-                    <div className="space-y-2">
-                      <Button variant="outline" className="w-full justify-start">
-                        <Download className="w-4 h-4 mr-2" />
-                        Download Health Summary
-                      </Button>
-                      <Button variant="outline" className="w-full justify-start">
-                        <Phone className="w-4 h-4 mr-2" />
-                        Emergency Contacts
-                      </Button>
-                      <Button variant="outline" className="w-full justify-start">
-                        <Settings className="w-4 h-4 mr-2" />
-                        Privacy Settings
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-          {/* AI Analysis Card */}
-          {linkedDoctors.length > 0 ? (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Brain className="w-5 h-5" />
-                  AI Health Analysis
-                </CardTitle>
-                <CardDescription>
-                  Get AI-powered insights about your health status
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <p className="text-sm text-blue-800">
-                    <strong>About AI Analysis:</strong> Our AI analyzes your complete medical history,
-                    recent visits, diagnoses, and vital signs to calculate a comprehensive health risk score
-                    and provide personalized insights.
-                  </p>
-                </div>
+        <FloatingActions
+          onOpenMap={() => setOpenMap(true)}
+          onOpenChat={() => setOpenChat(true)}
+        /> */}
 
-                <div className="space-y-2">
-                  <h4 className="text-sm font-semibold">What's Analyzed:</h4>
-                  <ul className="text-sm text-gray-600 space-y-1">
-                    <li>• Age and medical history</li>
-                    <li>• Recent diagnoses and prescriptions</li>
-                    <li>• Visit frequency (last 3 months)</li>
-                    <li>• Identified health patterns</li>
-                    <li>• Chronic conditions and allergies</li>
-                  </ul>
-                </div>
-
-                <div className="pt-2">
-                  <p className="text-xs text-yellow-800 bg-yellow-50 border border-yellow-200 rounded p-2">
-                    <strong>Note:</strong> Your doctor needs to trigger this analysis.
-                    Contact Dr. {linkedDoctors[0].name} to request an AI health assessment.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Brain className="w-5 h-5" />
-                  AI Health Analysis
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-gray-600">
-                  Please link with a doctor first to access AI health analysis.
-                </p>
-              </CardContent>
-            </Card>
-          )
-          }
-        </Tabs>
-        </div>
 
         {/* Emergency Banner */}
         <Card className="mt-8 border-red-200 bg-red-50">

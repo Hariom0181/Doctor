@@ -102,16 +102,16 @@ export function MedicalReportAnalyzer({ patientId }: MedicalReportAnalyzerProps)
   // Upload and Extract Text
   const handleUploadAndExtract = async () => {
     if (!selectedFile) return;
-  
+
     setIsExtracting(true);
     // Reset any previous data to avoid confusion
-    setReportData(''); 
-  
+    setReportData('');
+
     try {
       const formData = new FormData();
       formData.append('document', selectedFile);
       // Note: We don't need patientId for extract-only as we aren't saving to DB
-    
+
       const uploadResponse = await fetch('http://localhost:5000/api/documents/extract-only', {
         method: 'POST',
         headers: {
@@ -119,23 +119,23 @@ export function MedicalReportAnalyzer({ patientId }: MedicalReportAnalyzerProps)
         },
         body: formData
       });
-    
+
       const result = await uploadResponse.json();
-      
+
       if (!uploadResponse.ok || !result.success) {
         throw new Error(result.message || "Extraction failed");
       }
 
       // SAFETY CHECK: Ensure extractedText exists
       setReportData(result.extractedText || "No text could be extracted.");
-      
+
       toast({
         title: "Success",
         description: "Report text extracted successfully."
       });
-      
+
       // Close dialog on success
-      setIsUploadDialogOpen(false); 
+      setIsUploadDialogOpen(false);
       setSelectedFile(null);
 
     } catch (error: any) {
@@ -149,7 +149,7 @@ export function MedicalReportAnalyzer({ patientId }: MedicalReportAnalyzerProps)
       setIsExtracting(false);
     }
   };
-  
+
 
 
 
@@ -257,9 +257,10 @@ Blood Pressure: 145/95 mmHg (High)`;
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <Sparkles className="w-5 h-5" />
-                AI Medical Assistant
+                <Sparkles className="w-5 h-5 text-primary" />
+                AI Health Assistant
               </CardTitle>
+
               <CardDescription>
                 Analyze reports or chat with AI about health questions
               </CardDescription>
@@ -269,7 +270,7 @@ Blood Pressure: 145/95 mmHg (High)`;
 
         <CardContent>
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-2 ">
               <TabsTrigger value="analyze">
                 <FileText className="w-4 h-4 mr-2" />
                 Report Analysis
@@ -281,10 +282,10 @@ Blood Pressure: 145/95 mmHg (High)`;
             </TabsList>
 
             {/* REPORT ANALYSIS TAB */}
-            <TabsContent value="analyze" className="space-y-4">
+            <TabsContent value="analyze" className="space-y-4 ">
 
               {/* Action Buttons */}
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-3 gap-3 " >
                 <Button
                   variant="outline"
                   onClick={() => setIsUploadDialogOpen(true)}
@@ -371,7 +372,7 @@ Blood Pressure: 145/95 mmHg (High)`;
 
               {/* Analysis Results */}
               {analysis && (
-                <div className="mt-6 space-y-4">
+                <div className="mt-6 space-y-4 ">
                   <Badge className="bg-green-600">Analysis Results</Badge>
                   <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-6 border border-blue-200">
                     <div className="prose prose-sm max-w-none text-gray-800">
@@ -383,7 +384,7 @@ Blood Pressure: 145/95 mmHg (High)`;
             </TabsContent>
 
             {/* CHAT TAB */}
-            <TabsContent value="chat" className="space-y-4">
+            <TabsContent value="chat" className="space-y-4 ">
               <div className="border rounded-lg h-[500px] flex flex-col">
                 {/* Messages */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-3">

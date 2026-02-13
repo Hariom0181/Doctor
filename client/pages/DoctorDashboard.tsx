@@ -426,7 +426,7 @@ export default function DoctorDashboard() {
       loadCriticalPatients();
     }
   }, [activeTab]);
-  
+
 
 
 
@@ -1244,16 +1244,12 @@ export default function DoctorDashboard() {
                 Records
               </button>
               <div className="flex items-center space-x-3 ml-6 border-l pl-6">
-                {/* <div className="relative">
+                <div className="relative group">
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      console.log("Notification bell clicked");
-                      alert("Notifications:\n• New patient registered\n• Lab results ready for review\n• Appointment reminder");
-                      setNotifications(0);
-                    }}
+                    disabled
+                    className="cursor-not-allowed"
                   >
                     <Bell className="w-4 h-4" />
                     {notifications > 0 && (
@@ -1262,14 +1258,15 @@ export default function DoctorDashboard() {
                       </span>
                     )}
                   </Button>
-                </div> */}
-                {/* <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => alert("Settings panel would open here")}
-                >
-                  <Settings className="w-4 h-4" />
-                </Button> */}
+
+                  {/* Tooltip      */}
+                  <span className="absolute left-1/2 -translate-x-1/2 top-8 
+                     hidden group-hover:block
+                     bg-black text-white text-xs px-2 py-1 rounded">
+                    Coming Soon
+                  </span>
+                </div>
+
                 <Button
                   variant="outline"
                   size="sm"
@@ -2054,49 +2051,22 @@ export default function DoctorDashboard() {
                       <p className="text-sm text-gray-600">No pending requests</p>
                     </div>
                   ) : (
-                    pendingAppointments.slice(0, 3).map((appointment) => (
-                      <div key={appointment.id} className="border rounded-lg p-4 bg-yellow-50 border-yellow-200">
+                    pendingAppointments.slice(0,2).map((appointment) => (
+                      <div key={appointment.id} className="border rounded-md p-2 bg-yellow-50 border-yellow-200">
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex-1">
-                            <h4 className="font-medium">{appointment.patient_name}</h4>
-                            <p className="text-sm text-gray-600">
-                              {appointment.appointment_type}
+                            <h4 className="text-sm font-medium">
+                              {appointment.patient_name} •  {appointment.appointment_type} 
+                            </h4>
+                            <p className="text-xs text-gray-500">
+                              {new Date(appointment.appointment_date).toLocaleDateString()} • {formatTime(appointment.appointment_time)}
                             </p>
-                            <p className="text-sm text-gray-600">
-                              {new Date(appointment.appointment_date).toLocaleDateString()} at {formatTime(appointment.appointment_time)}
-                            </p>
-                            {appointment.reason && (
-                              <p className="text-xs text-gray-500 mt-1 italic">
-                                Reason: {appointment.reason}
-                              </p>
-                            )}
                           </div>
                         </div>
-                        <div className="flex space-x-2">
-                          <Button
-                            size="sm"
-                            onClick={() => {
-                              setSelectedAppointment(appointment);
-                              setIsConfirmDialogOpen(true);
-                            }}
-                          >
-                            <Check className="w-3 h-3 mr-1" />
-                            Confirm
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setSelectedAppointment(appointment);
-                              setIsRejectDialogOpen(true);
-                            }}
-                          >
-                            <X className="w-3 h-3 mr-1" />
-                            Reject
-                          </Button>
-                        </div>
+                       
                       </div>
-                    ))
+                    )
+                  )
                   )}
 
                   {pendingAppointments.length > 3 && (
@@ -2697,70 +2667,6 @@ export default function DoctorDashboard() {
                 </CardContent>
               </Card>
 
-              {/* Confirm Appointment Dialog */}
-              <Dialog open={isConfirmDialogOpen} onOpenChange={setIsConfirmDialogOpen}>
-                <DialogContent className="max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>Confirm Appointment</DialogTitle>
-                    <DialogDescription>
-                      Confirm this appointment and notify the patient
-                    </DialogDescription>
-                  </DialogHeader>
-
-                  {selectedAppointment && (
-                    <div className="space-y-4">
-                      <div className="bg-gray-50 p-4 rounded-lg space-y-2">
-                        <p><strong>Patient:</strong> {selectedAppointment.patient_name}</p>
-                        <p><strong>Type:</strong> {selectedAppointment.appointment_type}</p>
-                        <p><strong>Date:</strong> {new Date(selectedAppointment.appointment_date).toLocaleDateString()}</p>
-                        <p><strong>Time:</strong> {formatTime(selectedAppointment.appointment_time)}</p>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="confirm-notes">Notes for Patient (Optional)</Label>
-                        <Textarea
-                          id="confirm-notes"
-                          placeholder="Add any special instructions or notes..."
-                          value={actionNotes}
-                          onChange={(e) => setActionNotes(e.target.value)}
-                          rows={3}
-                        />
-                      </div>
-
-                      <div className="flex gap-3">
-                        <Button
-                          onClick={handleConfirmAppointment}
-                          disabled={processingAction}
-                          className="flex-1"
-                        >
-                          {processingAction ? (
-                            <>
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              Confirming...
-                            </>
-                          ) : (
-                            <>
-                              <Check className="w-4 h-4 mr-2" />
-                              Confirm Appointment
-                            </>
-                          )}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => {
-                            setIsConfirmDialogOpen(false);
-                            setActionNotes('');
-                            setSelectedAppointment(null);
-                          }}
-                          disabled={processingAction}
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </DialogContent>
-              </Dialog>
 
               {/* Reject Appointment Dialog */}
               <Dialog open={isRejectDialogOpen} onOpenChange={setIsRejectDialogOpen}>
@@ -3240,6 +3146,71 @@ export default function DoctorDashboard() {
           </TabsContent>
 
         </Tabs>
+
+        {/* Confirm Appointment Dialog */}
+        <Dialog open={isConfirmDialogOpen} onOpenChange={setIsConfirmDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Confirm Appointment</DialogTitle>
+              <DialogDescription>
+                Confirm this appointment and notify the patient
+              </DialogDescription>
+            </DialogHeader>
+
+            {selectedAppointment && (
+              <div className="space-y-4">
+                <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+                  <p><strong>Patient:</strong> {selectedAppointment.patient_name}</p>
+                  <p><strong>Type:</strong> {selectedAppointment.appointment_type}</p>
+                  <p><strong>Date:</strong> {new Date(selectedAppointment.appointment_date).toLocaleDateString()}</p>
+                  <p><strong>Time:</strong> {formatTime(selectedAppointment.appointment_time)}</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="confirm-notes">Notes for Patient (Optional)</Label>
+                  <Textarea
+                    id="confirm-notes"
+                    placeholder="Add any special instructions or notes..."
+                    value={actionNotes}
+                    onChange={(e) => setActionNotes(e.target.value)}
+                    rows={3}
+                  />
+                </div>
+
+                <div className="flex gap-3">
+                  <Button
+                    onClick={handleConfirmAppointment}
+                    disabled={processingAction}
+                    className="flex-1"
+                  >
+                    {processingAction ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Confirming...
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-4 h-4 mr-2" />
+                        Confirm Appointment
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setIsConfirmDialogOpen(false);
+                      setActionNotes('');
+                      setSelectedAppointment(null);
+                    }}
+                    disabled={processingAction}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
         <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>

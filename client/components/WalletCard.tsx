@@ -177,7 +177,7 @@ export function WalletCard({ patientId }: WalletCardProps) {
                 <Wallet className="w-5 h-5" />
                 Wallet
               </CardTitle>
-              <CardDescription>Manage your consultation payments</CardDescription>
+              <CardDescription>Money makes all </CardDescription>
             </div>
             <Button
               variant="outline"
@@ -192,7 +192,7 @@ export function WalletCard({ patientId }: WalletCardProps) {
         <CardContent>
           <div className="space-y-4">
             {/* Balance Display */}
-            <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg p-6 text-white">
+            <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg p-6 text-white">
               <p className="text-sm opacity-90 mb-1">Available Balance</p>
               {loadingBalance ? (
                 <div className="h-10 flex items-center">

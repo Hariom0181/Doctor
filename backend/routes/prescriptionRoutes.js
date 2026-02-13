@@ -11,8 +11,11 @@ router.post(
     body("doctorId").notEmpty().isInt().withMessage("Valid doctor ID is required"),
     body("medicationName").notEmpty().trim().withMessage("Medication name is required"),
     body("dosage").notEmpty().trim().withMessage("Dosage is required"),
-    body("frequency").notEmpty().isIn(['once','twice','thrice','four_times','weekly','as_needed']).withMessage("Valid frequency is required"),
-    body("duration").notEmpty().trim().withMessage("Duration is required"),
+    body("frequency").notEmpty().isIn(['once', 'twice', 'thrice', 'four_times', 'weekly', 'as_needed']).withMessage("Valid frequency is required"),
+    body("duration")
+      .notEmpty()
+      .isInt({ min: 1 })
+      .withMessage("Duration must be number of days"),
     body("startDate").notEmpty().isDate().withMessage("Valid start date is required")
   ],
   (req, res) => {
@@ -24,7 +27,8 @@ router.post(
         errors: errors.array()
       });
     }
-
+  
+    
     const {
       patientId,
       doctorId,
@@ -34,8 +38,11 @@ router.post(
       duration,
       instructions,
       startDate,
-      endDate
+      calculatedEndDate
     } = req.body;
+
+    calculatedEndDate = new Date(startDate);
+    calculatedEndDate.setDate(calculatedEndDate.getDate() + parseInt(duration));
 
     const sql = `
       INSERT INTO prescriptions 
@@ -45,7 +52,7 @@ router.post(
 
     db.query(
       sql,
-      [patientId, doctorId, medicationName, dosage, frequency, duration, instructions, startDate, endDate],
+      [patientId, doctorId, medicationName, dosage, frequency, duration, instructions, startDate, calculatedEndDate],
       (err, result) => {
         if (err) {
           console.error("Error creating prescription:", err);
@@ -68,53 +75,64 @@ router.post(
 // Get patient's prescriptions
 router.get("/patient/:patientId", (req, res) => {
   const { patientId } = req.params;
-  const { status } = req.query; // Optional filter by status
+  const { status } = req.query;
 
-  let sql = `
-    SELECT 
-      p.id,
-      p.medication_name,
-      p.dosage,
-      p.frequency,
-      p.duration,
-      p.instructions,
-      p.start_date,
-      p.end_date,
-      p.status,
-      p.created_at,
-      CONCAT(d.first_name, ' ', d.last_name) as doctor_name,
-      d.specialization
-    FROM prescriptions p
-    LEFT JOIN doctors d ON p.doctor_id = d.id
-    WHERE p.patient_id = ?
+  // 1. Define the first query (Update)
+  const expireOldPrescriptions = `
+    UPDATE prescriptions
+    SET status = 'completed'
+    WHERE status = 'active'
+      AND end_date < CURDATE()
   `;
 
-  const params = [patientId];
-
-  if (status) {
-    sql += " AND p.status = ?";
-    params.push(status);
-  }
-
-  sql += " ORDER BY p.created_at DESC";
-
-  db.query(sql, params, (err, results) => {
+  // 2. Run the first query
+  db.query(expireOldPrescriptions, (err) => {
     if (err) {
-      console.error("Error fetching prescriptions:", err);
-      return res.status(500).json({
-        success: false,
-        message: "Error fetching prescriptions"
-      });
+      console.error("Error expiring prescriptions:", err);
+      // If the first query fails, we stop here and return
+      return res.status(500).json({ error: "Update DB Error" });
     }
 
-    res.json({
-      success: true,
-      data: results,
-      count: results.length
+    // 3. Define the second query (Select) - NOW we define 'sql'
+    let sql = `
+      SELECT 
+        p.id, p.medication_name, p.dosage, p.frequency, p.duration,
+        p.instructions, p.start_date, p.end_date, p.status, p.created_at,
+        CONCAT(d.first_name, ' ', d.last_name) as doctor_name,
+        d.specialization
+      FROM prescriptions p
+      LEFT JOIN doctors d ON p.doctor_id = d.id
+      WHERE p.patient_id = ?
+    `;
+
+    const params = [patientId];
+
+    if (status) {
+      sql += " AND p.status = ?";
+      params.push(status);
+    }
+
+    sql += " ORDER BY p.created_at DESC";
+
+    // 4. Run the second query INSIDE the callback of the first
+    db.query(sql, params, (err, results) => {
+      if (err) {
+        console.error("Error fetching prescriptions:", err);
+        return res.status(500).json({
+          success: false,
+          message: "Error fetching prescriptions"
+        });
+      }
+
+      // 5. FINALLY send the one and only response
+      res.json({
+        success: true,
+        data: results,
+        count: results.length
+      });
     });
   });
 });
-
 // Get doctor's prescribed medications
 router.get("/doctor/:doctorId", (req, res) => {
   const { doctorId } = req.params;
@@ -168,7 +186,7 @@ router.patch("/:prescriptionId/status", (req, res) => {
   }
 
   const sql = "UPDATE prescriptions SET status = ?, updated_at = NOW() WHERE id = ?";
-  
+
   db.query(sql, [status, prescriptionId], (err, result) => {
     if (err) {
       console.error("Error updating prescription:", err);
