@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Heart, Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
-import { getAuthToken } from 'src/utils/auth';
+import { useAuth } from '@/contexts/AuthContext';
+
 
 
 interface LoginFormData {
@@ -20,6 +21,7 @@ interface ValidationErrors {
 
 export default function PatientLogin() {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [formData, setFormData] = useState<LoginFormData>({
     email: "",
     password: ""
@@ -78,54 +80,18 @@ export default function PatientLogin() {
     try {
       // console.log("Patient login data:", formData);
 
-      const response = await fetch("http://localhost:5000/api/patients/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password,
-        }),
-      });
-
-      const data = await response.json();
-
-
-      if (!response.ok) {
-        if (data.errors) {
-          const serverErrors: ValidationErrors = {};
-          data.errors.forEach((err: any) => {
-            serverErrors[err.param || err.path] = err.msg || err.message;
-          });
-          setErrors(serverErrors);
-          setSubmitMessage({ type: 'error', message: 'Please fix the validation errors below.' });
-        } else {
-          setSubmitMessage({
-            type: 'error',
-            message: data.message || "Login failed. Please check your credentials."
-          });
-        }
-        return;
-      }
-
-      // ✅ Store JWT token for authenticated requests
-      if (data.token) {
-        localStorage.setItem("PatientToken", data.token);  //------------------------------------------------------------------------------------------
-        localStorage.setItem("patientData", JSON.stringify(data.patient)); //------------------------------------------------------------------------------------------
-      }
-
+      await login(formData.email, formData.password, 'patient');
       setSubmitMessage({ type: 'success', message: "Login successful! Redirecting..." });
-
-      // Redirect after a short delay to show success message
       setTimeout(() => {
         navigate("/patient/dashboard");
       }, 1000);
 
     } catch (error) {
       console.error("Error during login:", error);
-      setSubmitMessage({
-        type: 'error',
-        message: "Network error. Please check your connection and try again."
-      });
+     setSubmitMessage({ 
+    type: 'error', 
+    message: error.message || "Login failed. Please check your credentials." 
+  });
     } finally {
       setIsLoading(false);
     }

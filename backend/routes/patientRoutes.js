@@ -5,6 +5,7 @@ const db = require("../config/db");
 const jwt = require("jsonwebtoken");
 const CloudinaryStorage = require('multer-storage-cloudinary').CloudinaryStorage;
 const { uploadProfile } = require("../config/cloudinary");
+const bcrypt = require("bcrypt");
 
 
 const authenticatePatient = (req, res, next) => {
@@ -20,6 +21,12 @@ const authenticatePatient = (req, res, next) => {
     const jwtSecret = process.env.JWT_SECRET || "your-fallback-secret-key-change-in-production";
     const decoded = jwt.verify(token, jwtSecret);
     // ✅ FIXED: Set req.patient instead of req.doctor
+    if (decoded.type !== 'patient') {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Patient credentials required."
+      });
+    }
     req.patient = decoded;
     next();
   } catch (error) {
@@ -34,7 +41,8 @@ const authenticatePatient = (req, res, next) => {
 // Configure multer for profile image upload
 
 router.post(
-  "/:patientId/upload-profile",
+  "/upload-profile",
+  authenticatePatient,
   (req, res, next) => {
     uploadProfile.single("profileImage")(req, res, (err) => {
       if (err) {
@@ -55,7 +63,7 @@ router.post(
         });
       }
 
-      const { patientId } = req.params;
+      const patientId = req.patient.id;
       const cloudinaryUrl = req.file.path;
 
       const sql = "UPDATE patients SET profile_img = ? WHERE id = ?";
@@ -195,7 +203,7 @@ router.get("/:patientId/profile-image", (req, res) => {
   const { patientId } = req.params;
 
   const sql = "SELECT profile_img FROM patients WHERE id = ?";
-  
+
   db.query(sql, [patientId], (err, results) => {
     if (err) {
       return res.status(500).json({
@@ -316,7 +324,7 @@ router.post(
 
     // Check if email already exists
     const checkEmailSql = "SELECT email FROM patients WHERE email = ?";
-    db.query(checkEmailSql, [email], (err, results) => {
+    db.query(checkEmailSql, [email], async (err, results) => {
       if (err) {
         console.error("Database error during email check:", err);
         return res.status(500).json({
@@ -358,7 +366,7 @@ router.post(
           bloodGroup,
           allergies,
           medicalHistory,
-          password, // Note: In production, hash this password before storing!
+          await bcrypt.hash(password, 12), // Note: In production, hash this password before storing!
         ],
         (err, result) => {
           if (err) {
@@ -416,7 +424,7 @@ router.post(
 
     // 1. Check if patient exists
     const sql = "SELECT * FROM patients WHERE email = ?";
-    db.query(sql, [email.toLowerCase()], (err, results) => {
+    db.query(sql, [email.toLowerCase()], async (err, results) => {
       if (err) {
         console.error("Database error during login:", err);
         return res.status(500).json({
@@ -435,7 +443,8 @@ router.post(
       const patient = results[0];
 
       // 2. Compare password
-      if (patient.password !== password) {
+      const isPasswordValid = await bcrypt.compare(password, patient.password);
+      if (!isPasswordValid) {
         return res.status(401).json({
           success: false,
           message: "Invalid email or password"
@@ -485,26 +494,6 @@ router.post(
   }
 );
 
-// Test endpoint to list all patients
-router.get("/list", (req, res) => {
-  const sql = "SELECT id, firstName, lastName, email FROM patients LIMIT 10";
-  db.query(sql, (err, results) => {
-    if (err) {
-      console.error("Database error:", err);
-      return res.status(500).json({
-        success: false,
-        message: "Database error"
-      });
-    }
-
-    res.json({
-      success: true,
-      message: "Patients list retrieved",
-      data: results,
-      count: results.length
-    });
-  });
-});
 
 // Get all available doctors for patient selection
 router.get("/available-doctors", authenticatePatient, (req, res) => {
@@ -553,8 +542,8 @@ router.get("/available-doctors", authenticatePatient, (req, res) => {
 // Update patient's doctor relationship - FIXED VERSION
 // Update patient's doctor relationship - ONE DOCTOR PER PATIENT VERSION
 // Update patient's doctor relationship - HANDLES REACTIVATION
-router.post("/:patientId/update-doctor", (req, res) => {
-  const patientId = req.params.patientId;
+router.post("/update-doctor", authenticatePatient, (req, res) => {
+  const patientId = req.patient.id;
   const { doctorId } = req.body;
 
   if (!patientId || !doctorId) {
@@ -639,60 +628,15 @@ router.post("/:patientId/update-doctor", (req, res) => {
   });
 });
 
-// Test endpoint to check patient_doctors table
-router.get("/check-links", (req, res) => {
-  const sql = "SELECT * FROM patient_doctors LIMIT 5";
-  db.query(sql, (err, results) => {
-    if (err) {
-      console.error("Database error checking patient_doctor:", err);
-      return res.status(500).json({
-        success: false,
-        message: "Database error checking patient_doctor table",
-        details: err.message
-      });
-    }
-
-    res.json({
-      success: true,
-      message: "Patient-Doctor links check",
-      data: results,
-      count: results.length,
-      tableExists: true
-    });
-  });
-});
-
-// Test endpoint to check doctors table
-router.get("/check-doctors", (req, res) => {
-  const sql = "SELECT id, first_name, last_name, specialization FROM doctors LIMIT 5";
-  db.query(sql, (err, results) => {
-    if (err) {
-      console.error("Database error checking doctors:", err);
-      return res.status(500).json({
-        success: false,
-        message: "Database error checking doctors",
-        details: err.message
-      });
-    }
-
-    res.json({
-      success: true,
-      message: "Doctors table check",
-      data: results,
-      count: results.length,
-      tableExists: true
-    });
-  });
-});
 
 
 // Get Patient's Linked Doctors API
 router.get(
-  "/:id/linked-doctors",
+  "/linked-doctors",
+  authenticatePatient,
   async (req, res) => {
     try {
-      const patientId = req.params.id;
-
+      const patientId = req.patient.id;
       // Validate patient ID
       if (!patientId || isNaN(patientId)) {
         return res.status(400).json({
@@ -869,7 +813,7 @@ router.get("/health-metrics", authenticatePatient, async (req, res) => {
         };
       });
 
-      
+
 
       res.json({
         success: true,
@@ -892,10 +836,8 @@ router.get("/health-metrics", authenticatePatient, async (req, res) => {
 
 // GET single patient details by ID (for doctor to view)
 // GET single patient details by ID (for doctor to view)
-router.get('/:patientId/details', (req, res) => {
-  try {
-    const { patientId } = req.params;
-
+router.get('/details', authenticatePatient, (req, res) => {  try {
+  const patientId = req.patient.id;
     const sql = `
       SELECT 
         id,

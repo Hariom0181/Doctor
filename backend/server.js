@@ -20,6 +20,10 @@ const IOThealthmetrics = require('./routes/healthMetricsRoute');
 const healthMetricsRoutes = require('./routes/healthMetricsRoutes');
 const deviceStatusRoutes = require('./routes/deviceStatusRoutes');  // ONLY HERE
 const cron = require('node-cron');
+
+
+
+
 const db = require("./config/db");
 
 dotenv.config();
@@ -32,7 +36,6 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-// ============ STATIC FILES ============
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/uploads/patients_profile', express.static(path.join(__dirname, 'uploads/patients_profile')));
 app.use('/uploads/doctors_profile', express.static(path.join(__dirname, 'uploads/doctors_profile')));
