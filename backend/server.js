@@ -17,9 +17,9 @@ const bookingRoutes = require('./routes/bookingRoutes');
 const aiRoutes = require('./routes/aiRoutes');
 const agoraRoutes = require('./routes/agoraRoutes');
 const IOThealthmetrics = require('./routes/healthMetricsRoute');
-const cron = require('node-cron');
 const healthMetricsRoutes = require('./routes/healthMetricsRoutes');
-const deviceStatusRoutes = require('./routes/deviceStatusRoutes');
+const deviceStatusRoutes = require('./routes/deviceStatusRoutes');  // ONLY HERE
+const cron = require('node-cron');
 const db = require("./config/db");
 
 dotenv.config();
@@ -33,14 +33,15 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // ============ STATIC FILES ============
-app.use('/api/devices', deviceStatusRoutes);
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/uploads/patients_profile', express.static(path.join(__dirname, 'uploads/patients_profile')));
 app.use('/uploads/doctors_profile', express.static(path.join(__dirname, 'uploads/doctors_profile')));
 app.use('/uploads/patient_documents', express.static(path.join(__dirname, 'uploads/patient_documents')));
 
+// ============ DEVICE STATUS ROUTE (FIRST) ============
+app.use('/api/devices', deviceStatusRoutes);
+
 // ============ DIRECT IoT ENDPOINTS (No Auth Required) ============
-// These must come BEFORE the router registration
 app.post('/api/health-metrics-iot/device-heartbeat', (req, res) => {
   try {
     const { device_id, is_online, battery_level, firmware_version } = req.body;
@@ -101,13 +102,63 @@ app.post('/api/health-metrics-iot/confirm-metric', (req, res) => {
       });
     }
 
-    console.log('✓ Metric received from device:', device_id, 'Request ID:', request_id);
+    console.log('✓ Metric received from device:', device_id);
+    console.log('  Request ID:', request_id);
     console.log('  Value:', value, unit);
 
-    res.json({
-      success: true,
-      metric_id: 1,
-      message: 'Metric received from device'
+    // First, find the metric_request to get patient_id and doctor_id
+    const findQuery = `
+      SELECT * FROM metric_requests 
+      WHERE request_data LIKE ?
+    `;
+
+    db.query(findQuery, [`%${request_id}%`], (err, results) => {
+      if (err) {
+        console.error('❌ Database error finding request:', err);
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to find request'
+        });
+      }
+
+      if (results.length === 0) {
+        console.error('❌ Request not found:', request_id);
+        return res.status(404).json({
+          success: false,
+          error: 'Request not found'
+        });
+      }
+
+      const request = results[0];
+      console.log('✓ Found request - Patient:', request.patient_id, 'Doctor:', request.doctor_id);
+
+      // Now insert into patient_health_metrics with correct patient_id and doctor_id
+      const insertQuery = `
+        INSERT INTO patient_health_metrics 
+        (patient_id, doctor_id, metric_type, value, unit, status, device_id, request_id)
+        VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)
+      `;
+
+      db.query(
+        insertQuery,
+        [request.patient_id, request.doctor_id, metric_type, value, unit, device_id, request_id],
+        (err, result) => {
+          if (err) {
+            console.error('❌ Database error inserting metric:', err);
+            return res.status(500).json({
+              success: false,
+              error: 'Failed to store metric'
+            });
+          }
+
+          console.log('✓ Metric stored in database, ID:', result.insertId);
+          res.json({
+            success: true,
+            metric_id: result.insertId,
+            message: 'Metric received from device'
+          });
+        }
+      );
     });
   } catch (error) {
     console.error('❌ Error:', error);
@@ -118,15 +169,13 @@ app.post('/api/health-metrics-iot/confirm-metric', (req, res) => {
   }
 });
 
-// ============ ROUTER REGISTRATION ============
-// This comes AFTER direct endpoints
+// ============ OTHER ROUTES ============
+app.use('/api/health-metrics-iot', IOThealthmetrics);
 app.use("/api/appointments", appointmentRoutes);
 app.use("/api/documents", documentRoutes);
 app.use('/api/video-consultations', videoConsultationRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/agora', agoraRoutes);
-app.use('/api/health-metrics-iot', IOThealthmetrics);
-
 app.use("/api/patients", patientRoutes);
 app.use("/api/doctors", doctorRoutes);
 app.use("/api/dashboard", dashboardRoutes);

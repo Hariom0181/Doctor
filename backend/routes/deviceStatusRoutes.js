@@ -3,7 +3,7 @@ const router = express.Router();
 const db = require('../config/db');
 
 // Get all devices and their status
-router.get('/devices', (req, res) => {
+router.get('/', (req, res) => {  // Changed from '/devices' to '/'
   try {
     const query = `
       SELECT 
@@ -17,21 +17,31 @@ router.get('/devices', (req, res) => {
       FROM esp32_devices
       ORDER BY device_id
     `;
-
     db.query(query, (err, devices) => {
       if (err) {
+        console.error('❌ Database error:', err);
         return res.status(500).json({ 
           success: false, 
           error: 'Database error' 
         });
       }
-
+      
+      console.log('📊 Raw devices from DB:', devices);
+      
+      const formattedDevices = devices.map(device => ({
+        ...device,
+        is_online: Boolean(device.is_online)
+      }));
+      
+      console.log('✓ Formatted devices:', formattedDevices);
+      
       res.json({
         success: true,
-        data: devices || []
+        data: formattedDevices || []
       });
     });
   } catch (error) {
+    console.error('❌ Error:', error);
     res.status(500).json({ 
       success: false, 
       error: error.message 
@@ -40,7 +50,7 @@ router.get('/devices', (req, res) => {
 });
 
 // Get single device status
-router.get('/devices/:deviceId', (req, res) => {
+router.get('/:deviceId', (req, res) => {  // Changed from '/devices/:deviceId' to '/:deviceId'
   try {
     const { deviceId } = req.params;
     
@@ -48,7 +58,6 @@ router.get('/devices/:deviceId', (req, res) => {
       SELECT * FROM esp32_devices 
       WHERE device_id = ?
     `;
-
     db.query(query, [deviceId], (err, results) => {
       if (err) {
         return res.status(500).json({ 
@@ -56,17 +65,21 @@ router.get('/devices/:deviceId', (req, res) => {
           error: 'Database error' 
         });
       }
-
       if (results.length === 0) {
         return res.status(404).json({ 
           success: false, 
           error: 'Device not found' 
         });
       }
-
+      
+      const device = {
+        ...results[0],
+        is_online: Boolean(results[0].is_online)
+      };
+      
       res.json({
         success: true,
-        data: results[0]
+        data: device
       });
     });
   } catch (error) {

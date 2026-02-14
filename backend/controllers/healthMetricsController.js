@@ -7,9 +7,9 @@ let mqttClient = null;
 
 const initializeMQTT = () => {
   if (mqttClient) return mqttClient;
-  
+
   const brokerUrl = process.env.MQTT_BROKER_URL || 'mqtt://localhost:1883';
-  
+
   mqttClient = mqtt.connect(brokerUrl, {
     username: process.env.MQTT_USERNAME,
     password: process.env.MQTT_PASSWORD,
@@ -82,14 +82,14 @@ const handleDeviceResponse = (topic, message) => {
 
         // Insert into patient_health_metrics with pending status
         const insertMetricQuery = `
-          INSERT INTO patient_health_metrics 
-          (patient_id, doctor_id, metric_type, value, unit, status, device_id)
-          VALUES (?, ?, ?, ?, ?, 'pending', ?)
-        `;
+        INSERT INTO patient_health_metrics 
+        (request_id, patient_id, doctor_id, metric_type, value, unit, status, device_id)
+        VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)
+      `;
 
         db.query(
           insertMetricQuery,
-          [request.patient_id, request.doctor_id, metric_type, value, unit, device_id],
+          [request_id, request.patient_id, request.doctor_id, metric_type, value, unit, device_id],
           (err, result) => {
             if (err) {
               console.error('❌ Error inserting metric:', err);
@@ -114,16 +114,16 @@ exports.requestMetric = async (req, res) => {
     const doctor_id = req.user?.id || req.doctor?.id;
 
     if (!patient_id || !metric_type || !device_id) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        error: 'Missing required fields: patient_id, metric_type, device_id' 
+        error: 'Missing required fields: patient_id, metric_type, device_id'
       });
     }
 
     if (!doctor_id) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         success: false,
-        error: 'Doctor authentication required' 
+        error: 'Doctor authentication required'
       });
     }
 
@@ -137,16 +137,16 @@ exports.requestMetric = async (req, res) => {
 
     db.query(verifyQuery, [patient_id, doctor_id], (err, results) => {
       if (err) {
-        return res.status(500).json({ 
+        return res.status(500).json({
           success: false,
-          error: 'Database error during verification' 
+          error: 'Database error during verification'
         });
       }
 
       if (results.length === 0) {
-        return res.status(403).json({ 
+        return res.status(403).json({
           success: false,
-          error: 'Patient is not linked to this doctor' 
+          error: 'Patient is not linked to this doctor'
         });
       }
 
@@ -165,9 +165,9 @@ exports.requestMetric = async (req, res) => {
         (err, result) => {
           if (err) {
             console.error('❌ Database error:', err);
-            return res.status(500).json({ 
+            return res.status(500).json({
               success: false,
-              error: 'Failed to create metric request' 
+              error: 'Failed to create metric request'
             });
           }
 
@@ -188,7 +188,7 @@ exports.requestMetric = async (req, res) => {
           client.publish(topic, payload, (err) => {
             if (err) {
               console.error('❌ MQTT publish error:', err);
-              return res.status(500).json({ 
+              return res.status(500).json({
                 success: false,
                 error: 'Failed to send command to device',
                 details: err.message
@@ -207,7 +207,7 @@ exports.requestMetric = async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Server error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       error: 'Internal server error',
       details: error.message
@@ -218,30 +218,31 @@ exports.requestMetric = async (req, res) => {
 exports.getRequestStatus = async (req, res) => {
   try {
     const { requestId } = req.params;
-    
+
     console.log('🔍 Looking for request:', requestId);
 
-    // Get the LATEST reading by timestamp (not by ID)
     const query = `
       SELECT * FROM patient_health_metrics 
-      ORDER BY reading_timestamp DESC 
+      WHERE reading_timestamp = (
+        SELECT MAX(reading_timestamp) FROM patient_health_metrics
+      )
       LIMIT 1
     `;
 
     db.query(query, (err, results) => {
       if (err) {
         console.error('❌ Database error:', err);
-        return res.status(500).json({ 
+        return res.status(500).json({
           success: false,
-          error: 'Database error' 
+          error: 'Database error'
         });
       }
 
       if (results.length === 0) {
         console.log('⏳ No reading found yet');
-        return res.status(404).json({ 
+        return res.status(404).json({
           success: false,
-          error: 'No reading found' 
+          error: 'No reading found'
         });
       }
 
@@ -260,9 +261,9 @@ exports.getRequestStatus = async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Server error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      error: 'Internal server error' 
+      error: 'Internal server error'
     });
   }
 };
@@ -272,9 +273,9 @@ exports.confirmMetric = async (req, res) => {
     const { request_id, value, unit } = req.body;
 
     if (!request_id || !value || !unit) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        error: 'Missing required fields' 
+        error: 'Missing required fields'
       });
     }
 
@@ -286,16 +287,16 @@ exports.confirmMetric = async (req, res) => {
     db.query(findQuery, [`%${request_id}%`], (err, results) => {
       if (err) {
         console.error('❌ Database error:', err);
-        return res.status(500).json({ 
+        return res.status(500).json({
           success: false,
-          error: 'Database error' 
+          error: 'Database error'
         });
       }
 
       if (results.length === 0) {
-        return res.status(404).json({ 
+        return res.status(404).json({
           success: false,
-          error: 'Request not found' 
+          error: 'Request not found'
         });
       }
 
@@ -310,9 +311,9 @@ exports.confirmMetric = async (req, res) => {
       db.query(updateRequestQuery, [request.id], (err) => {
         if (err) {
           console.error('❌ Error updating request:', err);
-          return res.status(500).json({ 
+          return res.status(500).json({
             success: false,
-            error: 'Failed to update request' 
+            error: 'Failed to update request'
           });
         }
 
@@ -328,9 +329,9 @@ exports.confirmMetric = async (req, res) => {
           (err, result) => {
             if (err) {
               console.error('❌ Error inserting metric:', err);
-              return res.status(500).json({ 
+              return res.status(500).json({
                 success: false,
-                error: 'Failed to store metric' 
+                error: 'Failed to store metric'
               });
             }
 
@@ -345,9 +346,9 @@ exports.confirmMetric = async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Server error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      error: 'Internal server error' 
+      error: 'Internal server error'
     });
   }
 };
@@ -358,9 +359,9 @@ exports.approveMetric = async (req, res) => {
     const doctor_id = req.user?.id || req.doctor?.id;
 
     if (!doctor_id) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         success: false,
-        error: 'Doctor authentication required' 
+        error: 'Doctor authentication required'
       });
     }
 
@@ -373,30 +374,30 @@ exports.approveMetric = async (req, res) => {
     db.query(query, [requestId, doctor_id], (err, result) => {
       if (err) {
         console.error('❌ Database error:', err);
-        return res.status(500).json({ 
+        return res.status(500).json({
           success: false,
-          error: 'Database error' 
+          error: 'Database error'
         });
       }
 
       if (result.affectedRows === 0) {
-        return res.status(404).json({ 
+        return res.status(404).json({
           success: false,
-          error: 'Metric not found or unauthorized' 
+          error: 'Metric not found or unauthorized'
         });
       }
 
       console.log('✓ Metric confirmed:', requestId);
-      res.json({ 
+      res.json({
         success: true,
-        message: 'Metric confirmed and saved' 
+        message: 'Metric confirmed and saved'
       });
     });
   } catch (error) {
     console.error('❌ Server error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      error: 'Internal server error' 
+      error: 'Internal server error'
     });
   }
 };
@@ -413,16 +414,16 @@ exports.getPatientMetrics = async (req, res) => {
 
     db.query(verifyQuery, [patientId, doctor_id], (err, results) => {
       if (err) {
-        return res.status(500).json({ 
+        return res.status(500).json({
           success: false,
-          error: 'Database error' 
+          error: 'Database error'
         });
       }
 
       if (results.length === 0) {
-        return res.status(403).json({ 
+        return res.status(403).json({
           success: false,
-          error: 'Unauthorized access to patient data' 
+          error: 'Unauthorized access to patient data'
         });
       }
 
@@ -435,9 +436,9 @@ exports.getPatientMetrics = async (req, res) => {
       db.query(query, [patientId], (err, results) => {
         if (err) {
           console.error('❌ Database error:', err);
-          return res.status(500).json({ 
+          return res.status(500).json({
             success: false,
-            error: 'Database error' 
+            error: 'Database error'
           });
         }
 
@@ -450,9 +451,9 @@ exports.getPatientMetrics = async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Server error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      error: 'Internal server error' 
+      error: 'Internal server error'
     });
   }
 };
@@ -461,6 +462,13 @@ exports.requestRetake = async (req, res) => {
   try {
     const { metricId } = req.params;
     const doctor_id = req.user?.id || req.doctor?.id;
+
+    if (!doctor_id) {
+      return res.status(401).json({
+        success: false,
+        error: 'Doctor authentication required'
+      });
+    }
 
     const query = `
       UPDATE patient_health_metrics 
@@ -471,29 +479,30 @@ exports.requestRetake = async (req, res) => {
     db.query(query, [metricId, doctor_id], (err, result) => {
       if (err) {
         console.error('❌ Database error:', err);
-        return res.status(500).json({ 
+        return res.status(500).json({
           success: false,
-          error: 'Database error' 
+          error: 'Database error'
         });
       }
 
       if (result.affectedRows === 0) {
-        return res.status(404).json({ 
+        return res.status(404).json({
           success: false,
-          error: 'Metric not found or unauthorized' 
+          error: 'Metric not found or unauthorized'
         });
       }
 
-      res.json({ 
+      console.log('✓ Retake requested for metric:', metricId);
+      res.json({
         success: true,
-        message: 'Retake requested' 
+        message: 'Retake requested'
       });
     });
   } catch (error) {
     console.error('❌ Server error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      error: 'Internal server error' 
+      error: 'Internal server error'
     });
   }
 };
