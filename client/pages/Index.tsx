@@ -426,10 +426,7 @@ export default function Index() {
                           </p>
                         )}
                       </div>
-                      {/* <Button variant="outline" size="sm">
-                        <Download className="w-4 h-4 mr-2" />
-                        Export Records
-                      </Button> */}
+                    
                     </div>
 
                     <div className="space-y-3">

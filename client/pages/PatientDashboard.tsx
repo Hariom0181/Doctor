@@ -528,7 +528,7 @@ export default function PatientDashboard() {
       setLoadingPatientDetails(true);
       setIsViewDialogOpen(true);
 
-      const details = await patientApiService.getPatientDetails(patientId);
+      const details = await patientApiService.getPatientDetails(patientId,'patient');
       setViewingPatient(details);
     } catch (error) {
       console.error('Error loading patient details:', error);

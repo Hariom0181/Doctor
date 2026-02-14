@@ -110,6 +110,22 @@ class PatientApiService {
     };
   }
 
+  private getAuthHeadersByRole(role: 'patient' | 'doctor'): HeadersInit {
+    const token =
+      role === 'patient'
+        ? localStorage.getItem('PatientToken')
+        : localStorage.getItem('DoctorToken');
+  
+    if (!token) {
+      throw new Error(`${role} not authenticated. Please login.`);
+    }
+  
+    return {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`
+    };
+  }
+
 
   async getLinkedDoctors(patientId: string): Promise<LinkedDoctor[]> {
     try {
@@ -146,11 +162,11 @@ class PatientApiService {
   }
   // Get single patient details (for doctor to view)
   // Get single patient details (for doctor to view)
-  async getPatientDetails(patientId: number): Promise<PatientProfile> {
+  async getPatientDetails(patientId: number , role: 'patient' | 'doctor'): Promise<PatientProfile> {
     try {
       const response = await fetch(`${API_BASE_URL}/patients/${patientId}/details`, {
         method: 'GET',
-        headers: this.getAuthHeaders()
+        headers: this.getAuthHeadersByRole(role)
       });
 
       if (!response.ok) {
