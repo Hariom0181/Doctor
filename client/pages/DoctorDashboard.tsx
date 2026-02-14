@@ -18,7 +18,7 @@ import type { PatientProfile } from '@/services/patientApi';
 import { DoctorAvailabilitySettings } from '@/components/DoctorAvailabilitySettings';
 import { Video } from 'lucide-react';
 import { DoctorConsultationRequests } from '@/components/DoctorConsultationRequests';
-import { getAuthToken } from 'src/utils/auth';
+import { getAuthToken, getUserData, clearAuth } from '../lib/auth';
 import { aiApiService } from '@/services/aiApi';
 import { PatientAIAnalysis } from '@/components/PatientAIAnalysis'
 // import { useToast } from '@/hooks/use-toast';
@@ -199,7 +199,7 @@ export default function DoctorDashboard() {
   useEffect(() => {
     const loadDoctorData = async () => {
       try {
-        const storedDoctorData = localStorage.getItem('doctorData'); //------------------------------------------------------------------------------------------
+        const storedDoctorData = localStorage.getItem('userData');
         if (storedDoctorData) {
           const parsedData = JSON.parse(storedDoctorData);
           const transformedData = {
@@ -407,8 +407,7 @@ export default function DoctorDashboard() {
   const loadCriticalPatients = async () => {
     setLoadingCritical(true);
     try {
-      const doctorData = localStorage.getItem('doctorData'); // 
-      const doctorId = doctorData ? JSON.parse(doctorData).id : null;
+      const doctorId = getUserData()?.id;
 
       if (doctorId) {
         const patients = await aiApiService.getCriticalPatients();
@@ -760,7 +759,7 @@ export default function DoctorDashboard() {
     }
   };
   const getCurrentDoctorId = () => {
-    const doctorsData = localStorage.getItem("doctorData"); //------------------------------------------------------------------------------------------
+    const doctorsData = localStorage.getItem("userData");
     if (doctorsData) {
       const doctor = JSON.parse(doctorsData);
       return doctor.id?.toString();
@@ -897,7 +896,7 @@ export default function DoctorDashboard() {
     setIsAddingMetrics(true);
 
     try {
-      const token = localStorage.getItem('DoctorToken'); //------------------------------------------------------------------------------------------
+      const token = getAuthToken(); //------------------------------------------------------------------------------------------
 
 
       const response = await fetch(
@@ -964,7 +963,8 @@ export default function DoctorDashboard() {
   // Function to get health metrics for a specific patient  
   const fetchPatientHealthMetrics = async (patientId) => {
     try {
-      const token = localStorage.getItem('DoctorToken'); //------------------------------------------------------------------------------------------
+      const token = getAuthToken();
+      //------------------------------------------------------------------------------------------
 
       const response = await fetch(
         `http://localhost:5000/api/doctors/patient/${patientId}/health-metrics`,
@@ -1004,7 +1004,7 @@ export default function DoctorDashboard() {
       setIsLoadingPatients(true);
       setPatientsError(null);
 
-      const token = localStorage.getItem('DoctorToken'); //------------------------------------------------------------------------------------------
+      const token = getAuthToken();//------------------------------------------------------------------------------------------
 
       if (!token) {
         throw new Error('No authentication token found. Please login again.');
@@ -1272,6 +1272,7 @@ export default function DoctorDashboard() {
                   size="sm"
                   onClick={() => {
                     if (confirm("Are you sure you want to logout?")) {
+                      clearAuth();
                       window.location.href = "/doctor/login";
                     }
                   }}
@@ -2051,22 +2052,22 @@ export default function DoctorDashboard() {
                       <p className="text-sm text-gray-600">No pending requests</p>
                     </div>
                   ) : (
-                    pendingAppointments.slice(0,2).map((appointment) => (
+                    pendingAppointments.slice(0, 2).map((appointment) => (
                       <div key={appointment.id} className="border rounded-md p-2 bg-yellow-50 border-yellow-200">
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex-1">
                             <h4 className="text-sm font-medium">
-                              {appointment.patient_name} •  {appointment.appointment_type} 
+                              {appointment.patient_name} •  {appointment.appointment_type}
                             </h4>
                             <p className="text-xs text-gray-500">
                               {new Date(appointment.appointment_date).toLocaleDateString()} • {formatTime(appointment.appointment_time)}
                             </p>
                           </div>
                         </div>
-                       
+
                       </div>
                     )
-                  )
+                    )
                   )}
 
                   {pendingAppointments.length > 3 && (

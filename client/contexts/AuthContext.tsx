@@ -1,164 +1,205 @@
-import React, { createContext, useContext, useReducer, ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
+import { saveAuth, clearAuth, getAuthToken, getUserData, getUserRole } from '@/lib/auth';
 
-// Types
-export interface User {
+// ============================================================
+// TYPES
+// ============================================================
+export interface Doctor {
   id: string;
   email: string;
   firstName: string;
   lastName: string;
-  role: 'patient' | 'doctor';
+  role: 'doctor';
+  phone: string;
+  specialization: string;
+  current_hospital: string;
+  licenseNumber: string;
+  years_of_experience: string;
+  qualifications: string;
+  consultation_fee: number;
+  available_hours: string;
+  bio: string;
+  profilePicture: string | null;
   isVerified: boolean;
-  profileComplete: boolean;
 }
 
-export interface Patient extends User {
+export interface Patient {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
   role: 'patient';
-  dateOfBirth: string;
   phone: string;
   address: string;
-  emergencyContact: string;
-  bloodGroup?: string;
-  allergies?: string;
-  medicalHistory?: string;
-}
-
-export interface Doctor extends User {
-  role: 'doctor';
-  medicalLicenseNumber: string;
-  specialization: string;
-  yearsOfExperience: string;
-  qualifications: string;
-  currentHospital: string;
-  consultationFee: number;
-  isApproved: boolean;
 }
 
 interface AuthState {
   user: Patient | Doctor | null;
+  role: 'doctor' | 'patient' | null;
   isLoading: boolean;
   isAuthenticated: boolean;
 }
 
-type AuthAction = 
+type AuthAction =
   | { type: 'LOGIN_START' }
-  | { type: 'LOGIN_SUCCESS'; payload: Patient | Doctor }
+  | { type: 'LOGIN_SUCCESS'; payload: { user: Patient | Doctor; role: 'doctor' | 'patient' } }
   | { type: 'LOGIN_FAILURE' }
   | { type: 'LOGOUT' }
+  | { type: 'RESTORE_SESSION'; payload: { user: Patient | Doctor; role: 'doctor' | 'patient' } }
   | { type: 'UPDATE_PROFILE'; payload: Partial<Patient | Doctor> };
 
 interface AuthContextType extends AuthState {
   login: (email: string, password: string, role: 'patient' | 'doctor') => Promise<void>;
   logout: () => void;
-  register: (userData: any, role: 'patient' | 'doctor') => Promise<void>;
   updateProfile: (updates: Partial<Patient | Doctor>) => void;
 }
 
-// Initial state
+// ============================================================
+// INITIAL STATE
+// ============================================================
 const initialState: AuthState = {
   user: null,
-  isLoading: false,
+  role: null,
+  isLoading: true, // Start as true so we wait for session restore
   isAuthenticated: false,
 };
 
-// Reducer
+// ============================================================
+// REDUCER
+// ============================================================
 function authReducer(state: AuthState, action: AuthAction): AuthState {
   switch (action.type) {
     case 'LOGIN_START':
-      return {
-        ...state,
-        isLoading: true,
-      };
+      return { ...state, isLoading: true };
+
     case 'LOGIN_SUCCESS':
       return {
         ...state,
-        user: action.payload,
+        user: action.payload.user,
+        role: action.payload.role,
         isAuthenticated: true,
         isLoading: false,
       };
+
     case 'LOGIN_FAILURE':
       return {
         ...state,
         user: null,
+        role: null,
         isAuthenticated: false,
         isLoading: false,
       };
+
     case 'LOGOUT':
       return {
         ...state,
         user: null,
+        role: null,
         isAuthenticated: false,
         isLoading: false,
       };
+
+    case 'RESTORE_SESSION':
+      return {
+        ...state,
+        user: action.payload.user,
+        role: action.payload.role,
+        isAuthenticated: true,
+        isLoading: false,
+      };
+
     case 'UPDATE_PROFILE':
       return {
         ...state,
         user: state.user ? { ...state.user, ...action.payload } : null,
       };
+
     default:
       return state;
   }
 }
 
-// Context
+// ============================================================
+// CONTEXT
+// ============================================================
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Provider component
+// ============================================================
+// PROVIDER
+// ============================================================
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
+  // Restore session on page refresh
+  useEffect(() => {
+    const token = getAuthToken();
+    const userData = getUserData();
+    const role = getUserRole();
+
+    if (token && userData && role) {
+      dispatch({
+        type: 'RESTORE_SESSION',
+        payload: { user: { ...userData, role }, role },
+      });
+    } else {
+      // No session — stop loading
+      dispatch({ type: 'LOGIN_FAILURE' });
+    }
+  }, []);
+
+  // ============================================================
+  // LOGIN
+  // ============================================================
   const login = async (email: string, password: string, role: 'patient' | 'doctor') => {
     dispatch({ type: 'LOGIN_START' });
-    
+
     try {
-      // Simulate API call
-      const response = await fetch('/api/auth/login', {
+      const endpoint =
+        role === 'doctor'
+          ? 'http://localhost:5000/api/doctors/login'
+          : 'http://localhost:5000/api/patients/login';
+
+      const response = await fetch(endpoint, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password, role }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
       });
 
-      if (response.ok) {
-        const userData = await response.json();
-        dispatch({ type: 'LOGIN_SUCCESS', payload: userData });
-        localStorage.setItem('authToken', userData.token);
-      } else {
-        throw new Error('Login failed');
+      const data = await response.json();
+
+      if (!response.ok) {
+        dispatch({ type: 'LOGIN_FAILURE' });
+        throw new Error(data.message || 'Login failed');
       }
+
+      // Backend returns either data.doctor or data.patient
+      const userData = role === 'doctor' ? data.doctor : data.patient;
+
+      // Save to localStorage
+      saveAuth(data.token, userData, role);
+
+      dispatch({
+        type: 'LOGIN_SUCCESS',
+        payload: { user: { ...userData, role }, role },
+      });
+
     } catch (error) {
       dispatch({ type: 'LOGIN_FAILURE' });
       throw error;
     }
   };
 
-  const register = async (userData: any, role: 'patient' | 'doctor') => {
-    try {
-      // Simulate API call
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ ...userData, role }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Registration failed');
-      }
-
-      const result = await response.json();
-      console.log('Registration successful:', result);
-    } catch (error) {
-      throw error;
-    }
-  };
-
+  // ============================================================
+  // LOGOUT
+  // ============================================================
   const logout = () => {
-    localStorage.removeItem('authToken');
+    clearAuth();
     dispatch({ type: 'LOGOUT' });
   };
 
+  // ============================================================
+  // UPDATE PROFILE
+  // ============================================================
   const updateProfile = (updates: Partial<Patient | Doctor>) => {
     dispatch({ type: 'UPDATE_PROFILE', payload: updates });
   };
@@ -167,7 +208,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ...state,
     login,
     logout,
-    register,
     updateProfile,
   };
 
@@ -178,7 +218,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// Custom hook
+// ============================================================
+// HOOK
+// ============================================================
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {

@@ -14,7 +14,9 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Camera, Wallet, X } from 'lucide-react';
 import { WalletCard } from '@/components/WalletCard';
 import { VideoConsultationBooking } from '@/components/VideoConsultationBooking';
-import { getAuthToken } from 'src/utils/auth';
+import { useAuth } from '@/contexts/AuthContext';
+ 
+
 
 import { FloatingHealthAssistant } from '@/components/FloatingHealthAssistant';
 
@@ -57,113 +59,8 @@ import {
 import { patientApiService, HealthMetric, LinkedDoctor, AvailableDoctor, PatientMedicalRecord, PatientProfile } from "@/services/patientApi";
 
 
-// ------------------------------
-// Hardcoded initial data (unchanged)
-// ------------------------------
-const INITIAL_PATIENT_DATA = {
-  name: "Rajesh Kumar",
-  age: 45,
-  id: "HMS2024001",
-  email: "rajesh.kumar@email.com",
-  phone: "+91 98765 43210",
-  bloodGroup: "B+",
-  address: "Village Rampur, District Meerut, UP - 250001",
-  emergencyContact: "Sunita Kumar (+91 98765 43211)",
-  profilePicture: "/placeholder.svg"
-};
-
-const INITIAL_HEALTH_METRICS = [
-  { label: "Blood Pressure", value: "130/85", status: "warning", lastChecked: "2024-01-15" },
-  { label: "Blood Sugar", value: "110 mg/dL", status: "normal", lastChecked: "2024-01-10" },
-  { label: "Weight", value: "78 kg", status: "normal", lastChecked: "2024-01-12" },
-  { label: "Heart Rate", value: "72 bpm", status: "normal", lastChecked: "2024-01-15" }
-];
-
-const INITIAL_RECENT_RECORDS = [
-  {
-    id: "1",
-    date: "2024-01-15",
-    type: "General Checkup",
-    doctor: "Dr. Priya Sharma",
-    hospital: "Primary Health Center",
-    diagnosis: "Blood pressure slightly elevated, cholesterol normal",
-    status: "Attention Needed",
-    nextCheckup: "2024-04-15",
-    documents: ["Blood Report", "ECG Report"]
-  },
-  {
-    id: "2",
-    date: "2024-01-10",
-    type: "Blood Test",
-    doctor: "Dr. Amit Verma",
-    hospital: "District Hospital",
-    diagnosis: "All parameters within normal range",
-    status: "Normal",
-    documents: ["Complete Blood Count", "Lipid Profile"]
-  },
-  {
-    id: "3",
-    date: "2024-01-05",
-    type: "Heart Screening",
-    doctor: "Dr. Sunita Patel",
-    hospital: "Cardiology Center",
-    diagnosis: "Mild irregularity detected, follow-up recommended",
-    status: "Attention Needed",
-    nextCheckup: "2024-03-05",
-    documents: ["ECG Report", "Echo Report"]
-  }
-];
-
-const INITIAL_UPCOMING_APPOINTMENTS = [
-  {
-    id: "1",
-    date: "2024-04-15",
-    time: "10:00 AM",
-    doctor: "Dr. Priya Sharma",
-    type: "Follow-up Checkup",
-    hospital: "Primary Health Center",
-    status: "confirmed"
-  },
-  {
-    id: "2",
-    date: "2024-03-05",
-    time: "2:30 PM",
-    doctor: "Dr. Sunita Patel",
-    type: "Heart Screening",
-    hospital: "Cardiology Center",
-    status: "pending"
-  }
-];
-
-const INITIAL_MEDICATIONS = [
-  {
-    name: "Amlodipine 5mg",
-    frequency: "Once daily",
-    duration: "30 days",
-    prescribed: "Dr. Priya Sharma",
-    startDate: "2024-01-15",
-    status: "active"
-  },
-  {
-    name: "Vitamin D3",
-    frequency: "Weekly",
-    duration: "90 days",
-    prescribed: "Dr. Amit Verma",
-    startDate: "2024-01-10",
-    status: "active"
-  }
-];
-
-const INITIAL_DOCTORS_LIST = [
-  { id: "doc1", name: "Dr. Priya Sharma", specialization: "Cardiologist" },
-  { id: "doc2", name: "Dr. Amit Verma", specialization: "Pathologist" },
-  { id: "doc3", name: "Dr. Sunita Patel", specialization: "General" }
-];
-
 export default function PatientDashboard() {
-  // ------------------------------
-  // State initialized from hardcoded data (backend-ready)
-  // Replace these via backend responses when ready
+ 
   // ------------------------------
   const [activeTab, setActiveTab] = useState("overview"); // <-- Replace with backend: default tab if needed
   // const [patientData, setPatientData] = useState(INITIAL_PATIENT_DATA); // <-- Replace with backend: patient data
@@ -180,7 +77,7 @@ export default function PatientDashboard() {
   const [isAppointmentDialogOpen, setIsAppointmentDialogOpen] = useState(false);
   const [bookingAppointment, setBookingAppointment] = useState(false);
   // <-- Replace with backend: medications
-  const [doctorsList, setDoctorsList] = useState(INITIAL_DOCTORS_LIST);
+  const [doctorsList, setDoctorsList] = useState([]);
   const [selectedDoctor, setSelectedDoctor] = useState("");
 
   // New state for API integration
@@ -212,6 +109,7 @@ export default function PatientDashboard() {
   const [isLoadingPrescriptions, setIsLoadingPrescriptions] = useState(false);
   const [openMap, setOpenMap] = useState(false);
   const [openChat, setOpenChat] = useState(false);
+  const { logout } = useAuth();
 
 
   // Document upload form
@@ -241,7 +139,7 @@ export default function PatientDashboard() {
   useEffect(() => {
     const loadPatientData = async () => {
       try {
-        const storedPatientData = localStorage.getItem('patientData'); //------------------------------------------------------------------------------------------
+        const storedPatientData = localStorage.getItem('userData'); //------------------------------------------------------------------------------------------
         if (storedPatientData) {
           const parsedData = JSON.parse(storedPatientData);
 
@@ -309,16 +207,14 @@ export default function PatientDashboard() {
   // Add this to your fetchMetrics function for better debugging
   const fetchMetrics = async () => {
     try {
-      const patientToken = localStorage.getItem("PatientToken"); //------------------------------------------------------------------------------------------
+      const patientToken = localStorage.getItem("token"); //------------------------------------------------------------------------------------------
 
       if (!patientToken) {
         console.error("No patient token found. User may not be logged in.");
         return;
       }
 
-      const tokenPayload = JSON.parse(atob(patientToken.split('.')[1]));
-      console.log("JWT Token payload:", tokenPayload);
-      console.log("Patient ID from token:", tokenPayload.id);
+    
 
       const response = await fetch(`http://localhost:5000/api/patients/health-metrics`, {
         method: "GET",
@@ -805,7 +701,7 @@ export default function PatientDashboard() {
       setIsLoadingRecentRecords(true);
       setMedicalRecordsError(null);
 
-      const patientData = JSON.parse(localStorage.getItem('patientData') || '{}'); //------------------------------------------------------------------------------------------
+      const patientData = JSON.parse(localStorage.getItem('userData') || '{}'); //------------------------------------------------------------------------------------------
       const patientId = patientData.id;
 
       if (!patientId) {
@@ -937,7 +833,7 @@ export default function PatientDashboard() {
     }
   };
   const getCurrentPatientId = () => {
-    const patientData = localStorage.getItem("patientData"); //------------------------------------------------------------------------------------------
+    const patientData = localStorage.getItem("userData"); //------------------------------------------------------------------------------------------
     if (patientData) {
       const patient = JSON.parse(patientData);
       return patient.id?.toString();
@@ -1060,6 +956,7 @@ export default function PatientDashboard() {
                   onClick={() => {
                     if (confirm("Are you sure you want to logout?")) {
                       window.location.href = "/patient/login";
+                      logout();
                     }
                   }}
                 >

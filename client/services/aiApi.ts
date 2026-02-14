@@ -15,7 +15,7 @@ export interface RiskScoreData {
 
 class AIApiService {
   private getPatientAuthHeaders(): HeadersInit {
-    const token = localStorage.getItem('PatientToken');
+    const token = localStorage.getItem('token');
     if (!token) {
       throw new Error('Patient not authenticated. Please login.');
     }
@@ -26,7 +26,7 @@ class AIApiService {
   }
   private getDoctorAuthHeaders(): HeadersInit {
     // This matches your auth.ts precisely
-    const token = localStorage.getItem('DoctorToken'); 
+    const token = localStorage.getItem('token');
     
     if (!token) {
       console.error("Auth Error: DoctorToken not found in localStorage");

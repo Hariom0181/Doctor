@@ -41,7 +41,7 @@ export interface ApiResponse<T> {
 
 class BookingApiService {
   private getPatientAuthHeaders(): HeadersInit {
-    const token = localStorage.getItem('PatientToken');
+    const token = localStorage.getItem('token');
     if (!token) {
       throw new Error('Patient not authenticated. Please login.');
     }
@@ -51,7 +51,7 @@ class BookingApiService {
     };
   }
   private getDoctorAuthHeaders(): HeadersInit {
-    const token = localStorage.getItem('DoctorToken');
+    const token = localStorage.getItem('token');
     if (!token) {
       throw new Error('Doctor not authenticated. Please login.');
     }
@@ -59,6 +59,7 @@ class BookingApiService {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`
     };
+
   }
 
   // ==================== PATIENT METHODS ====================

@@ -13,7 +13,8 @@ export function ProtectedRoute({
   allowedRoles, 
   requireAuth = true 
 }: ProtectedRouteProps) {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, isLoading } = useAuth();
+  if (isLoading) return null;
   const location = useLocation();
 
   // If authentication is required but user is not authenticated

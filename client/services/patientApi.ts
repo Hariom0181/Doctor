@@ -100,7 +100,7 @@ export interface ApiResponse<T> {
 
 class PatientApiService {
   private getAuthHeaders(): HeadersInit {
-    const token = localStorage.getItem('PatientToken'); // ONLY patient token
+    const token = localStorage.getItem('token'); // ONLY patient token
     if (!token) {
       throw new Error('Patient not authenticated. Please login.');
     }
@@ -117,7 +117,9 @@ class PatientApiService {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
-      const response = await fetch(`${API_BASE_URL}/patients/${patientId}/linked-doctors`, {
+      // const response = await fetch(`${API_BASE_URL}/patients/${patientId}/linked-doctors`, {
+      const response = await fetch(`${API_BASE_URL}/patients/linked-doctors`, {
+
         method: 'GET',
         headers: this.getAuthHeaders(),
         signal: controller.signal

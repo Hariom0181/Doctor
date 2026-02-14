@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Heart, Stethoscope, Mail, Lock, Eye, EyeOff, Shield, Loader2 } from "lucide-react";
-import { getAuthToken } from 'src/utils/auth';
+import { useAuth } from '@/contexts/AuthContext';
 
 
 interface LoginFormData {
@@ -22,6 +22,7 @@ interface ValidationErrors {
 
 export default function DoctorLogin() {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [formData, setFormData] = useState<LoginFormData>({
     email: "",
     password: "",
@@ -34,12 +35,12 @@ export default function DoctorLogin() {
 
   const handleInputChange = (field: keyof LoginFormData, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    
+
     // Clear error when user starts typing
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: "" }));
     }
-    
+
     // Clear general error message
     if (submitMessage) {
       setSubmitMessage(null);
@@ -70,67 +71,27 @@ export default function DoctorLogin() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitMessage(null);
-  
+
     if (!validateForm()) {
       setSubmitMessage({ type: 'error', message: 'Please fix the errors below and try again.' });
       return;
     }
-  
+
     setIsLoading(true);
-  
+
     try {
       console.log("Doctor login data:", formData);
-  
-      const response = await fetch("http://localhost:5000/api/doctors/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password,
-        }),
-      });
-  
-      const data = await response.json();
-      console.log("Server response:", data);
-  
-      if (!response.ok) {
-        if (data.errors) {
-          const serverErrors: ValidationErrors = {};
-          data.errors.forEach((err: any) => {
-            serverErrors[err.param || err.path] = err.msg || err.message;
-          });
-          setErrors(serverErrors);
-          setSubmitMessage({ type: 'error', message: 'Please fix the validation errors below.' });
-        } else {
-          setSubmitMessage({ 
-            type: 'error', 
-            message: data.message || "Login failed. Please check your credentials." 
-          });
-        }
-        return;
-      }
-  
-      // Store doctor data for authenticated requests - FIX THE KEYS HERE
-      if (data.token) {
-        // localStorage.clear();
-        localStorage.setItem("DoctorToken", data.token); // Changed from "authToken" //------------------------------------------------------------------------------------------
-        localStorage.setItem("doctorId", data.doctor.id.toString()); // Added doctorId //------------------------------------------------------------------------------------------
-        localStorage.setItem("doctorData", JSON.stringify(data.doctor));//------------------------------------------------------------------------------------------
-        console.log('🔵 Doctor id from login:', data.doctor.id);
-      }
-  
+      await login(formData.email, formData.password, 'doctor');
       setSubmitMessage({ type: 'success', message: "Login successful! Redirecting..." });
-  
-      // Redirect after a short delay to show success message
       setTimeout(() => {
         navigate("/doctor/dashboard");
       }, 1000);
-  
+
     } catch (error) {
       console.error("Error during login:", error);
       setSubmitMessage({ 
         type: 'error', 
-        message: "Network error. Please check your connection and try again." 
+        message: error.message || "Login failed. Please check your credentials." 
       });
     } finally {
       setIsLoading(false);

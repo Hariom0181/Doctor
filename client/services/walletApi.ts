@@ -34,7 +34,7 @@ export interface AddMoneyResponse {
 
 class WalletApiService {
   private getAuthHeaders(): HeadersInit {
-    const token = localStorage.getItem('PatientToken'); // ONLY patient token (wallets are patient-only)
+    const token = localStorage.getItem('token'); // ONLY patient token (wallets are patient-only)
     if (!token) {
       throw new Error('Patient not authenticated. Please login.');
     }

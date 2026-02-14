@@ -79,7 +79,7 @@ export interface LoginResponse {
 
 class DoctorApiService {
   private getAuthHeaders(): HeadersInit {
-    const token = localStorage.getItem('DoctorToken'); // ONLY doctor token
+    const token = localStorage.getItem('token');// ONLY doctor token
     if (!token) {
       throw new Error('Doctor not authenticated. Please login.');
     }
@@ -89,7 +89,7 @@ class DoctorApiService {
     };
   }
 
-  async 
+  async
 
   /**
    * Doctor Authentication
@@ -97,7 +97,7 @@ class DoctorApiService {
   async login(credentials: LoginCredentials): Promise<LoginResponse> {
     try {
       console.log('🔐 Doctor login attempt:', credentials.email);
-      
+
       const response = await fetch(`${API_BASE_URL}/doctors/login`, {
         method: 'POST',
         headers: {
@@ -113,8 +113,9 @@ class DoctorApiService {
 
       if (result.success && result.token) {
         // Store JWT token and doctor data
-        localStorage.setItem('DoctorToken', result.token); //-----------------------------------------------------------------------------------------
-        localStorage.setItem('doctorData', JSON.stringify(result.doctor));//-----------------------------------------------------------------------------------------
+        localStorage.setItem('token', result.token);
+        localStorage.setItem('userData', JSON.stringify(result.doctor));
+        localStorage.setItem('userRole', 'doctor');//-----------------------------------------------------------------------------------------
         console.log('✅ Doctor login successful, token stored');
       }
 
@@ -128,28 +129,27 @@ class DoctorApiService {
     try {
       const formData = new FormData();
       formData.append('profileImage', imageFile);
-  
-      const token = localStorage.getItem('DoctorToken'); //-----------------------------------------------------------------------------------------
-      
-      const response = await fetch(`${API_BASE_URL}/doctors/${doctorId}/upload-profile`, {
+
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/doctors/upload-profile`, {
         method: 'POST',
         headers: {
           ...(token && { Authorization: `Bearer ${token}` })
         },
         body: formData
       });
-  
+
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.message || 'Failed to upload image');
       }
-  
+
       const result = await response.json();
-      
+
       if (!result.success) {
         throw new Error(result.message);
       }
-  
+
       return {
         success: result.success,
         profileImagePath: result.profileImagePath
@@ -160,7 +160,7 @@ class DoctorApiService {
     }
   }
 
-  
+
   async getTodayAppointments(doctorId: number): Promise<any[]> {
     try {
       const response = await fetch(`${API_BASE_URL}/appointments/doctor/${doctorId}/today`, {
@@ -173,7 +173,7 @@ class DoctorApiService {
       }
 
       const result = await response.json();
-      
+
       if (!result.success) {
         throw new Error(result.message);
       }
@@ -197,7 +197,7 @@ class DoctorApiService {
       }
 
       const result = await response.json();
-      
+
       if (!result.success) {
         throw new Error(result.message);
       }
@@ -213,10 +213,10 @@ class DoctorApiService {
     try {
       let url = `${API_BASE_URL}/appointments/doctor/${doctorId}/all`;
       const params = new URLSearchParams();
-      
+
       if (status) params.append('status', status);
       if (date) params.append('date', date);
-      
+
       if (params.toString()) {
         url += `?${params.toString()}`;
       }
@@ -231,7 +231,7 @@ class DoctorApiService {
       }
 
       const result = await response.json();
-      
+
       if (!result.success) {
         throw new Error(result.message);
       }
@@ -306,7 +306,7 @@ class DoctorApiService {
   async getRecentActivities(doctorId: number, limit: number = 10): Promise<any[]> {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/doctors/${doctorId}/recent-activities?limit=${limit}`,
+        `${API_BASE_URL}/doctors/recent-activities?limit=${limit}`,
         {
           method: 'GET',
           headers: this.getAuthHeaders()
@@ -318,7 +318,7 @@ class DoctorApiService {
       }
 
       const result = await response.json();
-      
+
       if (!result.success) {
         throw new Error(result.message);
       }
@@ -333,7 +333,7 @@ class DoctorApiService {
   async getPatientsWithRiskAssessment(doctorId: number): Promise<any[]> {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/doctors/${doctorId}/patients/risk-assessment`,
+        `${API_BASE_URL}/doctors/patients/risk-assessment` ,
         {
           method: 'GET',
           headers: this.getAuthHeaders()
@@ -345,7 +345,7 @@ class DoctorApiService {
       }
 
       const result = await response.json();
-      
+
       if (!result.success) {
         throw new Error(result.message);
       }
@@ -356,24 +356,26 @@ class DoctorApiService {
       throw error;
     }
   }
-  
+
   async getDoctorProfileImage(doctorId: number): Promise<string | null> {
     try {
-      const response = await fetch(`${API_BASE_URL}/doctors/${doctorId}/profile-image`);
-  
+      const response = await fetch(`${API_BASE_URL}/doctors/profile-image`, {
+        headers: this.getAuthHeaders()
+      });
+      
       if (!response.ok) {
         if (response.status === 404) {
           return null;
         }
         throw new Error('Failed to fetch profile image');
       }
-  
+
       const result = await response.json();
-      
+
       if (result.success && result.profileImagePath) {
         return result.profileImagePath; // ✅ Return directly (already Cloudinary URL)
       }
-  
+
       return null;
     } catch (error) {
       console.error('Error fetching profile image:', error);
@@ -383,8 +385,9 @@ class DoctorApiService {
 
   async logout(): Promise<void> {
     try {
-      localStorage.removeItem('DoctorToken');//-----------------------------------------------------------------------------------------
-      localStorage.removeItem('doctorData');//-----------------------------------------------------------------------------------------
+      localStorage.removeItem('token');
+      localStorage.removeItem('userData');
+      localStorage.removeItem('userRole');//-----------------------------------------------------------------------------------------
       console.log('✅ Doctor logged out successfully');
     } catch (error) {
       console.error('❌ Error during logout:', error);
@@ -407,7 +410,7 @@ class DoctorApiService {
       }
 
       const result: ApiResponse<DoctorProfile> = await response.json();
-      
+
       if (!result.success) {
         throw new Error(result.message);
       }
@@ -421,22 +424,22 @@ class DoctorApiService {
   async getRecordsCount(): Promise<number> {
     try {
       console.log('📊 Fetching records count from API...');
-      
+
       const response = await fetch(`${API_BASE_URL}/doctors/medical-records/count`, {
         method: 'GET',
         headers: this.getAuthHeaders()
       });
-  
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-  
+
       const result: ApiResponse<{ count: number }> = await response.json();
-      
+
       if (!result.success) {
         throw new Error(result.message);
       }
-  
+
       return result.data.count;
     } catch (error) {
       console.error('❌ Error fetching records count:', error);
@@ -450,7 +453,7 @@ class DoctorApiService {
   async getLinkedPatients(): Promise<LinkedPatient[]> {
     try {
       console.log('🏥 Fetching linked patients...');
-      
+
       const response = await fetch(`${API_BASE_URL}/doctors/linked-patients`, {
         method: 'GET',
         headers: this.getAuthHeaders()
@@ -467,7 +470,7 @@ class DoctorApiService {
 
       const result: ApiResponse<LinkedPatient[]> = await response.json();
       console.log('📄 Linked patients result:', result);
-      
+
       if (!result.success) {
         throw new Error(result.message);
       }
@@ -485,7 +488,7 @@ class DoctorApiService {
   async addMedicalRecord(recordData: AddMedicalRecordRequest): Promise<MedicalRecord> {
     try {
       console.log('🏥 Adding medical record:', recordData);
-      
+
       const response = await fetch(`${API_BASE_URL}/doctors/medical-records`, {
         method: 'POST',
         headers: this.getAuthHeaders(),
@@ -502,7 +505,7 @@ class DoctorApiService {
 
       const result: ApiResponse<MedicalRecord> = await response.json();
       console.log('📄 Add medical record result:', result);
-      
+
       if (!result.success) {
         throw new Error(result.message);
       }
@@ -520,7 +523,7 @@ class DoctorApiService {
   async getPatientMedicalRecords(patientId: string): Promise<MedicalRecord[]> {
     try {
       console.log('🏥 Fetching medical records for patient:', patientId);
-      
+
       const response = await fetch(`${API_BASE_URL}/doctors/patients/${patientId}/medical-records`, {
         method: 'GET',
         headers: this.getAuthHeaders()
@@ -534,7 +537,7 @@ class DoctorApiService {
 
       const result: ApiResponse<MedicalRecord[]> = await response.json();
       console.log('📄 Patient medical records result:', result);
-      
+
       if (!result.success) {
         throw new Error(result.message);
       }
@@ -552,7 +555,7 @@ class DoctorApiService {
   async getMyMedicalRecords(): Promise<MedicalRecord[]> {
     try {
       console.log('🏥 Fetching my medical records');
-      
+
       const response = await fetch(`${API_BASE_URL}/doctors/my-medical-records`, {
         method: 'GET',
         headers: this.getAuthHeaders()
@@ -566,7 +569,7 @@ class DoctorApiService {
 
       const result: ApiResponse<MedicalRecord[]> = await response.json();
       console.log('📄 My medical records result:', result);
-      
+
       if (!result.success) {
         throw new Error(result.message);
       }
@@ -584,7 +587,7 @@ class DoctorApiService {
   async updateMedicalRecordx(recordId: number, recordData: Partial<AddMedicalRecordRequest>): Promise<MedicalRecord> {
     try {
       console.log('🏥 Updating medical record:', recordId, recordData);
-      
+
       const response = await fetch(`${API_BASE_URL}/doctors/medical-records/${recordId}`, {
         method: 'PUT',
         headers: this.getAuthHeaders(),
@@ -601,7 +604,7 @@ class DoctorApiService {
 
       const result: ApiResponse<MedicalRecord> = await response.json();
       console.log('📄 Update medical record result:', result);
-      
+
       if (!result.success) {
         throw new Error(result.message);
       }
@@ -619,7 +622,7 @@ class DoctorApiService {
   async deleteMedicalRecord(recordId: number): Promise<void> {
     try {
       console.log('🗑️ Deleting medical record:', recordId);
-      
+
       const response = await fetch(`${API_BASE_URL}/doctors/medical-records/${recordId}`, {
         method: 'DELETE',
         headers: this.getAuthHeaders()
@@ -634,7 +637,7 @@ class DoctorApiService {
       }
 
       const result: ApiResponse<null> = await response.json();
-      
+
       if (!result.success) {
         throw new Error(result.message);
       }
@@ -649,17 +652,17 @@ class DoctorApiService {
   /**
    * Utility Methods
    */
-  
+
   // Check if doctor is authenticated
   isAuthenticated(): boolean {
-    const token = localStorage.getItem('DoctorToken');//-----------------------------------------------------------------------------------------
+    const token = localStorage.getItem('token');//-----------------------------------------------------------------------------------------
     return !!token;
   }
 
   // Get stored doctor data
   getStoredDoctorData(): DoctorProfile | null {
     try {
-      const doctorData = localStorage.getItem('doctorData');//-----------------------------------------------------------------------------------------
+      const doctorData = localStorage.getItem('userData');//-----------------------------------------------------------------------------------------
       return doctorData ? JSON.parse(doctorData) : null;
     } catch (error) {
       console.error('Error parsing stored doctor data:', error);
@@ -696,7 +699,7 @@ class DoctorApiService {
       }
 
       const result = await response.json();
-      
+
       if (!result.success) {
         throw new Error(result.message);
       }
@@ -727,11 +730,11 @@ class DoctorApiService {
         headers: this.getAuthHeaders(),
         body: JSON.stringify(recordData)
       });
-  
+
       if (!response.ok) {
         throw new Error('Failed to update medical record');
       }
-  
+
       const result = await response.json();
       return result.success;
     } catch (error) {
@@ -739,7 +742,7 @@ class DoctorApiService {
       throw error;
     }
   }
-  
+
   // Get single medical record
   async getMedicalRecord(recordId: number): Promise<any> {
     try {
@@ -747,11 +750,11 @@ class DoctorApiService {
         method: 'GET',
         headers: this.getAuthHeaders()
       });
-  
+
       if (!response.ok) {
         throw new Error('Failed to fetch medical record');
       }
-  
+
       const result = await response.json();
       return result.data;
     } catch (error) {
@@ -771,7 +774,7 @@ class DoctorApiService {
       }
 
       const result = await response.json();
-      
+
       if (!result.success) {
         throw new Error(result.message);
       }
@@ -818,7 +821,7 @@ class DoctorApiService {
       }
 
       const result = await response.json();
-      
+
       if (!result.success) {
         throw new Error(result.message);
       }

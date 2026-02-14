@@ -17,6 +17,10 @@ const aiRoutes = require('./routes/aiRoutes');
 const agoraRoutes = require('./routes/agoraRoutes');
 const IOThealthmetrics = require('./routes/healthMetricsRoutes')
 const cron = require('node-cron');
+
+
+
+
 const db = require("./config/db");
 
 
@@ -28,6 +32,7 @@ const app = express();
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
+
 
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -49,7 +54,7 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use("/api/prescriptions", prescriptionRoutes);
 app.use('/api/ai', aiRoutes);
-// app.use('/api/health-metrics',healthMetricsRoutes);
+
 
 
 // Start Server
