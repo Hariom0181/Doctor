@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { getAuthToken, getUserData, clearAuth } from '../lib/auth';
+
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
@@ -64,7 +66,7 @@ export default function DoctorMetricRequestForm() {
       setFetchingPatients(true);
       setError(null);
 
-      const token = getToken();
+      const token = getAuthToken();
       if (!token) {
         setError('No authentication token found. Please login first.');
         setFetchingPatients(false);
@@ -109,7 +111,7 @@ export default function DoctorMetricRequestForm() {
 
   const loadDeviceStatus = async () => {
     try {
-      const token = getToken();
+      const token = getAuthToken();
       if (!token) return;
 
       const response = await fetch(`${API_BASE_URL}/devices`, {
@@ -140,7 +142,7 @@ export default function DoctorMetricRequestForm() {
       setLoading(true);
       setError(null);
 
-      const token = getToken();
+      const token = getAuthToken();
       if (!token) {
         setError('No authentication token');
         setLoading(false);
@@ -190,7 +192,7 @@ export default function DoctorMetricRequestForm() {
       console.log(`⏳ Polling ${pollCount}/${maxPolls}...`);
 
       try {
-        const token = getToken();
+        const token = getAuthToken();
         if (!token) {
           clearInterval(pollInterval);
           setError('Token expired');
@@ -218,6 +220,7 @@ export default function DoctorMetricRequestForm() {
         const data = await response.json();
         console.log('📥 Response data:', data);
 
+        // Accept data if value exists (regardless of status)
         if (data.value) {
           console.log('✓ Device response received!');
           setStatus('received');
@@ -251,7 +254,7 @@ export default function DoctorMetricRequestForm() {
 
     try {
       setLoading(true);
-      const token = getToken();
+      const token = getAuthToken();
 
       const response = await fetch(`${API_BASE_URL}/health-metrics-iot/approve-metric/${metricValue.metricId}`, {
         method: 'POST',
@@ -280,7 +283,7 @@ export default function DoctorMetricRequestForm() {
 
     try {
       setLoading(true);
-      const token = getToken();
+      const token = getAuthToken();
 
       const response = await fetch(`${API_BASE_URL}/health-metrics-iot/retake/${metricValue.metricId}`, {
         method: 'POST',

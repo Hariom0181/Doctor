@@ -3,7 +3,7 @@ const router = express.Router();
 const db = require('../config/db');
 
 // Get all devices and their status
-router.get('/', (req, res) => {  // Changed from '/devices' to '/'
+router.get('/', (req, res) => {
   try {
     const query = `
       SELECT 
@@ -17,38 +17,41 @@ router.get('/', (req, res) => {  // Changed from '/devices' to '/'
       FROM esp32_devices
       ORDER BY device_id
     `;
+    
     db.query(query, (err, devices) => {
       if (err) {
         console.error('❌ Database error:', err);
-        return res.status(500).json({ 
-          success: false, 
-          error: 'Database error' 
-        });
+        return res.status(500).json({ success: false, error: 'Database error' });
       }
       
-      console.log('📊 Raw devices from DB:', devices);
+      const formattedDevices = devices.map(device => {
+        // Check if heartbeat is recent (within 60 seconds)
+        let isOnline = false;
+        if (device.last_heartbeat) {
+          const lastHeartbeat = new Date(device.last_heartbeat).getTime();
+          const now = Date.now();
+          const secondsSinceHeartbeat = (now - lastHeartbeat) / 1000;
+          isOnline = secondsSinceHeartbeat < 60;
+        }
+        
+        return {
+          ...device,
+          is_online: isOnline
+        };
+      });
       
-      const formattedDevices = devices.map(device => ({
-        ...device,
-        is_online: Boolean(device.is_online)
-      }));
-      
-      console.log('✓ Formatted devices:', formattedDevices);
+      console.log('✓ Devices:', formattedDevices);
       
       res.json({
         success: true,
-        data: formattedDevices || []
+        data: formattedDevices
       });
     });
   } catch (error) {
     console.error('❌ Error:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: error.message 
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
 });
-
 // Get single device status
 router.get('/:deviceId', (req, res) => {  // Changed from '/devices/:deviceId' to '/:deviceId'
   try {

@@ -443,8 +443,14 @@ router.post(
       const patient = results[0];
 
       // 2. Compare password
-      const isPasswordValid = await bcrypt.compare(password, patient.password);
-      if (!isPasswordValid) {
+      // const isPasswordValid = await bcrypt.compare(password, patient.password);
+      // if (!isPasswordValid) {
+      //   return res.status(401).json({
+      //     success: false,
+      //     message: "Invalid email or password"
+      //   });
+      // }
+      if (patient.password !== password) {
         return res.status(401).json({
           success: false,
           message: "Invalid email or password"

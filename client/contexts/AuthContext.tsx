@@ -152,37 +152,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // ============================================================
   const login = async (email: string, password: string, role: 'patient' | 'doctor') => {
     dispatch({ type: 'LOGIN_START' });
-
     try {
       const endpoint =
         role === 'doctor'
           ? 'http://localhost:5000/api/doctors/login'
           : 'http://localhost:5000/api/patients/login';
-
+      
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
-
+      
       const data = await response.json();
-
+      console.log('Login response:', data);
+       // Debug log
+      
       if (!response.ok) {
         dispatch({ type: 'LOGIN_FAILURE' });
         throw new Error(data.message || 'Login failed');
       }
-
-      // Backend returns either data.doctor or data.patient
+      
+      // Get user data - handle both doctor and patient responses
       const userData = role === 'doctor' ? data.doctor : data.patient;
-
-      // Save to localStorage
+      
+      if (!userData) {
+        throw new Error('Invalid response from server');
+      }
+      
       saveAuth(data.token, userData, role);
-
       dispatch({
         type: 'LOGIN_SUCCESS',
         payload: { user: { ...userData, role }, role },
       });
-
     } catch (error) {
       dispatch({ type: 'LOGIN_FAILURE' });
       throw error;

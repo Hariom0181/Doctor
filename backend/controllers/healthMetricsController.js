@@ -218,32 +218,25 @@ exports.requestMetric = async (req, res) => {
 exports.getRequestStatus = async (req, res) => {
   try {
     const { requestId } = req.params;
-
+    
     console.log('🔍 Looking for request:', requestId);
 
     const query = `
       SELECT * FROM patient_health_metrics 
-      WHERE reading_timestamp = (
-        SELECT MAX(reading_timestamp) FROM patient_health_metrics
-      )
+      WHERE request_id = ?
+      ORDER BY reading_timestamp DESC
       LIMIT 1
     `;
 
-    db.query(query, (err, results) => {
+    db.query(query, [requestId], (err, results) => {
       if (err) {
         console.error('❌ Database error:', err);
-        return res.status(500).json({
-          success: false,
-          error: 'Database error'
-        });
+        return res.status(500).json({ success: false, error: 'Database error' });
       }
 
       if (results.length === 0) {
         console.log('⏳ No reading found yet');
-        return res.status(404).json({
-          success: false,
-          error: 'No reading found'
-        });
+        return res.status(404).json({ success: false, error: 'No reading found' });
       }
 
       const metric = results[0];
@@ -261,10 +254,7 @@ exports.getRequestStatus = async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Server error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error'
-    });
+    res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };
 
