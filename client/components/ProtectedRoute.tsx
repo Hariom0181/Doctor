@@ -8,45 +8,31 @@ interface ProtectedRouteProps {
   requireAuth?: boolean;
 }
 
-export function ProtectedRoute({ 
-  children, 
-  allowedRoles, 
-  requireAuth = true 
+export function ProtectedRoute({
+  children,
+  allowedRoles,
+  requireAuth = true
 }: ProtectedRouteProps) {
-  const { isAuthenticated, user, isLoading } = useAuth();
+  const { isAuthenticated, role, isLoading } = useAuth();
+
   if (isLoading) return null;
+
   const location = useLocation();
+  const authPaths = ['/patient/login', '/patient/register', '/doctor/login', '/doctor/register'];
 
-  // If authentication is required but user is not authenticated
+  // Check role access
+  if (allowedRoles && role && !allowedRoles.includes(role)) {
+    return <Navigate to={role === 'patient' ? '/patient/dashboard' : '/doctor/dashboard'} replace />;
+  }
+
+  // Check authentication
   if (requireAuth && !isAuthenticated) {
-    // Redirect to appropriate login page based on the current path
-    if (location.pathname.includes('/doctor')) {
-      return <Navigate to="/doctor/login" state={{ from: location }} replace />;
-    } else {
-      return <Navigate to="/patient/login" state={{ from: location }} replace />;
-    }
+    return <Navigate to={location.pathname.includes('/doctor') ? '/doctor/login' : '/patient/login'} replace />;
   }
 
-  // If specific roles are required, check user role
-  if (allowedRoles && user && !allowedRoles.includes(user.role)) {
-    // Redirect to unauthorized page or appropriate dashboard
-    if (user.role === 'patient') {
-      return <Navigate to="/patient/dashboard" replace />;
-    } else {
-      return <Navigate to="/doctor/dashboard" replace />;
-    }
-  }
-
-  // If user is authenticated but trying to access auth pages, redirect to dashboard
-  if (isAuthenticated && user) {
-    const authPaths = ['/patient/login', '/patient/register', '/doctor/login', '/doctor/register'];
-    if (authPaths.includes(location.pathname)) {
-      if (user.role === 'patient') {
-        return <Navigate to="/patient/dashboard" replace />;
-      } else {
-        return <Navigate to="/doctor/dashboard" replace />;
-      }
-    }
+  // Redirect authenticated users away from auth pages
+  if (isAuthenticated && role && authPaths.includes(location.pathname)) {
+    return <Navigate to={role === 'patient' ? '/patient/dashboard' : '/doctor/dashboard'} replace />;
   }
 
   return <>{children}</>;

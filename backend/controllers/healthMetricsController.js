@@ -18,7 +18,10 @@ const initializeMQTT = () => {
     reconnectPeriod: 1000,
   });
 
+  let errorLogged = false;
+
   mqttClient.on('connect', () => {
+    errorLogged = false;
     console.log('✓ Connected to MQTT broker');
     mqttClient.subscribe('esp32/+/response', (err) => {
       if (err) console.error('❌ MQTT subscription error:', err);
@@ -27,7 +30,10 @@ const initializeMQTT = () => {
   });
 
   mqttClient.on('error', (err) => {
-    console.error('❌ MQTT error:', err);
+    if (!errorLogged) {
+      console.error('❌ MQTT error:', err.code);
+      errorLogged = true;
+    }
   });
 
   mqttClient.on('message', (topic, message) => {
@@ -187,11 +193,11 @@ exports.requestMetric = async (req, res) => {
 
           client.publish(topic, payload, (err) => {
             if (err) {
-              console.error('❌ MQTT publish error:', err);
-              return res.status(500).json({
+              console.error('❌ Device offline or MQTT unavailable');
+              return res.status(503).json({
                 success: false,
-                error: 'Failed to send command to device',
-                details: err.message
+                error: 'Device is offline. Please try again later.',
+                details: 'Cannot reach ESP32 device'
               });
             }
 
@@ -218,7 +224,7 @@ exports.requestMetric = async (req, res) => {
 exports.getRequestStatus = async (req, res) => {
   try {
     const { requestId } = req.params;
-    
+
     console.log('🔍 Looking for request:', requestId);
 
     const query = `
@@ -349,46 +355,71 @@ exports.approveMetric = async (req, res) => {
     const doctor_id = req.user?.id || req.doctor?.id;
 
     if (!doctor_id) {
-      return res.status(401).json({
-        success: false,
-        error: 'Doctor authentication required'
-      });
+      return res.status(401).json({ success: false, error: 'Doctor authentication required' });
     }
 
-    const query = `
-      UPDATE patient_health_metrics 
-      SET status = 'confirmed', confirmed_at = NOW()
+    // First, get the metric details
+    const getMetricQuery = `
+      SELECT * FROM patient_health_metrics 
       WHERE id = ? AND doctor_id = ?
     `;
 
-    db.query(query, [requestId, doctor_id], (err, result) => {
-      if (err) {
-        console.error('❌ Database error:', err);
-        return res.status(500).json({
-          success: false,
-          error: 'Database error'
-        });
+    db.query(getMetricQuery, [requestId, doctor_id], (err, results) => {
+      if (err || results.length === 0) {
+        return res.status(404).json({ success: false, error: 'Metric not found' });
       }
 
-      if (result.affectedRows === 0) {
-        return res.status(404).json({
-          success: false,
-          error: 'Metric not found or unauthorized'
-        });
-      }
+      const metric = results[0];
 
-      console.log('✓ Metric confirmed:', requestId);
-      res.json({
-        success: true,
-        message: 'Metric confirmed and saved'
+      // Update status to confirmed
+      const updateQuery = `
+        UPDATE patient_health_metrics 
+        SET status = 'confirmed', confirmed_at = NOW()
+        WHERE id = ?
+      `;
+
+      db.query(updateQuery, [requestId], (err) => {
+        if (err) {
+          return res.status(500).json({ success: false, error: 'Database error' });
+        }
+
+        // Insert into health_metrics table
+
+        const insertQuery = `
+        INSERT INTO health_metrics 
+        (patient_id, metric_type, value_numeric, unit, status, recorded_date, recorded_time, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+        const recordedDate = new Date(metric.reading_timestamp).toISOString().split('T')[0];
+        const recordedTime = new Date(metric.reading_timestamp).toTimeString().slice(0, 5);
+
+
+        db.query(
+          insertQuery,
+          [
+            metric.patient_id,
+            metric.metric_type,
+            parseFloat(metric.value),
+            metric.unit.replace('Â°', '°'),  // FIX THIS
+            'normal',
+            recordedDate,
+            recordedTime,
+            `IoT: ${metric.value} ${metric.unit}`
+          ],
+          (insertErr) => {
+            if (insertErr) {
+              console.error('Error inserting to health_metrics:', insertErr);
+            }
+
+            console.log('✓ Metric confirmed:', requestId);
+            res.json({ success: true, message: 'Metric confirmed and saved' });
+          }
+        );
       });
     });
   } catch (error) {
     console.error('❌ Server error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error'
-    });
+    res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };
 

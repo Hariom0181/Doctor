@@ -15,7 +15,7 @@ import { Camera, Wallet, X } from 'lucide-react';
 import { WalletCard } from '@/components/WalletCard';
 import { VideoConsultationBooking } from '@/components/VideoConsultationBooking';
 import { useAuth } from '@/contexts/AuthContext';
- 
+
 
 
 import { FloatingHealthAssistant } from '@/components/FloatingHealthAssistant';
@@ -60,7 +60,7 @@ import { patientApiService, HealthMetric, LinkedDoctor, AvailableDoctor, Patient
 
 
 export default function PatientDashboard() {
- 
+
   // ------------------------------
   const [activeTab, setActiveTab] = useState("overview"); // <-- Replace with backend: default tab if needed
   // const [patientData, setPatientData] = useState(INITIAL_PATIENT_DATA); // <-- Replace with backend: patient data
@@ -207,15 +207,11 @@ export default function PatientDashboard() {
   // Add this to your fetchMetrics function for better debugging
   const fetchMetrics = async () => {
     try {
-      const patientToken = localStorage.getItem("token"); //------------------------------------------------------------------------------------------
-
+      const patientToken = localStorage.getItem("token");
       if (!patientToken) {
-        console.error("No patient token found. User may not be logged in.");
+        console.error("No patient token found.");
         return;
       }
-
-    
-
       const response = await fetch(`http://localhost:5000/api/patients/health-metrics`, {
         method: "GET",
         headers: {
@@ -224,24 +220,13 @@ export default function PatientDashboard() {
         },
       });
 
-      console.log("Response status:", response.status);
-      console.log("Response OK:", response.ok);
-
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Response error:", errorText);
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const result = await response.json();
-      // console.log("Full API response:", result); // This will show us what we're getting
-
       if (result.success) {
         setHealthMetrics(result.data);
-        // console.log("Health metrics loaded:", result.data);
-        // console.log("Number of metrics:", result.data.length);
-      } else {
-        console.error("Failed to fetch health metrics:", result.message);
       }
     } catch (error) {
       console.error("Failed to fetch health metrics:", error);
@@ -424,7 +409,7 @@ export default function PatientDashboard() {
       setLoadingPatientDetails(true);
       setIsViewDialogOpen(true);
 
-      const details = await patientApiService.getPatientDetails(patientId,'patient');
+      const details = await patientApiService.getPatientDetails(patientId, 'patient');
       setViewingPatient(details);
     } catch (error) {
       console.error('Error loading patient details:', error);
@@ -773,37 +758,33 @@ export default function PatientDashboard() {
     fetchLinkedDoctors();
   }, []);
 
-  // Fetch available doctors for selection
+
   useEffect(() => {
     const fetchAvailableDoctors = async () => {
-      // console.log('🔄 Fetching available doctors...');
+
       setIsLoadingAvailableDoctors(true);
 
       try {
         const doctors = await patientApiService.getAvailableDoctors();
-        // console.log('✅ Available doctors fetched:', doctors);
+
         setAvailableDoctors(doctors);
 
-        // Update the doctors list for the profile section dropdown
+
         if (doctors.length > 0) {
           const transformedDoctors = doctors.map(doctor => ({
             id: doctor.id.toString(),
             name: doctor.name,
             specialization: doctor.specialization
           }));
-          // console.log('🔄 Transforming doctors for dropdown:', transformedDoctors);
-          setDoctorsList(transformedDoctors);
-          // console.log('🔄 Updated doctorsList state with:', transformedDoctors.length, 'doctors');
 
-          // Force a re-render by updating a timestamp
-          // console.log('🔄 Doctors list updated, should re-render dropdown');
+          setDoctorsList(transformedDoctors);
+
         } else {
           console.log('⚠️ No doctors found in API response');
         }
       } catch (error) {
         console.error('❌ Failed to fetch available doctors:', error);
-        // Keep the hardcoded doctors list as fallback
-        // console.log('🔄 Using fallback doctors list');
+
       } finally {
         setIsLoadingAvailableDoctors(false);
       }
@@ -1294,7 +1275,7 @@ export default function PatientDashboard() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-gray-400">
-                        {['Blood Pressure', 'Blood Sugar', 'Weight', 'Heart Rate'][index]}
+                        {['Blood Pressure', 'Temperature', 'Weight', 'Heart Rate'][index]}
                       </p>
                       <p className="text-2xl font-bold text-gray-300">
                         No data

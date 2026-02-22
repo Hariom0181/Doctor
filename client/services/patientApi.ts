@@ -111,10 +111,7 @@ class PatientApiService {
   }
 
   private getAuthHeadersByRole(role: 'patient' | 'doctor'): HeadersInit {
-    const token =
-      role === 'patient'
-        ? localStorage.getItem('PatientToken')
-        : localStorage.getItem('DoctorToken');
+    const token = localStorage.getItem('token');
   
     if (!token) {
       throw new Error(`${role} not authenticated. Please login.`);
@@ -125,8 +122,6 @@ class PatientApiService {
       Authorization: `Bearer ${token}`
     };
   }
-
-
   async getLinkedDoctors(patientId: string): Promise<LinkedDoctor[]> {
     try {
       // Add timeout to prevent long waits
@@ -315,7 +310,7 @@ class PatientApiService {
       const formData = new FormData();
       formData.append('profileImage', imageFile);
 
-      const token = localStorage.getItem('PatientToken'); //-----------------------------------------------------------------------------------------
+      const token = localStorage.getItem('token'); //-----------------------------------------------------------------------------------------
 
       const response = await fetch(`${API_BASE_URL}/patients/${patientId}/upload-profile`, {
         method: 'POST',
@@ -496,7 +491,7 @@ class PatientApiService {
   }
   async uploadPatientDocument(formData: FormData): Promise<{ success: boolean; documentId: number; filePath: string }> {
     try {
-      const token = localStorage.getItem('PatientToken'); //-----------------------------------------------------------------------------------------
+      const token = localStorage.getItem('token'); //-----------------------------------------------------------------------------------------
 
       const response = await fetch(`${API_BASE_URL}/documents/upload`, {
         method: 'POST',

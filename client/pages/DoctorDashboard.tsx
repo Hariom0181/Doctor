@@ -705,7 +705,7 @@ export default function DoctorDashboard() {
         medicationName: newMedication.medicationName,
         dosage: newMedication.dosage,
         frequency: newMedication.frequency,
-        duration: newMedication.duration,
+        duration:  parseInt(newMedication.duration),
         instructions: newMedication.instructions,
         startDate: newMedication.startDate
       });

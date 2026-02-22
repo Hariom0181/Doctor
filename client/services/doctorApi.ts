@@ -675,13 +675,14 @@ class DoctorApiService {
     const doctorData = this.getStoredDoctorData();
     return doctorData?.id || null;
   }
+  
   async prescribeMedication(prescriptionData: {
     patientId: number;
     doctorId: number;
     medicationName: string;
     dosage: string;
     frequency: string;
-    duration: string;
+    duration: number;
     instructions?: string;
     startDate: string;
     endDate?: string;
@@ -695,6 +696,7 @@ class DoctorApiService {
 
       if (!response.ok) {
         const error = await response.json();
+        console.log("Validation Errors:", error.errors);
         throw new Error(error.message || 'Failed to create prescription');
       }
 

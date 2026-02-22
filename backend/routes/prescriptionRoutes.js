@@ -37,11 +37,10 @@ router.post(
       frequency,
       duration,
       instructions,
-      startDate,
-      calculatedEndDate
+      startDate
     } = req.body;
-
-    calculatedEndDate = new Date(startDate);
+    
+    let calculatedEndDate = new Date(startDate);
     calculatedEndDate.setDate(calculatedEndDate.getDate() + parseInt(duration));
 
     const sql = `

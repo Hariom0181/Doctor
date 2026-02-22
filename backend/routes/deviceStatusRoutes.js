@@ -7,23 +7,18 @@ router.get('/', (req, res) => {
   try {
     const query = `
       SELECT 
-        device_id,
-        device_name,
-        is_online,
-        last_heartbeat,
-        current_metric_type,
-        battery_level,
-        firmware_version
+        device_id, device_name, is_online, last_heartbeat,
+        current_metric_type, battery_level, firmware_version
       FROM esp32_devices
       ORDER BY device_id
     `;
-    
+
     db.query(query, (err, devices) => {
       if (err) {
         console.error('❌ Database error:', err);
         return res.status(500).json({ success: false, error: 'Database error' });
       }
-      
+
       const formattedDevices = devices.map(device => {
         // Check if heartbeat is recent (within 60 seconds)
         let isOnline = false;
@@ -33,19 +28,25 @@ router.get('/', (req, res) => {
           const secondsSinceHeartbeat = (now - lastHeartbeat) / 1000;
           isOnline = secondsSinceHeartbeat < 60;
         }
-        
+
+        // Update database if status changed
+        if (isOnline !== device.is_online) {
+          db.query(
+            'UPDATE esp32_devices SET is_online = ? WHERE device_id = ?',
+            [isOnline ? 1 : 0, device.device_id],
+            (err) => {
+              if (err) console.error('Error updating device status:', err);
+            }
+          );
+        }
+
         return {
           ...device,
           is_online: isOnline
         };
       });
-      
-      console.log('✓ Devices:', formattedDevices);
-      
-      res.json({
-        success: true,
-        data: formattedDevices
-      });
+
+      res.json({ success: true, data: formattedDevices });
     });
   } catch (error) {
     console.error('❌ Error:', error);
@@ -56,39 +57,39 @@ router.get('/', (req, res) => {
 router.get('/:deviceId', (req, res) => {  // Changed from '/devices/:deviceId' to '/:deviceId'
   try {
     const { deviceId } = req.params;
-    
+
     const query = `
       SELECT * FROM esp32_devices 
       WHERE device_id = ?
     `;
     db.query(query, [deviceId], (err, results) => {
       if (err) {
-        return res.status(500).json({ 
-          success: false, 
-          error: 'Database error' 
+        return res.status(500).json({
+          success: false,
+          error: 'Database error'
         });
       }
       if (results.length === 0) {
-        return res.status(404).json({ 
-          success: false, 
-          error: 'Device not found' 
+        return res.status(404).json({
+          success: false,
+          error: 'Device not found'
         });
       }
-      
+
       const device = {
         ...results[0],
         is_online: Boolean(results[0].is_online)
       };
-      
+
       res.json({
         success: true,
         data: device
       });
     });
   } catch (error) {
-    res.status(500).json({ 
-      success: false, 
-      error: error.message 
+    res.status(500).json({
+      success: false,
+      error: error.message
     });
   }
 });

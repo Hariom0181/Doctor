@@ -22,7 +22,7 @@ interface MetricValue {
   metricId: number;
 }
 
-const getToken = () => localStorage.getItem('DoctorToken');
+
 
 export default function DoctorMetricRequestForm() {
   const [linkedPatients, setLinkedPatients] = useState<LinkedPatient[]>([]);
@@ -82,7 +82,6 @@ export default function DoctorMetricRequestForm() {
           'Authorization': `Bearer ${token}`,
         },
       });
-
       if (response.status === 401) {
         setError('Unauthorized. Please login again.');
         setFetchingPatients(false);
@@ -135,6 +134,11 @@ export default function DoctorMetricRequestForm() {
   const handleRequestMetric = async () => {
     if (!selectedPatientId) {
       setError('Please select a patient');
+      return;
+    }
+    const selectedDevice = devices.find(d => d.device_id === deviceId);
+    if (!selectedDevice?.is_online) {
+      setError('❌ Device is offline. Please check ESP32 connection.');
       return;
     }
 
@@ -196,6 +200,7 @@ export default function DoctorMetricRequestForm() {
         if (!token) {
           clearInterval(pollInterval);
           setError('Token expired');
+          setStatus('idle');
           return;
         }
 
@@ -207,11 +212,19 @@ export default function DoctorMetricRequestForm() {
           },
         });
 
+        // Device offline response
+        if (response.status === 503) {
+          clearInterval(pollInterval);
+          setError('❌ Device is offline. Please check ESP32 connection and try again.');
+          setStatus('idle');
+          return;
+        }
+
         if (!response.ok) {
           console.log(`⏳ Still waiting... (${pollCount}s)`);
           if (pollCount >= maxPolls) {
             clearInterval(pollInterval);
-            setError('Device response timeout. Please try again.');
+            setError('Device not responding. Please try again later.');
             setStatus('idle');
           }
           return;
@@ -220,7 +233,6 @@ export default function DoctorMetricRequestForm() {
         const data = await response.json();
         console.log('📥 Response data:', data);
 
-        // Accept data if value exists (regardless of status)
         if (data.value) {
           console.log('✓ Device response received!');
           setStatus('received');
@@ -235,15 +247,17 @@ export default function DoctorMetricRequestForm() {
         console.error('❌ Polling error:', err);
         if (pollCount >= maxPolls) {
           clearInterval(pollInterval);
+          setError('Network error. Please try again.');
           setStatus('idle');
         }
       }
     }, 2000);
 
+    // Fallback timeout - clears after 30s max
     setTimeout(() => {
       clearInterval(pollInterval);
       if (status === 'requested') {
-        setError('Device response timeout. Please try again.');
+        setError('Device not responding. Please try again.');
         setStatus('idle');
       }
     }, 30000);

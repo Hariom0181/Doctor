@@ -7,7 +7,6 @@ const CloudinaryStorage = require('multer-storage-cloudinary').CloudinaryStorage
 const { uploadProfile } = require("../config/cloudinary");
 const bcrypt = require("bcrypt");
 
-
 const authenticatePatient = (req, res, next) => {
   const token = req.header('Authorization')?.replace('Bearer ', '');
   if (!token) {
@@ -36,12 +35,141 @@ const authenticatePatient = (req, res, next) => {
     });
   }
 };
+const authenticateDoctor = (req, res, next) => {
+  const token = req.header('Authorization')?.replace('Bearer ', '');
+  if (!token) {
+    return res.status(401).json({
+      success: false,
+      message: "Access denied. No token provided."
+    });
+  }
+  try {
+    const jwtSecret = process.env.JWT_SECRET || "your-fallback-secret-key-change-in-production";
+    const decoded = jwt.verify(token, jwtSecret);
+    if (decoded.type !== 'doctor') {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Doctor credentials required."
+      });
+    }
+    req.doctor = decoded;
+    next();
+  } catch (error) {
+    res.status(401).json({
+      success: false,
+      message: "Invalid token"
+    });
+  }
+};
+
+// Doctor view patient details
+router.get('/:patientId/details', authenticateDoctor, (req, res) => {
+  try {
+    const { patientId } = req.params;
+    const doctorId = req.doctor.id;
+
+    console.log('🔍 Checking link for - Patient:', patientId, 'Doctor:', doctorId);
+
+    const checkLinkSql = `
+      SELECT id FROM patient_doctors 
+      WHERE patient_id = ? AND doctor_id = ? AND status = 'active'
+    `;
+
+    db.query(checkLinkSql, [patientId, doctorId], (err, linkResults) => {
+      console.log('📊 Link query result:', linkResults, 'Error:', err);
+      
+      if (err || linkResults.length === 0) {
+        return res.status(403).json({ success: false, message: 'Access denied' });
+      }
+
+      const sql = `
+        SELECT 
+          id, firstName, lastName, email, phone, dateOfBirth, gender,
+          address, city, state, pincode, emergencyContact, emergencyPhone,
+          bloodGroup, allergies, medicalHistory, created_at, profile_img
+        FROM patients 
+        WHERE id = ?
+      `;
+
+      db.query(sql, [patientId], (err, results) => {
+        if (err || results.length === 0) {
+          return res.status(404).json({ success: false, message: 'Patient not found' });
+        }
+
+        res.json({
+          success: true,
+          data: results[0]
+        });
+      });
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
 
 
+// Get patient's next checkup date from medical records
+// Get patient's next checkup date from medical records
+router.get('/:patientId/next-checkup', authenticatePatient, (req, res) => {
+  try {
+    const { patientId } = req.params;
+
+    const sql = `
+    SELECT 
+      mr.next_checkup_date,
+      DATEDIFF(mr.next_checkup_date, CURDATE()) as days_remaining,
+      COALESCE(CONCAT(d.first_name, ' ', d.last_name), 'Doctor') as doctor_name,
+      d.specialization,
+      mr.examination_type
+    FROM medical_records mr
+    LEFT JOIN doctors d ON mr.doctor_id = d.id
+    WHERE mr.patient_id = ? AND mr.next_checkup_date IS NOT NULL
+    ORDER BY mr.next_checkup_date DESC
+    LIMIT 1
+  `;
+
+    db.query(sql, [patientId], (err, results) => {
+      if (err) {
+        console.error('Error:', err);
+        return res.status(500).json({
+          success: false,
+          message: 'Error fetching checkup'
+        });
+      }
+
+      if (results.length === 0) {
+        return res.json({
+          success: true,
+          data: null,
+          message: 'No upcoming checkup'
+        });
+      }
+
+      const checkup = results[0];
+      res.json({
+        success: true,
+        data: {
+          date: checkup.next_checkup_date,
+          daysRemaining: checkup.days_remaining,
+          doctorName: `${checkup.first_name} ${checkup.last_name}`,
+          specialization: checkup.specialization,
+          examinationType: checkup.examination_type
+        }
+      });
+    });
+  } catch (error) {
+    console.error('Server error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
 // Configure multer for profile image upload
 
+// Upload patient profile image
 router.post(
-  "/upload-profile",
+  "/:patientId/upload-profile",
   authenticatePatient,
   (req, res, next) => {
     uploadProfile.single("profileImage")(req, res, (err) => {
@@ -56,6 +184,17 @@ router.post(
   },
   async (req, res) => {
     try {
+      const { patientId } = req.params;
+      const authenticatedPatientId = req.patient.id;
+
+      // Security: Patient can only upload their own profile
+      if (patientId != authenticatedPatientId) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied. You can only upload your own profile image"
+        });
+      }
+
       if (!req.file) {
         return res.status(400).json({
           success: false,
@@ -63,21 +202,21 @@ router.post(
         });
       }
 
-      const patientId = req.patient.id;
       const cloudinaryUrl = req.file.path;
-
       const sql = "UPDATE patients SET profile_img = ? WHERE id = ?";
 
       db.query(sql, [cloudinaryUrl, patientId], (err) => {
         if (err) {
+          console.error("Error updating profile image:", err);
           return res.status(500).json({
             success: false,
-            message: "Error updating profile picture"
+            message: "Error updating profile image"
           });
         }
 
         res.json({
           success: true,
+          message: "Profile image uploaded successfully",
           profileImagePath: cloudinaryUrl
         });
       });
@@ -91,7 +230,70 @@ router.post(
   }
 );
 
+// Save push notification token
+router.post('/save-push-token', authenticatePatient, (req, res) => {
+  try {
+    const { pushToken } = req.body;
+    const patientId = req.patient.id;
 
+    if (!pushToken) {
+      return res.status(400).json({
+        success: false,
+        message: 'Push token is required'
+      });
+    }
+
+    const sql = 'UPDATE patients SET push_token = ? WHERE id = ?';
+    
+    db.query(sql, [pushToken, patientId], (err, result) => {
+      if (err) {
+        console.error('Error saving push token:', err);
+        return res.status(500).json({
+          success: false,
+          message: 'Error saving push token'
+        });
+      }
+
+      res.json({
+        success: true,
+        message: 'Push token saved successfully'
+      });
+    });
+  } catch (error) {
+    console.error('Server error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+
+// Send test notification
+router.post('/send-test-notification', authenticatePatient, async (req, res) => {
+  try {
+    const patientId = req.patient.id;
+    const { title, body } = req.body;
+
+    await sendNotificationToPatient(
+      patientId, 
+      title || 'Test Notification',
+      body || 'This is a test push notification'
+    );
+
+    res.json({
+      success: true,
+      message: 'Notification sent successfully'
+    });
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to send notification',
+      error: error.message 
+    });
+  }
+});
 
 // Update medical record
 router.put('/medical-records/:recordId', async (req, res) => {
@@ -733,115 +935,102 @@ router.get(
   }
 );
 // Add this to your patientRoutes.js file
+// getting own specific health metrics 
 router.get("/health-metrics", authenticatePatient, async (req, res) => {
   try {
-    const patientId = req.patient.id; // Get patient ID from token
+    const patientId = req.patient.id;
 
+    // Get from BOTH tables
+    const iotQuery = `
+      SELECT 
+        id, metric_type, value as value_numeric, unit, 
+        'normal' as status, DATE(reading_timestamp) as recorded_date,
+        TIME(reading_timestamp) as recorded_time, 
+        'IoT Device' as notes, reading_timestamp as created_at
+      FROM patient_health_metrics 
+      WHERE patient_id = ? AND status = 'confirmed'
+    `;
 
-
-    // Get health metrics for this patient
-    const getMetricsSql = `
+    const manualQuery = `
       SELECT 
         id, metric_type, value_systolic, value_diastolic, value_numeric,
         unit, status, recorded_date, recorded_time, notes, created_at
       FROM health_metrics 
-      WHERE patient_id = ? 
-      ORDER BY metric_type, recorded_date DESC, recorded_time DESC
+      WHERE patient_id = ?
     `;
 
-    db.query(getMetricsSql, [patientId], (metricsErr, metricsResults) => {
-      if (metricsErr) {
-        console.error("Database error during metrics fetch:", metricsErr);
-        return res.status(500).json({
-          success: false,
-          message: "Database error during metrics retrieval"
+    // Execute both queries
+    db.query(iotQuery, [patientId], (err1, iotResults) => {
+      db.query(manualQuery, [patientId], (err2, manualResults) => {
+        if (err1 || err2) {
+          return res.status(500).json({ success: false, message: "Database error" });
+        }
+
+        // Combine and group by metric type (latest only)
+        const allMetrics = [...iotResults, ...manualResults];
+        const groupedMetrics = {};
+
+        allMetrics.forEach(metric => {
+          if (!groupedMetrics[metric.metric_type]) {
+            groupedMetrics[metric.metric_type] = metric;
+          }
         });
-      }
 
-      // console.log("Raw metrics from database:", metricsResults);
-      // console.log("Number of raw metrics:", metricsResults.length);
+        // Format for frontend
+        const formattedMetrics = Object.values(groupedMetrics).map(metric => {
+          let displayValue = "";
+          let label = "";
+          
+          switch (metric.metric_type) {
+            case "blood_pressure":
+              displayValue = `${metric.value_systolic}/${metric.value_diastolic}`;
+              label = "Blood Pressure";
+              break;
+            case "temperature":
+              displayValue = `${metric.value_numeric} ${metric.unit || '°C'}`;
+              label = "Temperature";
+              break;
+            case "blood_sugar":
+              displayValue = `${metric.value_numeric} ${metric.unit || 'mg/dL'}`;
+              label = "Blood Sugar";
+              break;
+            case "weight":
+              displayValue = `${metric.value_numeric} ${metric.unit || 'kg'}`;
+              label = "Weight";
+              break;
+            case "heart_rate":
+              displayValue = `${metric.value_numeric} ${metric.unit || 'bpm'}`;
+              label = "Heart Rate";
+              break;
+            default:
+              displayValue = metric.value_numeric ? `${metric.value_numeric} ${metric.unit || ''}`.trim() : "";
+              label = metric.metric_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+          }
 
-      // If no metrics found, return empty array but with success
-      if (metricsResults.length === 0) {
-        console.log("No metrics found for patient:", patientId);
-        return res.json({
+          return {
+            id: metric.id,
+            label,
+            value: displayValue,
+            status: metric.status || "normal",
+            lastChecked: metric.recorded_date,
+            notes: metric.notes
+          };
+        });
+
+        res.json({
           success: true,
-          message: "No health metrics found for this patient",
-          data: [],
-          patientId: patientId
+          message: "Health metrics retrieved successfully",
+          data: formattedMetrics,
+          patientId
         });
-      }
-
-      // Group by metric type and get the latest for each type
-      const groupedMetrics = {};
-      metricsResults.forEach(metric => {
-        if (!groupedMetrics[metric.metric_type]) {
-          groupedMetrics[metric.metric_type] = metric; // Take the first (latest) one
-        }
-      });
-
-      console.log("Grouped metrics:", groupedMetrics);
-
-      // Format for frontend display
-      const formattedMetrics = Object.values(groupedMetrics).map(metric => {
-        let displayValue = "";
-        let label = "";
-
-        switch (metric.metric_type) {
-          case "blood_pressure":
-            displayValue = `${metric.value_systolic}/${metric.value_diastolic}`;
-            label = "Blood Pressure";
-            break;
-          case "blood_sugar":
-            displayValue = `${metric.value_numeric} ${metric.unit || 'mg/dL'}`;
-            label = "Blood Sugar";
-            break;
-          case "weight":
-            displayValue = `${metric.value_numeric} ${metric.unit || 'kg'}`;
-            label = "Weight";
-            break;
-          case "heart_rate":
-            displayValue = `${metric.value_numeric} ${metric.unit || 'bpm'}`;
-            label = "Heart Rate";
-            break;
-          default:
-            displayValue = metric.value_numeric ? `${metric.value_numeric} ${metric.unit || ''}`.trim() : "";
-            label = metric.metric_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-        }
-
-        return {
-          id: metric.id,
-          label: label,
-          value: displayValue,
-          status: metric.status || "normal",
-          lastChecked: metric.recorded_date,
-          notes: metric.notes
-        };
-      });
-
-
-
-      res.json({
-        success: true,
-        message: "Health metrics retrieved successfully",
-        data: formattedMetrics,
-        patientId: patientId
       });
     });
-
   } catch (error) {
     console.error("Server error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error"
-    });
+    res.status(500).json({ success: false, message: "Internal server error" });
   }
 });
-// GET /api/patients/:patientId/medical-records
-// GET /api/patients/:patientId/medical-records
 
-// GET single patient details by ID (for doctor to view)
-// GET single patient details by ID (for doctor to view)
 router.get('/details', authenticatePatient, (req, res) => {  try {
   const patientId = req.patient.id;
     const sql = `

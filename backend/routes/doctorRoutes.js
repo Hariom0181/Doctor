@@ -5,7 +5,6 @@ const { body, validationResult } = require("express-validator");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { uploadProfile } = require("../config/cloudinary");
-
 // ============================================================
 // AUTH MIDDLEWARE
 // ============================================================
@@ -38,6 +37,34 @@ const authenticateDoctor = (req, res, next) => {
     return res.status(401).json({
       success: false,
       message: "Invalid or expired token.",
+    });
+  }
+};
+const authenticatePatient = (req, res, next) => {
+  const token = req.header('Authorization')?.replace('Bearer ', '');
+  if (!token) {
+    return res.status(401).json({
+      success: false,
+      message: "Access denied. No token provided."
+    });
+  }
+
+  try {
+    const jwtSecret = process.env.JWT_SECRET || "your-fallback-secret-key-change-in-production";
+    const decoded = jwt.verify(token, jwtSecret);
+    // ✅ FIXED: Set req.patient instead of req.doctor
+    if (decoded.type !== 'patient') {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Patient credentials required."
+      });
+    }
+    req.patient = decoded;
+    next();
+  } catch (error) {
+    res.status(401).json({
+      success: false,
+      message: "Invalid token"
     });
   }
 };
@@ -378,7 +405,7 @@ router.post(
               process.env.JWT_SECRET ||
               "your-fallback-secret-key-change-in-production";
 
-            const token = jwt.sign(
+            const token = jwt.sign( 
               { id: doctor.id, email: doctor.email, type: "doctor" },
               jwtSecret,
               { expiresIn: "24h" }
@@ -560,6 +587,30 @@ router.get("/recent-activities", authenticateDoctor, (req, res) => {
     }
     res.json({ success: true, data: results, count: results.length });
   });
+});
+
+// Get doctor profile image by doctor ID (for patients)
+router.get("/profile-image/:doctorId", authenticatePatient, (req, res) => {
+  const { doctorId } = req.params;
+
+  db.query(
+    "SELECT profile_img FROM doctors WHERE id = ?",
+    [doctorId],
+    (err, results) => {
+      if (err) {
+        return res.status(500).json({ success: false, message: "Error fetching profile image" });
+      }
+
+      if (results.length === 0 || !results[0].profile_img) {
+        return res.status(404).json({ success: false, message: "No profile image found" });
+      }
+
+      res.json({
+        success: true,
+        profileImagePath: results[0].profile_img
+      });
+    }
+  );
 });
 
 // Patient risk assessment for logged-in doctor

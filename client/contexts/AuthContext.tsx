@@ -143,8 +143,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     } else {
       // No session — stop loading
+      clearAuth()
       dispatch({ type: 'LOGIN_FAILURE' });
     }
+  }, []);
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // Optional: logout on tab close
+      // clearAuth();
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, []);
 
   // ============================================================

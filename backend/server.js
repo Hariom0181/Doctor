@@ -189,10 +189,12 @@ app.use('/api/health-metrics', healthMetricsRoutes);
 
 // ============ START SERVER ============
 const PORT = 5000;
-app.listen(PORT, () => {
-  console.log(`✅ Server running on http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ Server running on http://0.0.0.0:${PORT}`);
 });
-
+app.get('/', (req, res) => {
+  res.json({ message: 'Backend is reachable' });
+});
 // ============ CRON JOB ============
 cron.schedule('*/1 * * * *', async () => {
   const sql = `
@@ -211,3 +213,13 @@ cron.schedule('*/1 * * * *', async () => {
     }
   });
 });
+
+cron.schedule('0 0 * * *', () => {
+  const sql = `UPDATE prescriptions SET status = 'completed' WHERE end_date < CURDATE()`;
+  db.query(sql, (err) => {
+    if (err) console.error('Auto-expire error:', err);
+    else console.log('✅ Expired old prescriptions');
+  });
+});
+
+
