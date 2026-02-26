@@ -16,6 +16,7 @@ import {
   Monitor,
   Users,
   Clock,
+  AlertCircle,
 } from 'lucide-react';
 import { agoraApiService } from '@/services/agoraApi';
 import { useToast } from '@/hooks/use-toast';
@@ -49,10 +50,16 @@ export function VideoCallRoom({
   const [remoteUsers, setRemoteUsers] = useState<number[]>([]);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isEnding, setIsEnding] = useState(false);
-  
-  // ✅ CRITICAL: Prevent double-joining in React StrictMode
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+
+  // ✅ CRITICAL: Refs to prevent double operations
   const hasJoinedRef = useRef(false);
   const isJoiningRef = useRef(false);
+  const clientRef = useRef<IAgoraRTCClient | null>(null);
+  const tracksRef = useRef<{ video: ICameraVideoTrack | null; audio: IMicrophoneAudioTrack | null }>({
+    video: null,
+    audio: null,
+  });
 
   // Timer effect
   useEffect(() => {
@@ -64,58 +71,138 @@ export function VideoCallRoom({
     }
   }, [isJoined]);
 
+  // Add this BEFORE initializeAgora is called
+  useEffect(() => {
+    // Before joining, make sure all previous tracks are closed
+    const cleanupPreviousTracks = async () => {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(d => d.kind === 'videoinput');
+        console.log('📹 Available cameras:', videoDevices.length);
+      } catch (error) {
+        console.error('Error checking devices:', error);
+      }
+    };
+
+    cleanupPreviousTracks();
+
+    // Return cleanup function
+    return () => {
+      console.log('Component unmounting, cleaning up...');
+    };
+  }, []);
+
   // ✅ SINGLE useEffect for joining
   useEffect(() => {
-    // Prevent double-joining
     if (hasJoinedRef.current || isJoiningRef.current) {
       console.log('🚫 Already joined or joining, skipping...');
       return;
     }
 
-    hasJoinedRef.current = true;
-    isJoiningRef.current = true;
+    // ✅ Add delay for doctor to prevent UID_CONFLICT
+    const delayMs = role === 'doctor' ? 2500 : 500; // Doctor waits 2.5 seconds
 
-    initializeAgora();
+    console.log(`⏳ Waiting ${delayMs}ms before joining (role: ${role})`);
+
+    const timer = setTimeout(() => {
+      hasJoinedRef.current = true;
+      isJoiningRef.current = true;
+      initializeAgora();
+    }, delayMs);
 
     return () => {
+      clearTimeout(timer);
       console.log('🧹 Cleanup: Leaving channel');
       leaveChannel();
       hasJoinedRef.current = false;
       isJoiningRef.current = false;
     };
-  }, []); // ✅ Empty deps - only run once
+  }, []);
+
+  // ✅ Safely close tracks
+  // In closeTracks function, add longer delay
+  const closeTracks = async () => {
+    try {
+      if (tracksRef.current.video) {
+        console.log('🛑 Closing video track');
+        tracksRef.current.video.stop();
+        tracksRef.current.video.close();
+        tracksRef.current.video = null;
+      }
+      if (tracksRef.current.audio) {
+        console.log('🛑 Closing audio track');
+        tracksRef.current.audio.stop();
+        tracksRef.current.audio.close();
+        tracksRef.current.audio = null;
+      }
+
+      // ✅ INCREASE delay
+      await new Promise(resolve => setTimeout(resolve, 3000)); // 2 seconds instead of 1
+    } catch (error) {
+      console.error('Error closing tracks:', error);
+    }
+  };
+
 
   const initializeAgora = async () => {
     try {
+      setConnectionError(null);
       console.log('🎥 Initializing Agora for', role, 'userId:', userId);
 
-      // ✅ Create Agora client ONCE
+       try {
+      console.log('🔍 Checking camera access...');
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: true, 
+        audio: true 
+      });
+      stream.getTracks().forEach(track => track.stop());
+      console.log('✅ Camera access granted');
+    } catch (permError: any) {
+      console.error('❌ Camera permission error:', permError.message);
+      setConnectionError('Camera not available. Check browser permissions.');
+      return;
+    }
+
+
+      // ✅ Close any existing tracks FIRST
+      await closeTracks();
+
+      // ✅ Small delay to ensure device is released
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      console.log('✅ Device released, creating new tracks...');
+
+      // ✅ Create fresh Agora client
       const agoraClient = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
-      
-      // Set up event listeners
+      clientRef.current = agoraClient;
+
+      // ✅ Set up event listeners
       agoraClient.on('user-published', async (user, mediaType) => {
         console.log('👤 User published:', user.uid, mediaType);
-        await agoraClient.subscribe(user, mediaType);
+        try {
+          await agoraClient.subscribe(user, mediaType);
 
-        if (mediaType === 'video') {
-          const remoteVideoTrack = user.videoTrack;
-          const remotePlayerContainer = document.getElementById(`remote-player-${user.uid}`);
-          if (remotePlayerContainer) {
-            remoteVideoTrack?.play(remotePlayerContainer);
+          if (mediaType === 'video') {
+            const remoteVideoTrack = user.videoTrack;
+            const remotePlayerContainer = document.getElementById(`remote-player-${user.uid}`);
+            if (remotePlayerContainer) {
+              remoteVideoTrack?.play(remotePlayerContainer);
+            }
           }
-        }
 
-        if (mediaType === 'audio') {
-          const remoteAudioTrack = user.audioTrack;
-          remoteAudioTrack?.play();
-        }
-
-        setRemoteUsers((prev) => {
-          if (!prev.includes(user.uid as number)) {
-            return [...prev, user.uid as number];
+          if (mediaType === 'audio') {
+            const remoteAudioTrack = user.audioTrack;
+            remoteAudioTrack?.play();
           }
-          return prev;
-        });
+
+          setRemoteUsers((prev) => {
+            if (!prev.includes(user.uid as number)) {
+              return [...prev, user.uid as number];
+            }
+            return prev;
+          });
+        } catch (error) {
+          console.error('Error subscribing to user:', error);
+        }
       });
 
       agoraClient.on('user-unpublished', (user) => {
@@ -128,8 +215,24 @@ export function VideoCallRoom({
         setRemoteUsers((prev) => prev.filter((uid) => uid !== user.uid));
       });
 
-      // ✅ Get Agora credentials
+      // ✅ Error handler
+      agoraClient.on('error', (error) => {
+        console.error('❌ Agora Error:', error);
+        setConnectionError(`Agora Error: ${error.message}`);
+      });
+
+      // ✅ Connection state change
+      agoraClient.on('connection-state-change', (curState, revState, reason) => {
+        console.log('📡 Connection state:', curState, 'Reason:', reason);
+        if (curState === 'DISCONNECTED') {
+          setConnectionError('Connection lost. Attempting to reconnect...');
+        }
+      });
+
+      // ✅ Get token with unique UID
       const credentials = await agoraApiService.generateToken(consultationId, userId, role);
+      console.log('🔑 MY UID:', credentials.uid, 'Role:', role);
+      console.log('🔑 Consultation ID:', consultationId, 'User ID:', userId);
 
       console.log('🔑 Credentials received:', {
         appId: credentials.appId,
@@ -138,7 +241,7 @@ export function VideoCallRoom({
         role: role
       });
 
-      // ✅ Join channel with generated UID
+      // ✅ Join channel
       await agoraClient.join(
         credentials.appId,
         credentials.channelName,
@@ -147,44 +250,99 @@ export function VideoCallRoom({
       );
 
       console.log('✅ Joined channel:', credentials.channelName, 'as UID:', credentials.uid);
-      
-      // Store client AFTER successful join
+
       setClient(agoraClient);
 
-      // Create and publish local tracks
-      const videoTrack = await AgoraRTC.createCameraVideoTrack();
-      const audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
+      // ✅ Create tracks with error handling
+      try {
+        const videoTrack = await AgoraRTC.createCameraVideoTrack({
+          encoderConfig: {
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            frameRate: { ideal: 30 },
+            bitrateMin: 1000,
+            bitrateMax: 2500,
+          },
+        });
 
-      setLocalVideoTrack(videoTrack);
-      setLocalAudioTrack(audioTrack);
+        const audioTrack = await AgoraRTC.createMicrophoneAudioTrack({
+          encoderConfig: {
+            sampleRate: 48000,
+            stereo: true,
+          },
+        });
 
-      // Play local video
-      const localPlayerContainer = document.getElementById('local-player');
-      if (localPlayerContainer) {
-        videoTrack.play(localPlayerContainer);
+        // ✅ Publish tracks FIRST
+        await agoraClient.publish([videoTrack, audioTrack]);
+        console.log('✅ Published local tracks');
+
+        // ✅ Update refs immediately
+        tracksRef.current.video = videoTrack;
+        tracksRef.current.audio = audioTrack;
+
+        // ✅ Set joined state to trigger DOM render
+        setIsJoined(true);
+        setLocalVideoTrack(videoTrack);
+        setLocalAudioTrack(audioTrack);
+        isJoiningRef.current = false;
+
+        // ✅ WAIT for DOM to update before playing video
+        setTimeout(() => {
+          const localPlayerContainer = document.getElementById('local-player');
+          console.log('📹 Local player container:', localPlayerContainer);
+
+          if (localPlayerContainer) {
+            videoTrack.play(localPlayerContainer);
+            console.log('✅ Local video playing in container');
+          } else {
+            console.error('❌ Local player container still not found!');
+            // Try again after another delay
+            setTimeout(() => {
+              const retryContainer = document.getElementById('local-player');
+              if (retryContainer) {
+                videoTrack.play(retryContainer);
+                console.log('✅ Local video playing (retry)');
+              }
+            }, 200);
+          }
+        }, 100);
+
+        // ✅ Mark consultation as started (doctor only)
+        if (role === 'doctor') {
+          try {
+            await agoraApiService.startConsultation(consultationId);
+          } catch (error) {
+            console.error('Error marking consultation as started:', error);
+          }
+        }
+
+        toast({
+          title: 'Connected',
+          description: 'You have joined the video consultation',
+        });
+      } catch (trackError: any) {
+        console.error('❌ Error creating tracks:', trackError);
+        setConnectionError(`Camera/Microphone Error: ${trackError.message}`);
+
+        // Leave channel if tracks fail
+        try {
+          await agoraClient.leave();
+        } catch (e) {
+          console.error('Error leaving on track failure:', e);
+        }
+
+        toast({
+          title: 'Device Error',
+          description: trackError.message || 'Cannot access camera or microphone',
+          variant: 'destructive',
+        });
       }
-
-      // Publish tracks
-      await agoraClient.publish([videoTrack, audioTrack]);
-      console.log('✅ Published local tracks');
-
-      setIsJoined(true);
-      isJoiningRef.current = false; // ✅ Mark joining complete
-
-      // If doctor, mark consultation as started
-      if (role === 'doctor') {
-        await agoraApiService.startConsultation(consultationId);
-      }
-
-      toast({
-        title: 'Connected',
-        description: 'You have joined the video consultation',
-      });
     } catch (error: any) {
       console.error('❌ Error initializing Agora:', error);
-      hasJoinedRef.current = false; // ✅ Reset on error
+      hasJoinedRef.current = false;
       isJoiningRef.current = false;
-      
+      setConnectionError(error.message || 'Failed to initialize video call');
+
       toast({
         title: 'Connection Error',
         description: error.message || 'Failed to join video call',
@@ -194,37 +352,47 @@ export function VideoCallRoom({
   };
 
   const toggleVideo = async () => {
-    if (localVideoTrack) {
-      await localVideoTrack.setEnabled(!isVideoEnabled);
-      setIsVideoEnabled(!isVideoEnabled);
+    try {
+      if (tracksRef.current.video) {
+        await tracksRef.current.video.setEnabled(!isVideoEnabled);
+        setIsVideoEnabled(!isVideoEnabled);
+      }
+    } catch (error) {
+      console.error('Error toggling video:', error);
+      setConnectionError('Failed to toggle video');
     }
   };
 
   const toggleAudio = async () => {
-    if (localAudioTrack) {
-      await localAudioTrack.setEnabled(!isAudioEnabled);
-      setIsAudioEnabled(!isAudioEnabled);
+    try {
+      if (tracksRef.current.audio) {
+        await tracksRef.current.audio.setEnabled(!isAudioEnabled);
+        setIsAudioEnabled(!isAudioEnabled);
+      }
+    } catch (error) {
+      console.error('Error toggling audio:', error);
+      setConnectionError('Failed to toggle audio');
     }
   };
 
   const leaveChannel = async () => {
     try {
-      if (localVideoTrack) {
-        localVideoTrack.stop();
-        localVideoTrack.close();
-        setLocalVideoTrack(null);
-      }
-      if (localAudioTrack) {
-        localAudioTrack.stop();
-        localAudioTrack.close();
-        setLocalAudioTrack(null);
-      }
-      if (client && isJoined) {
-        await client.leave();
+      console.log('👋 Leaving channel...');
+
+      // ✅ Close tracks first
+      await closeTracks();
+
+      // ✅ Leave channel
+      if (clientRef.current) {
+        await clientRef.current.leave();
+        clientRef.current = null;
         setClient(null);
       }
+
       setIsJoined(false);
       setRemoteUsers([]);
+      setConnectionError(null);
+      console.log('✅ Left channel');
     } catch (error) {
       console.error('Error leaving channel:', error);
     }
@@ -274,6 +442,14 @@ export function VideoCallRoom({
 
   return (
     <div className="fixed inset-0 bg-gray-900 z-50 flex flex-col">
+      {/* Error Display */}
+      {connectionError && (
+        <div className="bg-red-900 text-red-100 px-4 py-3 flex items-center gap-2">
+          <AlertCircle className="w-5 h-5" />
+          <span>{connectionError}</span>
+        </div>
+      )}
+
       {/* Header */}
       <div className="bg-gray-800 text-white p-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -299,7 +475,7 @@ export function VideoCallRoom({
       </div>
 
       {/* Video Grid */}
-      <div className="flex-1 flex items-center justify-center p-4 gap-4">
+      <div className="flex-1 flex items-center justify-center p-4 gap-4 relative">
         {remoteUsers.length > 0 ? (
           <div className="relative w-full max-w-4xl h-full bg-gray-800 rounded-lg overflow-hidden">
             {remoteUsers.map((uid) => (
@@ -319,21 +495,24 @@ export function VideoCallRoom({
             <CardContent className="flex flex-col items-center justify-center h-96">
               <Users className="w-16 h-16 mb-4 text-gray-500" />
               <p className="text-lg">Waiting for {role === 'doctor' ? 'patient' : 'doctor'} to join...</p>
+              {!isJoined && <p className="text-sm text-gray-400 mt-2">Connecting...</p>}
             </CardContent>
           </Card>
         )}
 
-        {/* Local Video */}
-        <div className="absolute bottom-24 right-8 w-64 h-48 bg-gray-800 rounded-lg overflow-hidden border-2 border-gray-600 shadow-lg">
-          <div
-            id="local-player"
-            className="w-full h-full"
-            style={{ width: '100%', height: '100%' }}
-          />
-          <div className="absolute top-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-sm">
-            You {!isVideoEnabled && '(Video Off)'}
+        {/* ✅ LOCAL VIDEO CONTAINER - THIS WAS MISSING! */}
+        {isJoined && (
+          <div className="absolute bottom-24 right-8 w-64 h-48 bg-gray-800 rounded-lg overflow-hidden border-2 border-gray-600 shadow-lg">
+            <div
+              id="local-player"
+              className="w-full h-full"
+              style={{ width: '100%', height: '100%' }}
+            />
+            <div className="absolute top-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-sm">
+              You {!isVideoEnabled && '(Video Off)'}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Controls */}
@@ -343,6 +522,7 @@ export function VideoCallRoom({
           variant={isAudioEnabled ? 'default' : 'destructive'}
           onClick={toggleAudio}
           className="rounded-full w-14 h-14"
+          disabled={!isJoined}
         >
           {isAudioEnabled ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />}
         </Button>
@@ -352,6 +532,7 @@ export function VideoCallRoom({
           variant={isVideoEnabled ? 'default' : 'destructive'}
           onClick={toggleVideo}
           className="rounded-full w-14 h-14"
+          disabled={!isJoined}
         >
           {isVideoEnabled ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
         </Button>

@@ -35,8 +35,10 @@
     "jsonwebtoken": "^9.0.3",
     "leaflet": "^1.9.4",
     "mysql2": "^3.14.3",
+    "pdfjs-dist": "^5.4.296",
     "react-leaflet": "^4.2.1",
     "react-markdown": "^10.1.0",
+    "react-pdf": "^10.4.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {

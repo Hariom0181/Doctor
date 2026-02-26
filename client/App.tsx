@@ -13,12 +13,15 @@ import NotFound from "./pages/NotFound";
 import React from "react";
 
 
+
 import PatientLogin from "./pages/PatientLogin";
 import PatientRegister from "./pages/PatientRegister";
 import PatientDashboard from "./pages/PatientDashboard";
 import DoctorLogin from "./pages/DoctorLogin";
 import DoctorRegister from "./pages/DoctorRegister";
 import DoctorDashboard from "./pages/DoctorDashboard";
+import NurseRegister from './pages/NurseRegister';
+
 
 const queryClient = new QueryClient();
 
@@ -37,6 +40,8 @@ const App = () => (
             <Route path="/doctor/login" element={<PublicRoute><DoctorLogin /></PublicRoute>} />
             <Route path="/doctor/register" element={<PublicRoute><DoctorRegister /></PublicRoute>} />
             <Route path="/doctor/dashboard" element={<DoctorRoute><DoctorDashboard /></DoctorRoute>} />
+            <Route path="/nurse-register" element={<PublicRoute><NurseRegister /></PublicRoute>} />
+            
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

@@ -20,6 +20,8 @@ const IOThealthmetrics = require('./routes/healthMetricsRoute');
 const healthMetricsRoutes = require('./routes/healthMetricsRoutes');
 const deviceStatusRoutes = require('./routes/deviceStatusRoutes');  // ONLY HERE
 const cron = require('node-cron');
+const nurseRoutes = require('./routes/nurseRoutes');
+
 
 
 
@@ -35,6 +37,8 @@ const app = express();
 // ============ MIDDLEWARE ============
 app.use(cors());
 app.use(bodyParser.json());
+app.use('/api/nurses', nurseRoutes);
+
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/uploads/patients_profile', express.static(path.join(__dirname, 'uploads/patients_profile')));

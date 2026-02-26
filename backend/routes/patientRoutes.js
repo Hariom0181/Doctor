@@ -595,23 +595,18 @@ router.post(
 router.post(
   "/login",
   [
-    // Email validation
     body("email")
       .isEmail()
       .normalizeEmail()
       .withMessage("Valid email is required"),
 
-    // Password validation - SIMPLIFIED FOR LOGIN
     body("password")
       .notEmpty()
       .withMessage("Password is required")
       .isLength({ min: 1 })
       .withMessage("Password cannot be empty"),
-    // Removed strict password format validation for login
-    // Users should be able to login with their existing passwords
   ],
   (req, res) => {
-    // Check validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       console.log("Login validation errors:", errors.array());
@@ -644,64 +639,61 @@ router.post(
 
       const patient = results[0];
 
-      // 2. Compare password
-      // const isPasswordValid = await bcrypt.compare(password, patient.password);
-      // if (!isPasswordValid) {
-      //   return res.status(401).json({
-      //     success: false,
-      //     message: "Invalid email or password"
-      //   });
-      // }
-      if (patient.password !== password) {
-        return res.status(401).json({
-          success: false,
-          message: "Invalid email or password"
-        });
-      }
-
-      // 3. Update last login time FIRST
-      const updateLastLoginSql = "UPDATE patients SET lastLogin = NOW() WHERE id = ?";
-      db.query(updateLastLoginSql, [patient.id], (updateErr) => {
-        if (updateErr) {
-          console.error("Error updating last login:", updateErr);
-          // Continue anyway - don't fail login for this
+      // 2. Compare password using bcrypt ✅ FIXED
+      try {
+        const isPasswordValid = await bcrypt.compare(password, patient.password);
+        
+        if (!isPasswordValid) {
+          return res.status(401).json({
+            success: false,
+            message: "Invalid email or password"
+          });
         }
 
-        // 4. Generate JWT token
-        const jwtSecret = process.env.JWT_SECRET || "your-fallback-secret-key-change-in-production";
-        const token = jwt.sign(
-          {
-            id: patient.id,
-            email: patient.email,
-            type: 'patient'
-          },
-          jwtSecret,
-          { expiresIn: "24h" }
-        );
+        // 3. Update last login time
+        const updateLastLoginSql = "UPDATE patients SET lastLogin = NOW() WHERE id = ?";
+        db.query(updateLastLoginSql, [patient.id], (updateErr) => {
+          if (updateErr) {
+            console.error("Error updating last login:", updateErr);
+          }
 
-        // 5. Get current timestamp for response
+          // 4. Generate JWT token
+          const jwtSecret = process.env.JWT_SECRET || "your-fallback-secret-key-change-in-production";
+          const token = jwt.sign(
+            {
+              id: patient.id,
+              email: patient.email,
+              type: 'patient'
+            },
+            jwtSecret,
+            { expiresIn: "24h" }
+          );
 
-
-        // 6. Send successful response with current timestamp
-        res.status(200).json({
-          success: true,
-          message: "Login successful",
-          token,
-          patient: {
-            id: patient.id,
-            firstName: patient.firstName,
-            lastName: patient.lastName,
-            email: patient.email,
-            phone: patient.phone,
-            address: patient.address,
-
-          },
+          // 5. Send successful response
+          res.status(200).json({
+            success: true,
+            message: "Login successful",
+            token,
+            patient: {
+              id: patient.id,
+              firstName: patient.firstName,
+              lastName: patient.lastName,
+              email: patient.email,
+              phone: patient.phone,
+              address: patient.address,
+            },
+          });
         });
-      });
+      } catch (compareErr) {
+        console.error("Password comparison error:", compareErr);
+        return res.status(500).json({
+          success: false,
+          message: "Server error during authentication"
+        });
+      }
     });
   }
 );
-
 
 // Get all available doctors for patient selection
 router.get("/available-doctors", authenticatePatient, (req, res) => {
@@ -1282,6 +1274,43 @@ router.get('/:patientId/medical-records/:recordId', authenticatePatient, async (
   }
 });
 // Add this test route right after the authenticatePatient function
+
+// Get upcoming appointments for patient
+router.get('/:patientId/appointments/upcoming', authenticatePatient, (req, res) => {
+  const { patientId } = req.params;
+
+  const sql = `
+    SELECT 
+      a.id,
+      a.appointment_date,
+      a.appointment_time,
+      a.appointment_type,
+      a.status,
+      a.reason,
+      CONCAT(d.first_name, ' ', d.last_name) as doctor_name,
+      d.specialization
+    FROM appointments a
+    LEFT JOIN doctors d ON a.doctor_id = d.id
+    WHERE a.patient_id = ? 
+      AND a.status = 'confirmed'
+      AND a.appointment_date >= CURDATE()
+    ORDER BY a.appointment_date ASC, a.appointment_time ASC
+  `;
+
+  db.query(sql, [patientId], (err, results) => {
+    if (err) {
+      return res.status(500).json({
+        success: false,
+        message: 'Error fetching appointments'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: results
+    });
+  });
+});
 
 
 module.exports = router;

@@ -22,23 +22,10 @@ router.post("/upload", uploadDocument.single("document"), (req, res) => {
       return res.status(400).json({ success: false, message: "No file uploaded" });
     }
 
-    const fileUrl = req.file.secure_url; // ✅ ALWAYS exists
+    const fileUrl = req.file.path;
 
-    if (!fileUrl) {
-      return res.status(500).json({
-        success: false,
-        message: "Cloudinary upload failed (no file URL)"
-      });
-    }
-
-    const {
-      patientId,
-      documentType,
-      documentDate,
-      hospitalName,
-      notes
-    } = req.body;
-
+    const { patientId, documentType, documentDate, hospitalName, notes } = req.body;
+    
     const sql = `
       INSERT INTO patient_documents
       (patient_id, document_type, document_name, file_path, document_date, hospital_name, notes)
@@ -47,21 +34,12 @@ router.post("/upload", uploadDocument.single("document"), (req, res) => {
 
     db.query(
       sql,
-      [
-        patientId,
-        documentType,
-        req.file.originalname,
-        fileUrl,            // ✅ FIXED
-        documentDate,
-        hospitalName,
-        notes
-      ],
+      [patientId, documentType, req.file.originalname, fileUrl, documentDate, hospitalName, notes],
       (err, result) => {
         if (err) {
           console.error("Error saving document:", err);
           return res.status(500).json({ success: false, message: "Error saving document" });
         }
-
         res.status(201).json({
           success: true,
           documentId: result.insertId,
@@ -69,14 +47,41 @@ router.post("/upload", uploadDocument.single("document"), (req, res) => {
         });
       }
     );
-
   } catch (error) {
     console.error("Upload failed:", error);
     res.status(500).json({ success: false, message: "Document upload failed" });
   }
 });
 
+// Download document through backend
+router.get("/download/:documentId", (req, res) => {
+  const { documentId } = req.params;
+  const sql = "SELECT file_path, document_name FROM patient_documents WHERE id = ?";
+  
+  db.query(sql, [documentId], async (err, results) => {
+    if (err || results.length === 0) {
+      return res.status(404).json({ success: false, message: "Document not found" });
+    }
 
+    try {
+      const axios = require('axios');
+      const fileUrl = results[0].file_path;
+      
+      const response = await axios.get(fileUrl, { 
+        responseType: 'stream'
+      });
+
+      res.setHeader('Content-Type', response.headers['content-type'] || 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${results[0].document_name}"`);
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      
+      response.data.pipe(res);
+    } catch (error) {
+      console.error("Download error:", error.message);
+      res.status(500).json({ success: false, message: "Error downloading document" });
+    }
+  });
+});
 
 
 // tract text from document using Google Vision API

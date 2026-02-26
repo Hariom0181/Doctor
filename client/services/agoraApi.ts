@@ -15,7 +15,7 @@ export interface AgoraTokenResponse {
 
 class AgoraApiService {
   private getPatientAuthHeaders(): HeadersInit {
-    const token = localStorage.getItem('PatientToken');
+    const token = localStorage.getItem('token');
     if (!token) {
       throw new Error('Patient not authenticated. Please login.');
     }

@@ -1156,4 +1156,154 @@ router.get("/dashboard/stats", authenticateDoctor, (req, res) => {
   });
 });
 
+router.get('/nurses/list', authenticateDoctor, (req, res) => {
+  const sql = `
+    SELECT id, first_name, last_name, qualification, current_hospital
+    FROM nurses
+    WHERE is_verified = TRUE AND verification_status = 'approved'
+    ORDER BY first_name ASC
+  `;
+
+  db.query(sql, (err, results) => {
+    if (err) {
+      return res.status(500).json({ success: false, message: 'Failed to fetch nurses' });
+    }
+
+    res.json({
+      success: true,
+      data: results
+    });
+  });
+});
+
+
+// Assign nurse to patient
+router.post('/:patientId/assign-nurse', authenticateDoctor, (req, res) => {
+  const { patientId } = req.params;
+  const { nurseId } = req.body;
+  const doctorId = req.doctor.id;
+
+  const sql = `
+    INSERT INTO nurse_patient_assignments 
+    (nurse_id, patient_id, assigned_date, status, notes, created_at, updated_at)
+    VALUES (?, ?, CURDATE(), 'active', ?, NOW(), NOW())
+  `;
+
+  db.query(sql, [nurseId, patientId, req.body.notes || null], (err, result) => {
+    if (err) {
+      return res.status(500).json({ success: false, message: 'Assignment failed' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Nurse assigned successfully',
+      assignmentId: result.insertId
+    });
+  });
+});
+
+// Get patient's medication logs (nurse administered)
+router.get("/patients/:patientId/medication-logs", authenticateDoctor, (req, res) => {
+  const { patientId } = req.params;
+
+  const sql = `
+    SELECT 
+      ml.id,
+      ml.medication_name,
+      ml.dosage,
+      ml.given_at,
+      ml.notes,
+      CONCAT(n.first_name, ' ', n.last_name) as nurse_name,
+      ml.created_at
+    FROM medication_logs ml
+    LEFT JOIN nurses n ON ml.nurse_id = n.id
+    WHERE ml.patient_id = ?
+    ORDER BY ml.given_at DESC
+  `;
+
+  db.query(sql, [patientId], (err, results) => {
+    if (err) {
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Error fetching medication logs' 
+      });
+    }
+
+    res.json({ 
+      success: true, 
+      data: results,
+      count: results.length
+    });
+  });
+});
+
+// Get patient's nurse notes (observations)
+router.get("/patients/:patientId/nurse-notes", authenticateDoctor, (req, res) => {
+  const { patientId } = req.params;
+
+  const sql = `
+    SELECT 
+      nn.id,
+      nn.observation,
+      nn.observation_type,
+      nn.severity,
+      CONCAT(n.first_name, ' ', n.last_name) as nurse_name,
+      nn.created_at
+    FROM nurse_notes nn
+    LEFT JOIN nurses n ON nn.nurse_id = n.id
+    WHERE nn.patient_id = ?
+    ORDER BY nn.created_at DESC
+  `;
+
+  db.query(sql, [patientId], (err, results) => {
+    if (err) {
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Error fetching nurse notes' 
+      });
+    }
+
+    res.json({ 
+      success: true, 
+      data: results,
+      count: results.length
+    });
+  });
+});
+
+// Get patient's self-reported medication (home-based patients)
+router.get("/patients/:patientId/medication-reports", authenticateDoctor, (req, res) => {
+  const { patientId } = req.params;
+
+  const sql = `
+    SELECT 
+      pmr.id,
+      pmr.medication_name,
+      pmr.dosage,
+      pmr.taken_at,
+      pmr.notes,
+      pmr.created_at
+    FROM patient_medication_reports pmr
+    WHERE pmr.patient_id = ?
+    ORDER BY pmr.taken_at DESC
+  `;
+
+  db.query(sql, [patientId], (err, results) => {
+    if (err) {
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Error fetching medication reports' 
+      });
+    }
+
+    res.json({ 
+      success: true, 
+      data: results,
+      count: results.length
+    });
+  });
+});
+
+// Get all nurses for dropdown
+
 module.exports = router;

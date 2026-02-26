@@ -333,7 +333,7 @@ class DoctorApiService {
   async getPatientsWithRiskAssessment(doctorId: number): Promise<any[]> {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/doctors/patients/risk-assessment` ,
+        `${API_BASE_URL}/doctors/patients/risk-assessment`,
         {
           method: 'GET',
           headers: this.getAuthHeaders()
@@ -362,7 +362,7 @@ class DoctorApiService {
       const response = await fetch(`${API_BASE_URL}/doctors/profile-image`, {
         headers: this.getAuthHeaders()
       });
-      
+
       if (!response.ok) {
         if (response.status === 404) {
           return null;
@@ -675,7 +675,7 @@ class DoctorApiService {
     const doctorData = this.getStoredDoctorData();
     return doctorData?.id || null;
   }
-  
+
   async prescribeMedication(prescriptionData: {
     patientId: number;
     doctorId: number;
@@ -835,7 +835,81 @@ class DoctorApiService {
     }
   }
 
+  async assignNurseToPatient(patientId: number, nurseId: number, notes?: string): Promise<boolean> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/doctors/${patientId}/assign-nurse`, {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify({ nurseId, notes })
+      });
 
+      const result = await response.json();
+      return result.success;
+    } catch (error) {
+      console.error('Error assigning nurse:', error);
+      throw error;
+    }
+  }
+
+  async getNursesList(): Promise<any[]> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/doctors/nurses/list`, {
+        method: 'GET',
+        headers: this.getAuthHeaders()
+      });
+
+      const result = await response.json();
+      return result.data || [];
+    } catch (error) {
+      console.error('Error fetching nurses:', error);
+      return [];
+    }
+  }
+
+  async getPatientMedicationLogs(patientId: number): Promise<any[]> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/doctors/patients/${patientId}/medication-logs`, {
+      method: 'GET',
+      headers: this.getAuthHeaders()
+    });
+
+    const result = await response.json();
+    return result.data || [];
+  } catch (error) {
+    console.error('Error fetching medication logs:', error);
+    return [];
+  }
+}
+
+async getPatientNurseNotes(patientId: number): Promise<any[]> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/doctors/patients/${patientId}/nurse-notes`, {
+      method: 'GET',
+      headers: this.getAuthHeaders()
+    });
+
+    const result = await response.json();
+    return result.data || [];
+  } catch (error) {
+    console.error('Error fetching nurse notes:', error);
+    return [];
+  }
+}
+
+async getPatientMedicationReports(patientId: number): Promise<any[]> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/doctors/patients/${patientId}/medication-reports`, {
+      method: 'GET',
+      headers: this.getAuthHeaders()
+    });
+
+    const result = await response.json();
+    return result.data || [];
+  } catch (error) {
+    console.error('Error fetching medication reports:', error);
+    return [];
+  }
+}
 
 
 }

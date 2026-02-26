@@ -22,6 +22,10 @@ import { DoctorConsultationRequests } from '@/components/DoctorConsultationReque
 import { getAuthToken, getUserData, clearAuth } from '../lib/auth';
 import { aiApiService } from '@/services/aiApi';
 import { PatientAIAnalysis } from '@/components/PatientAIAnalysis'
+import PatientNurseAssignment from "@/components/PatientNurseAssignment";
+import NurseActivityLogs from "@/components/NurseActivityLogs";
+
+
 // import { useToast } from '@/hooks/use-toast';
 
 
@@ -226,6 +230,7 @@ export default function DoctorDashboard() {
             await loadRecentActivities(parsedData.id);
             console.log("Doctor ID :", parsedData.id);
             // console.log("Doctor ID :",doctorData.id);  
+            console.log("Current selectedPatient state:", selectedPatient);
 
 
 
@@ -705,7 +710,7 @@ export default function DoctorDashboard() {
         medicationName: newMedication.medicationName,
         dosage: newMedication.dosage,
         frequency: newMedication.frequency,
-        duration:  parseInt(newMedication.duration),
+        duration: parseInt(newMedication.duration),
         instructions: newMedication.instructions,
         startDate: newMedication.startDate
       });
@@ -1971,13 +1976,13 @@ export default function DoctorDashboard() {
 
         {/* Main Dashboard Tabs */}
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabKey)} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="patients">Patient Management</TabsTrigger>
+            <TabsTrigger value="nurses">Nurse Management</TabsTrigger>
             <TabsTrigger value="appointments">Appointments</TabsTrigger>
             <TabsTrigger value="records">Medical Records</TabsTrigger>
             <TabsTrigger value="video-consultation">Video Consultation</TabsTrigger>
-
           </TabsList>
 
           <TabsContent value="overview" className="pt-6 space-y-6">
@@ -3147,6 +3152,68 @@ export default function DoctorDashboard() {
             </div>
           </TabsContent>
 
+          <TabsContent value="nurses" className="pt-6 space-y-6">
+            <Tabs defaultValue="assignment" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="assignment">👨‍⚕️ Assign Nurses</TabsTrigger>
+                <TabsTrigger value="activity">📊 Activity Logs</TabsTrigger>
+              </TabsList>
+
+              {/* Assignment Tab */}
+              <TabsContent value="assignment" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Nurse Patient Assignment</CardTitle>
+                    <CardDescription>Assign qualified nurses to monitor your patients</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="mb-4 space-y-2">
+                      <Label>Select Patient for Nurse Assignment</Label>
+                      <Select
+                        value={selectedPatient?.id?.toString() || ""}
+                        onValueChange={(value) => {
+                          const patient = linkedPatients.find(p => p.id.toString() === value);
+                          setSelectedPatient(patient || null);
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a patient..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {linkedPatients.map(patient => (
+                            <SelectItem key={patient.id} value={patient.id.toString()}>
+                              {patient.name} (ID: {patient.id})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {selectedPatient ? (
+                      <PatientNurseAssignment
+                        patientId={selectedPatient.id}
+                        patientName={selectedPatient.name}
+                        onAssignmentSuccess={() => {
+                          console.log('Nurse assigned successfully');
+                        }}
+                      />
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">
+                        <Users className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                        <p>Select a patient above to manage nurse assignments</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Activity Logs Tab */}
+              <TabsContent value="activity">
+                <NurseActivityLogs />
+              </TabsContent>
+            </Tabs>
+          </TabsContent>
+
         </Tabs>
 
         {/* Confirm Appointment Dialog */}
@@ -3343,9 +3410,9 @@ export default function DoctorDashboard() {
           {/* ------------------------------------- */}
         </Dialog>
         <section className="mt-8">
-        <h2>IoT Device Readings</h2>
-        <DoctorMetricRequestForm />
-      </section>
+          <h2>IoT Device Readings</h2>
+          <DoctorMetricRequestForm />
+        </section>
       </div>
     </div>
   );

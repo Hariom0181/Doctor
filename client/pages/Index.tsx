@@ -258,6 +258,11 @@ export default function Index() {
                     Doctor Login
                   </Button>
                 </Link>
+                <Link to="/nurse-register">
+                  <Button variant="outline" size="sm">
+                    Nurse Register
+                  </Button>
+                </Link>
               </div>
             </nav>
           </div>
@@ -426,7 +431,7 @@ export default function Index() {
                           </p>
                         )}
                       </div>
-                    
+
                     </div>
 
                     <div className="space-y-3">

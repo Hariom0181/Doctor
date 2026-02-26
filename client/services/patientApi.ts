@@ -122,7 +122,7 @@ class PatientApiService {
       Authorization: `Bearer ${token}`
     };
   }
-  async getLinkedDoctors(patientId: string): Promise<LinkedDoctor[]> {
+  async getLinkedDoctors(): Promise<LinkedDoctor[]> {
     try {
       // Add timeout to prevent long waits
       const controller = new AbortController();
@@ -257,29 +257,37 @@ class PatientApiService {
     }
   }
 
-  async updateDoctorRelationship(patientId: string, doctorId: string): Promise<void> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/patients/${patientId}/update-doctor`, {
-        method: 'POST',
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify({ doctorId })
-      });
+  async updateDoctorRelationship(doctorId: string): Promise<boolean> {
+  try {
+    console.log('🏥 Updating doctor relationship with doctor ID:', doctorId);
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+    // ✅ Remove patientId parameter - use token instead
+    const response = await fetch(`http://localhost:5000/api/patients/update-doctor`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${localStorage.getItem('token')}`
+      },
+      body: JSON.stringify({ 
+        doctorId: parseInt(doctorId)  // ✅ Convert to number
+      })
+    });
 
-      const result = await response.json();
+    console.log('📡 Update doctor response status:', response.status);
 
-      if (!result.success) {
-        throw new Error(result.message);
-      }
-    } catch (error) {
-      console.error('Error updating doctor relationship:', error);
-      throw error;
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
-  }
 
+    const result = await response.json();
+    console.log('✅ Doctor relationship updated:', result);
+
+    return result.success;
+  } catch (error) {
+    console.error('❌ Error updating doctor relationship:', error);
+    throw error;
+  }
+}
   async getHealthMetrics(patientId: string): Promise<HealthMetric[]> {
     try {
       const response = await fetch(`${API_BASE_URL}/patients/${patientId}/health-metrics`, {

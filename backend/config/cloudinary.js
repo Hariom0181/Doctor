@@ -38,6 +38,8 @@ const documentStorage = new CloudinaryStorage({
   params: {
     folder: "patient_documents",
     resource_type: "auto",
+    type: "upload",
+    access_mode: "public",  // CHANGE THIS
     public_id: (req, file) =>
       `patient_${req.body.patientId || "unknown"}_${Date.now()}`
   },

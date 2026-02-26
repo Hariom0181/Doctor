@@ -47,7 +47,7 @@ export default function PatientRegister() {
     city: "",
     state: "",
     pincode: "",
-    
+
     emergencyContact: "",
     emergencyPhone: "",
     bloodGroup: "",
@@ -66,16 +66,16 @@ export default function PatientRegister() {
 
   const handleInputChange = (field: keyof FormData, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    
+
     // Clear error when user starts typing
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: "" }));
     }
-    
+
     // Real-time validation for specific fields
     if (field === 'confirmPassword' || field === 'password') {
-      validatePasswordMatch(field === 'confirmPassword' ? value as string : formData.confirmPassword, 
-                           field === 'password' ? value as string : formData.password);
+      validatePasswordMatch(field === 'confirmPassword' ? value as string : formData.confirmPassword,
+        field === 'password' ? value as string : formData.password);
     }
   };
 
@@ -192,7 +192,7 @@ export default function PatientRegister() {
         throw new Error("Failed to register patient");
       } else {
         setSubmitMessage({ type: 'success', message: "Registration successful! You can now log in to your account." });
-        
+
         // Reset form after success
         setFormData({
           firstName: "",
@@ -314,7 +314,7 @@ export default function PatientRegister() {
                     {errors.lastName && <p className="text-sm text-red-500">{errors.lastName}</p>}
                   </div>
                 </div>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="email">Email Address *</Label>
@@ -403,7 +403,7 @@ export default function PatientRegister() {
                   </div>
                   {errors.address && <p className="text-sm text-red-500">{errors.address}</p>}
                 </div>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="city">City *</Label>
@@ -507,13 +507,16 @@ export default function PatientRegister() {
                     <Label htmlFor="allergies">Known Allergies</Label>
                     <Input
                       id="allergies"
-                      placeholder="List any known allergies"
+                      placeholder="None (Leave empty if no allergies)"
                       value={formData.allergies}
                       onChange={(e) => handleInputChange("allergies", e.target.value)}
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Please list any food or drug allergies. You can leave this field empty if the patient has no known allergies.
+                    </p>
                   </div>
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="medicalHistory">Medical History</Label>
                   <Textarea
@@ -600,9 +603,9 @@ export default function PatientRegister() {
 
               {/* Submit Button */}
               <div className="flex space-x-4">
-                <Button 
-                  type="submit" 
-                  className="flex-1" 
+                <Button
+                  type="submit"
+                  className="flex-1"
                   disabled={!formData.agreeTerms || isLoading}
                 >
                   {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

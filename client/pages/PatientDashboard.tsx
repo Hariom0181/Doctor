@@ -735,7 +735,7 @@ export default function PatientDashboard() {
 
         // console.log('Using current patient ID:', patientId);
 
-        const doctors = await patientApiService.getLinkedDoctors(patientId);
+        const doctors = await patientApiService.getLinkedDoctors();
         setLinkedDoctors(doctors);
 
         // Update the doctors list for the profile section
@@ -831,34 +831,25 @@ export default function PatientDashboard() {
       day: 'numeric'
     });
   };
-  const handleDoctorSelection = async (doctorId: string) => {
-    if (!doctorId) return;
+ const handleDoctorSelection = async (doctorId: string) => {
+  if (!doctorId) return;
 
-    try {
-      // Get the current logged-in patient's ID
-      const patientId = getCurrentPatientId();
+  try {
+    console.log('Updating to doctor ID:', doctorId);
 
-      if (!patientId) {
-        alert('Please log in again to update your doctor.');
-        return;
-      }
+    // ✅ Remove patientId - service uses token now
+    await patientApiService.updateDoctorRelationship(doctorId);
 
-      // console.log('Updating doctor for patient:', patientId, 'to doctor:', doctorId);
+    // ✅ Remove patientId here too
+    const doctors = await patientApiService.getLinkedDoctors();
+    setLinkedDoctors(doctors);
 
-      // Update the doctor relationship for the current patient
-      await patientApiService.updateDoctorRelationship(patientId, doctorId);
-
-      // Refresh the linked doctors
-      const doctors = await patientApiService.getLinkedDoctors(patientId);
-      setLinkedDoctors(doctors);
-
-      // Show success message
-      alert('Doctor relationship updated successfully!');
-    } catch (error) {
-      console.error('Failed to update doctor relationship:', error);
-      alert('Failed to update doctor relationship. Please try again.');
-    }
-  };
+    alert('Doctor relationship updated successfully!');
+  } catch (error) {
+    console.error('Failed to update doctor relationship:', error);
+    alert('Failed to update doctor relationship. Please try again.');
+  }
+};
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
@@ -2054,12 +2045,17 @@ export default function PatientDashboard() {
                                     variant="outline"
                                     size="sm"
                                     onClick={() => {
-                                      const viewUrl = doc.file_path.replace('/image/upload/', '/raw/upload/');
-                                      window.open(viewUrl, '_blank');
+                                      const link = document.createElement('a');
+                                      // Use backend proxy instead of direct Cloudinary URL
+                                      link.href = `/api/documents/download/${doc.id}`;
+                                      link.download = doc.document_name || 'document';
+                                      document.body.appendChild(link);
+                                      link.click();
+                                      document.body.removeChild(link);
                                     }}
                                   >
                                     <Download className="w-3 h-3 mr-1" />
-                                    View
+                                    Download
                                   </Button>
 
                                   <Button

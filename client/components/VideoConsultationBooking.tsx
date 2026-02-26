@@ -138,7 +138,7 @@ export function VideoConsultationBooking({ patientId }: VideoConsultationBooking
 
   const loadLinkedDoctors = async () => {
     try {
-      const doctors = await patientApiService.getLinkedDoctors(patientId.toString());
+      const doctors = await patientApiService.getLinkedDoctors();
       setLinkedDoctors(doctors);
     } catch (error) {
       console.error('Error loading doctors:', error);
