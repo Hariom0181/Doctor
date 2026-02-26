@@ -1,9 +1,9 @@
-// backend/server.js
 const express = require("express");
 const bodyParser = require("body-parser");
 const cors = require("cors");
 const path = require('path');
 const dotenv = require('dotenv');
+const fs = require('fs');
 
 const patientRoutes = require("./routes/patientRoutes");
 const doctorRoutes = require("./routes/doctorRoutes");
@@ -18,13 +18,9 @@ const aiRoutes = require('./routes/aiRoutes');
 const agoraRoutes = require('./routes/agoraRoutes');
 const IOThealthmetrics = require('./routes/healthMetricsRoute');
 const healthMetricsRoutes = require('./routes/healthMetricsRoutes');
-const deviceStatusRoutes = require('./routes/deviceStatusRoutes');  // ONLY HERE
+const deviceStatusRoutes = require('./routes/deviceStatusRoutes');
 const cron = require('node-cron');
 const nurseRoutes = require('./routes/nurseRoutes');
-
-
-
-
 
 const db = require("./config/db");
 
@@ -34,21 +30,41 @@ console.log('🔑 GEMINI_API_KEY:', process.env.GEMINI_API_KEY ? 'EXISTS ✅' : 
 
 const app = express();
 
+// ============ CREATE UPLOAD DIRECTORIES IF THEY DON'T EXIST ============
+const uploadDirs = [
+  path.join(__dirname, 'uploads'),
+  path.join(__dirname, 'uploads/patient_documents'),
+  path.join(__dirname, 'uploads/patients_profile'),
+  path.join(__dirname, 'uploads/doctors_profile')
+];
+
+uploadDirs.forEach(dir => {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+    console.log(`✅ Created directory: ${dir}`);
+  }
+});
+
 // ============ MIDDLEWARE ============
 app.use(cors());
 app.use(bodyParser.json());
-app.use('/api/nurses', nurseRoutes);
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-
+// ============ STATIC FILES ============
+// Serve all files from uploads directory
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Also serve individual directories for backward compatibility
 app.use('/uploads/patients_profile', express.static(path.join(__dirname, 'uploads/patients_profile')));
 app.use('/uploads/doctors_profile', express.static(path.join(__dirname, 'uploads/doctors_profile')));
 app.use('/uploads/patient_documents', express.static(path.join(__dirname, 'uploads/patient_documents')));
 
-// ============ DEVICE STATUS ROUTE (FIRST) ============
+// ============ ROUTES ============
+app.use('/api/nurses', nurseRoutes);
 app.use('/api/devices', deviceStatusRoutes);
 
-// ============ DIRECT IoT ENDPOINTS (No Auth Required) ============
+// IoT endpoints (no auth required)
 app.post('/api/health-metrics-iot/device-heartbeat', (req, res) => {
   try {
     const { device_id, is_online, battery_level, firmware_version } = req.body;
@@ -113,7 +129,6 @@ app.post('/api/health-metrics-iot/confirm-metric', (req, res) => {
     console.log('  Request ID:', request_id);
     console.log('  Value:', value, unit);
 
-    // First, find the metric_request to get patient_id and doctor_id
     const findQuery = `
       SELECT * FROM metric_requests 
       WHERE request_data LIKE ?
@@ -139,7 +154,6 @@ app.post('/api/health-metrics-iot/confirm-metric', (req, res) => {
       const request = results[0];
       console.log('✓ Found request - Patient:', request.patient_id, 'Doctor:', request.doctor_id);
 
-      // Now insert into patient_health_metrics with correct patient_id and doctor_id
       const insertQuery = `
         INSERT INTO patient_health_metrics 
         (patient_id, doctor_id, metric_type, value, unit, status, device_id, request_id)
@@ -176,7 +190,7 @@ app.post('/api/health-metrics-iot/confirm-metric', (req, res) => {
   }
 });
 
-// ============ OTHER ROUTES ============
+// ✅ MAIN API ROUTES
 app.use('/api/health-metrics-iot', IOThealthmetrics);
 app.use("/api/appointments", appointmentRoutes);
 app.use("/api/documents", documentRoutes);
@@ -191,15 +205,19 @@ app.use("/api/prescriptions", prescriptionRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/health-metrics', healthMetricsRoutes);
 
+// ============ ROOT ENDPOINT ============
+app.get('/', (req, res) => {
+  res.json({ message: 'Backend is reachable' });
+});
+
 // ============ START SERVER ============
 const PORT = 5000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ Server running on http://0.0.0.0:${PORT}`);
+  console.log(`📁 Upload directory: ${path.join(__dirname, 'uploads')}`);
 });
-app.get('/', (req, res) => {
-  res.json({ message: 'Backend is reachable' });
-});
-// ============ CRON JOB ============
+
+// ============ CRON JOBS ============
 cron.schedule('*/1 * * * *', async () => {
   const sql = `
     UPDATE video_consultations 
@@ -211,7 +229,7 @@ cron.schedule('*/1 * * * *', async () => {
   
   db.query(sql, (err, result) => {
     if (err) {
-      console.error('Error expiring appointments:', err);
+      console.error('❌ Error expiring appointments:', err);
     } else if (result.affectedRows > 0) {
       console.log(`✅ Expired ${result.affectedRows} appointments`);
     }
@@ -221,9 +239,7 @@ cron.schedule('*/1 * * * *', async () => {
 cron.schedule('0 0 * * *', () => {
   const sql = `UPDATE prescriptions SET status = 'completed' WHERE end_date < CURDATE()`;
   db.query(sql, (err) => {
-    if (err) console.error('Auto-expire error:', err);
+    if (err) console.error('❌ Auto-expire error:', err);
     else console.log('✅ Expired old prescriptions');
   });
 });
-
-

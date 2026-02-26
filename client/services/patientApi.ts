@@ -364,7 +364,11 @@ class PatientApiService {
       const result = await response.json();
 
       if (result.success && result.profileImagePath) {
-        return result.profileImagePath; // ✅ Cloudinary URL is already complete
+        // If relative path, prepend server URL
+        const imagePath = result.profileImagePath;
+        return imagePath.startsWith('http') 
+          ? imagePath 
+          : `http://localhost:5000${imagePath}`;
       }
 
       return null;
@@ -497,15 +501,17 @@ class PatientApiService {
       throw error;
     }
   }
+  
+  // ============ DOCUMENT UPLOAD (LOCAL STORAGE) ============
   async uploadPatientDocument(formData: FormData): Promise<{ success: boolean; documentId: number; filePath: string }> {
     try {
-      const token = localStorage.getItem('token'); //-----------------------------------------------------------------------------------------
+      const token = localStorage.getItem('token');
 
       const response = await fetch(`${API_BASE_URL}/documents/upload`, {
         method: 'POST',
         headers: {
           ...(token && { Authorization: `Bearer ${token}` })
-          // Don't set Content-Type for FormData
+          // Don't set Content-Type for FormData - browser will set it automatically
         },
         body: formData
       });
@@ -524,7 +530,7 @@ class PatientApiService {
       return {
         success: result.success,
         documentId: result.documentId,
-        filePath: result.filePath
+        filePath: result.filePath // This is now a local path like /uploads/patient_documents/{patientId}/{filename}
       };
     } catch (error) {
       console.error('Error uploading document:', error);
@@ -532,26 +538,40 @@ class PatientApiService {
     }
   }
 
+  // ============ GET PATIENT DOCUMENTS ============
   async getPatientDocuments(patientId: number): Promise<any[]> {
-    const response = await fetch(`${API_BASE_URL}/documents/patient/${patientId}`, {
-      method: 'GET',
-      headers: this.getAuthHeaders()
-    });
+    try {
+      const response = await fetch(`${API_BASE_URL}/documents/patient/${patientId}`, {
+        method: 'GET',
+        headers: this.getAuthHeaders()
+      });
 
-    if (!response.ok) {
-      throw new Error('Failed to fetch documents');
+      if (!response.ok) {
+        throw new Error('Failed to fetch documents');
+      }
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.message);
+      }
+
+      // Map the file paths to be usable by the frontend
+      return result.data.map((doc: any) => ({
+        ...doc,
+        // file_path is now like /uploads/patient_documents/{patientId}/{filename}
+        // Create full URL for display/download
+        file_url: doc.file_path.startsWith('http') 
+          ? doc.file_path 
+          : `http://localhost:5000${doc.file_path}`
+      }));
+    } catch (error) {
+      console.error('Error fetching documents:', error);
+      throw error;
     }
-
-    const result = await response.json();
-
-    if (!result.success) {
-      throw new Error(result.message);
-    }
-
-    return result.data; // this contains file_path, document_name, etc.
   }
 
-
+  // ============ DELETE PATIENT DOCUMENT ============
   async deletePatientDocument(documentId: number): Promise<boolean> {
     try {
       const response = await fetch(`${API_BASE_URL}/documents/${documentId}`, {
@@ -571,12 +591,40 @@ class PatientApiService {
     }
   }
 
+  // ============ DOWNLOAD DOCUMENT ============
+  async downloadPatientDocument(documentId: number, documentName: string): Promise<void> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/documents/download/${documentId}`, {
+        method: 'GET',
+        headers: this.getAuthHeaders()
+      });
 
+      if (!response.ok) {
+        throw new Error('Failed to download document');
+      }
 
-
-
-
+      // Create a blob from the response
+      const blob = await response.blob();
+      
+      // Create a temporary URL for the blob
+      const url = window.URL.createObjectURL(blob);
+      
+      // Create a temporary anchor element and trigger download
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = documentName || 'document';
+      document.body.appendChild(link);
+      link.click();
+      
+      // Cleanup
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error downloading document:', error);
+      throw error;
+    }
+  }
 }
 
 export const patientApiService = new PatientApiService();
-export default patientApiService; 
+export default patientApiService;

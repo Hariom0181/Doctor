@@ -11,7 +11,7 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Camera, Wallet, X } from 'lucide-react';
+import { Camera, View, Wallet, X } from 'lucide-react';
 import { WalletCard } from '@/components/WalletCard';
 import { VideoConsultationBooking } from '@/components/VideoConsultationBooking';
 import { useAuth } from '@/contexts/AuthContext';
@@ -831,25 +831,25 @@ export default function PatientDashboard() {
       day: 'numeric'
     });
   };
- const handleDoctorSelection = async (doctorId: string) => {
-  if (!doctorId) return;
+  const handleDoctorSelection = async (doctorId: string) => {
+    if (!doctorId) return;
 
-  try {
-    console.log('Updating to doctor ID:', doctorId);
+    try {
+      console.log('Updating to doctor ID:', doctorId);
 
-    // ✅ Remove patientId - service uses token now
-    await patientApiService.updateDoctorRelationship(doctorId);
+      // ✅ Remove patientId - service uses token now
+      await patientApiService.updateDoctorRelationship(doctorId);
 
-    // ✅ Remove patientId here too
-    const doctors = await patientApiService.getLinkedDoctors();
-    setLinkedDoctors(doctors);
+      // ✅ Remove patientId here too
+      const doctors = await patientApiService.getLinkedDoctors();
+      setLinkedDoctors(doctors);
 
-    alert('Doctor relationship updated successfully!');
-  } catch (error) {
-    console.error('Failed to update doctor relationship:', error);
-    alert('Failed to update doctor relationship. Please try again.');
-  }
-};
+      alert('Doctor relationship updated successfully!');
+    } catch (error) {
+      console.error('Failed to update doctor relationship:', error);
+      alert('Failed to update doctor relationship. Please try again.');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
@@ -2045,19 +2045,14 @@ export default function PatientDashboard() {
                                     variant="outline"
                                     size="sm"
                                     onClick={() => {
-                                      const link = document.createElement('a');
-                                      // Use backend proxy instead of direct Cloudinary URL
-                                      link.href = `/api/documents/download/${doc.id}`;
-                                      link.download = doc.document_name || 'document';
-                                      document.body.appendChild(link);
-                                      link.click();
-                                      document.body.removeChild(link);
+                                      // Replace with your actual backend URL or environment variable
+                                      const backendUrl = "http://localhost:5000";
+                                      window.open(`${backendUrl}/api/documents/view/${doc.id}`, "_blank");
                                     }}
                                   >
-                                    <Download className="w-3 h-3 mr-1" />
-                                    Download
+                                    <View className="w-3 h-3 mr-1" />
+                                    View
                                   </Button>
-
                                   <Button
                                     variant="outline"
                                     size="sm"
