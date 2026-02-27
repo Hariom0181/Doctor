@@ -1,14 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Heart, Stethoscope, Mail, Lock, Eye, EyeOff, Shield, Loader2 } from "lucide-react";
 import { useAuth } from '@/contexts/AuthContext';
-
 
 interface LoginFormData {
   email: string;
@@ -35,35 +28,20 @@ export default function DoctorLogin() {
 
   const handleInputChange = (field: keyof LoginFormData, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-
-    // Clear error when user starts typing
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: "" }));
-    }
-
-    // Clear general error message
-    if (submitMessage) {
-      setSubmitMessage(null);
-    }
+    if (errors[field]) setErrors(prev => ({ ...prev, [field]: "" }));
+    if (submitMessage) setSubmitMessage(null);
   };
 
   const validateForm = (): boolean => {
     const newErrors: ValidationErrors = {};
-
-    // Email validation
     if (!formData.email) {
       newErrors.email = "Email is required";
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = "Please enter a valid email address";
     }
-
-    // Password validation
     if (!formData.password) {
       newErrors.password = "Password is required";
-    } else if (formData.password.length < 1) {
-      newErrors.password = "Password cannot be empty";
     }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -71,27 +49,17 @@ export default function DoctorLogin() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitMessage(null);
-
-    if (!validateForm()) {
-      setSubmitMessage({ type: 'error', message: 'Please fix the errors below and try again.' });
-      return;
-    }
+    if (!validateForm()) return;
 
     setIsLoading(true);
-
     try {
-      console.log("Doctor login data:", formData);
       await login(formData.email, formData.password, 'doctor');
       setSubmitMessage({ type: 'success', message: "Login successful! Redirecting..." });
-      setTimeout(() => {
-        navigate("/doctor/dashboard");
-      }, 1000);
-
-    } catch (error) {
-      console.error("Error during login:", error);
-      setSubmitMessage({ 
-        type: 'error', 
-        message: error.message || "Login failed. Please check your credentials." 
+      setTimeout(() => navigate("/doctor/dashboard"), 1000);
+    } catch (error: any) {
+      setSubmitMessage({
+        type: 'error',
+        message: error.message || "Login failed. Please check your credentials."
       });
     } finally {
       setIsLoading(false);
@@ -99,177 +67,281 @@ export default function DoctorLogin() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <Link to="/" className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-                <Heart className="w-6 h-6 text-primary-foreground" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">HealthTrack</h1>
-                <p className="text-sm text-gray-600">Automatic Health Monitoring</p>
-              </div>
-            </Link>
-            <div className="flex items-center space-x-4">
-              <Link to="/doctor/register" className="text-primary hover:text-primary/80">
-                Don't have an account? Register
-              </Link>
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500;700&display=swap');
+
+        .dl-root {
+          min-height: 100vh;
+          background: #F2F4F7;
+          font-family: 'DM Sans', sans-serif;
+          display: flex;
+          flex-direction: column;
+        }
+
+        /* ── NAV ── */
+        .dl-nav {
+          background: #fff;
+          border-bottom: 1px solid #E2E6EE;
+          padding: 0 5%;
+          height: 70px;
+          display: flex; align-items: center; justify-content: space-between;
+          position: sticky; top: 0; z-index: 50;
+        }
+        .dl-nav-brand { display: flex; align-items: center; gap: 12px; text-decoration: none; }
+        .dl-nav-icon {
+          width: 40px; height: 40px; background: #0B4F6C;
+          border-radius: 12px; display: flex; align-items: center; justify-content: center;
+        }
+        .dl-nav-title { font-family: 'DM Serif Display', serif; font-size: 1.4rem; color: #0B4F6C; margin-bottom: -2px; }
+        .dl-nav-sub { font-size: 0.75rem; color: #8C96A8; }
+        .dl-nav-link { font-size: 0.9rem; color: #5A6478; text-decoration: none; }
+        .dl-nav-link strong { color: #0B4F6C; margin-left: 4px; }
+
+        /* ── MAIN LAYOUT ── */
+        .dl-container {
+          flex: 1;
+          display: flex;
+          max-width: 1200px;
+          margin: 0 auto;
+          width: 100%;
+          padding: 2.5rem 2rem;
+          gap: 4rem;
+          align-items: center;
+        }
+
+        @media (max-width: 1024px) {
+          .dl-container { flex-direction: column; gap: 2.5rem; padding: 2rem 1rem; }
+          .dl-side { text-align: center; align-items: center !important; }
+        }
+
+        /* ── LEFT SIDE ── */
+        .dl-side {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+        }
+        .dl-side-eyebrow {
+          font-size: 0.75rem; font-weight: 700; color: #0B8A6C;
+          background: #EDFBF7; border: 1px solid #B7EDD9;
+          padding: 6px 14px; border-radius: 20px;
+          margin-bottom: 1.5rem; display: flex; align-items: center; gap: 8px;
+        }
+        .dl-side-heading {
+          font-family: 'DM Serif Display', serif;
+          font-size: 3rem; line-height: 1.1; color: #0D1621; margin-bottom: 1.5rem;
+        }
+        .dl-side-heading em { font-style: italic; color: #0B4F6C; }
+        .dl-side-sub { font-size: 1.05rem; color: #5A6478; line-height: 1.6; margin-bottom: 2rem; max-width: 500px; }
+        
+        .dl-feature-list {
+          display: grid; grid-template-columns: 1fr; gap: 0.75rem; width: 100%; max-width: 480px;
+        }
+        .dl-feature-item {
+          background: #fff; border: 1px solid #E2E6EE; padding: 0.85rem 1rem; border-radius: 12px;
+          display: flex; gap: 12px; align-items: center; font-size: 0.85rem; font-weight: 500; color: #344054;
+        }
+
+        /* ── RIGHT SIDE (FORM) ── */
+        .dl-form-section {
+          flex: 1;
+          display: flex;
+          justify-content: center;
+          width: 100%;
+        }
+        .dl-card {
+          background: #fff;
+          border: 1px solid #E2E6EE;
+          border-radius: 24px;
+          width: 100%;
+          max-width: 460px;
+          box-shadow: 0 10px 40px rgba(0,0,0,0.04);
+          overflow: hidden;
+        }
+        .dl-card-header {
+          background: linear-gradient(135deg, #0B4F6C 0%, #062D40 100%);
+          padding: 2.25rem 2rem;
+          text-align: center;
+          color: #fff;
+        }
+        .dl-card-title { font-family: 'DM Serif Display', serif; font-size: 1.75rem; margin-top: 0.75rem; }
+        .dl-card-desc { font-size: 0.85rem; opacity: 0.7; margin-top: 0.4rem; }
+
+        .dl-form-body { padding: 2.25rem 2rem; }
+
+        /* ── INPUTS ── */
+        .dl-field { margin-bottom: 1.25rem; }
+        .dl-label { display: block; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #5A6478; margin-bottom: 0.5rem; }
+        .dl-input-wrap { position: relative; }
+        .dl-input-icon { position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #B0BAC9; }
+        .dl-input {
+          width: 100%; height: 50px; border: 1px solid #DDE1E9; border-radius: 12px;
+          padding: 0 1rem 0 3rem; font-size: 0.95rem; background: #FAFBFD; transition: all 0.2s;
+        }
+        .dl-input:focus { border-color: #0B4F6C; background: #fff; box-shadow: 0 0 0 4px rgba(11,79,108,0.08); outline: none; }
+        
+        .dl-submit-btn {
+          width: 100%; height: 50px; background: #0B4F6C; color: #fff; border: none;
+          border-radius: 12px; font-weight: 600; cursor: pointer; transition: 0.2s;
+          display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 1rem;
+        }
+        .dl-submit-btn:hover { background: #093D56; transform: translateY(-1px); }
+
+        .dl-alert { padding: 1rem; border-radius: 12px; margin-bottom: 1.5rem; font-size: 0.85rem; display: flex; align-items: center; gap: 8px; }
+        .dl-alert-error { background: #FFF1F0; border: 1px solid #FFCCC7; color: #CF1322; }
+        .dl-alert-success { background: #EDFBF7; border: 1px solid #B7EDD9; color: #0B6B50; }
+
+        /* ── FOOTER ── */
+        .dl-page-footer {
+          background: #fff; border-top: 1px solid #E2E6EE;
+          padding: 1.5rem 5%;
+          display: flex; justify-content: space-between;
+          font-size: 0.8rem; color: #8C96A8;
+        }
+      `}</style>
+
+      <div className="dl-root">
+        <nav className="dl-nav">
+          <Link to="/" className="dl-nav-brand">
+            <div className="dl-nav-icon"><Heart size={20} color="#fff" fill="#fff" /></div>
+            <div>
+              <div className="dl-nav-title">HealthTrack</div>
+              <div className="dl-nav-sub">Practice Management</div>
             </div>
-          </div>
-        </div>
-      </header>
+          </Link>
+          <Link to="/doctor/register" className="dl-nav-link">
+            Need an account? <strong>Register here</strong>
+          </Link>
+        </nav>
 
-      <div className="flex items-center justify-center min-h-[calc(100vh-4rem)] px-4 py-8">
-        <div className="w-full max-w-md">
-          <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
-              <Stethoscope className="w-8 h-8 text-primary-foreground" />
+        <main className="dl-container">
+          {/* Left Side: Context & Info */}
+          <section className="dl-side">
+            <div className="dl-side-eyebrow">
+              <Shield size={14} />
+              AUTHORIZED MEDICAL PERSONNEL ONLY
             </div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Doctor Portal</h1>
-            <p className="text-gray-600">Access your medical practice dashboard</p>
-          </div>
-
-          {/* Success/Error Message */}
-          {submitMessage && (
-            <Alert className={`mb-6 ${submitMessage.type === 'error' ? 'border-red-500 bg-red-50' : 'border-green-500 bg-green-50'}`}>
-              <AlertDescription className={submitMessage.type === 'error' ? 'text-red-700' : 'text-green-700'}>
-                {submitMessage.message}
-              </AlertDescription>
-            </Alert>
-          )}
-
-          <Card>
-            <CardHeader className="text-center">
-              <CardTitle className="flex items-center justify-center">
-                <Shield className="w-5 h-5 mr-2 text-primary" />
-                Secure Login
-              </CardTitle>
-              <CardDescription>
-                Enter your verified medical credentials to access the system
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email">Medical Email Address</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="dr.yourname@hospital.com"
-                      className={`pl-10 ${errors.email ? "border-red-500" : ""}`}
-                      value={formData.email}
-                      onChange={(e) => handleInputChange("email", e.target.value)}
-                      disabled={isLoading}
-                      required
-                    />
-                  </div>
-                  {errors.email && <p className="text-sm text-red-500">{errors.email}</p>}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                    <Input
-                      id="password"
-                      type={showPassword ? "text" : "password"}
-                      placeholder="Enter your secure password"
-                      className={`pl-10 pr-10 ${errors.password ? "border-red-500" : ""}`}
-                      value={formData.password}
-                      onChange={(e) => handleInputChange("password", e.target.value)}
-                      disabled={isLoading}
-                      required
-                    />
-                    <button
-                      type="button"
-                      className="absolute right-3 top-3 h-4 w-4 text-gray-400 hover:text-gray-600"
-                      onClick={() => setShowPassword(!showPassword)}
-                      disabled={isLoading}
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                  {errors.password && <p className="text-sm text-red-500">{errors.password}</p>}
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="rememberMe"
-                      checked={formData.rememberMe}
-                      onCheckedChange={(checked) => handleInputChange("rememberMe", checked)}
-                      disabled={isLoading}
-                    />
-                    <Label htmlFor="rememberMe" className="text-sm">
-                      Keep me signed in
-                    </Label>
-                  </div>
-                  <Link to="/doctor/forgot-password" className="text-sm text-primary hover:underline">
-                    Forgot password?
-                  </Link>
-                </div>
-
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {isLoading ? "Authenticating..." : "Access Medical Portal"}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-
-          <div className="text-center mt-6 space-y-2">
-            <p className="text-sm text-gray-600">
-              New to the platform?{" "}
-              <Link to="/doctor/register" className="text-primary hover:underline font-medium">
-                Register as Doctor
-              </Link>
+            <h1 className="dl-side-heading">
+              Manage your practice<br /><em>with precision.</em>
+            </h1>
+            <p className="dl-side-sub">
+              Access clinical tools, patient longitudinal records, and health analytics in a HIPAA-compliant environment.
             </p>
-            <p className="text-sm text-gray-600">
-              Are you a patient?{" "}
-              <Link to="/patient/login" className="text-primary hover:underline font-medium">
-                Patient Login
-              </Link>
-            </p>
+            
+            <div className="dl-feature-list">
+              {[
+                "Comprehensive Patient Dashboards",
+                "Automated Health Analytics & Alerts",
+                "Telemedicine & Secure Messaging",
+                "Lab Integration & E-Prescriptions",
+                "End-to-end HIPAA Data Encryption"
+              ].map((text, i) => (
+                <div key={i} className="dl-feature-item">
+                  <div style={{ color: '#0B8A6C' }}><Loader2 size={16} /></div>
+                  {text}
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* Right Side: Login Form */}
+          <section className="dl-form-section">
+            <div className="dl-card">
+              <div className="dl-card-header">
+                <Stethoscope size={36} color="#fff" style={{ margin: '0 auto' }} />
+                <h2 className="dl-card-title">Doctor Portal</h2>
+                <p className="dl-card-desc">Enter your medical credentials to continue</p>
+              </div>
+
+              <div className="dl-form-body">
+                {submitMessage && (
+                  <div className={`dl-alert ${submitMessage.type === 'error' ? 'dl-alert-error' : 'dl-alert-success'}`}>
+                    {submitMessage.message}
+                  </div>
+                )}
+
+                <form onSubmit={handleSubmit}>
+                  <div className="dl-field">
+                    <label className="dl-label">Medical Email</label>
+                    <div className="dl-input-wrap">
+                      <Mail className="dl-input-icon" size={18} />
+                      <input
+                        type="email"
+                        placeholder="dr.name@hospital.com"
+                        className={`dl-input ${errors.email ? 'border-red-500' : ''}`}
+                        value={formData.email}
+                        onChange={(e) => handleInputChange("email", e.target.value)}
+                        disabled={isLoading}
+                      />
+                    </div>
+                    {errors.email && <div style={{color: '#FF4D4F', fontSize: '0.75rem', marginTop: '4px'}}>{errors.email}</div>}
+                  </div>
+
+                  <div className="dl-field">
+                    <label className="dl-label">Password</label>
+                    <div className="dl-input-wrap">
+                      <Lock className="dl-input-icon" size={18} />
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        placeholder="••••••••"
+                        className={`dl-input ${errors.password ? 'border-red-500' : ''}`}
+                        value={formData.password}
+                        onChange={(e) => handleInputChange("password", e.target.value)}
+                        disabled={isLoading}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#B0BAC9' }}
+                      >
+                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: '#5A6478', cursor: 'pointer' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={formData.rememberMe}
+                        onChange={(e) => handleInputChange("rememberMe", e.target.checked)}
+                        style={{ accentColor: '#0B4F6C' }}
+                      />
+                      Remember Me
+                    </label>
+                    <Link to="/doctor/forgot-password" style={{ fontSize: '0.8rem', color: '#0B4F6C', textDecoration: 'none', fontWeight: 600 }}>
+                      Forgot password?
+                    </Link>
+                  </div>
+
+                  <button type="submit" className="dl-submit-btn" disabled={isLoading}>
+                    {isLoading ? <Loader2 className="animate-spin" size={20} /> : "Access Medical Portal"}
+                  </button>
+                </form>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '2rem 0', color: '#B0BAC9', fontSize: '0.75rem' }}>
+                  <div style={{ flex: 1, height: '1px', background: '#EDF0F5' }} />
+                  OR
+                  <div style={{ flex: 1, height: '1px', background: '#EDF0F5' }} />
+                </div>
+
+                <div style={{ textAlign: 'center', fontSize: '0.85rem', color: '#5A6478' }}>
+                  <p>Are you a patient? <Link to="/patient/login" style={{ color: '#0B4F6C', fontWeight: 600, textDecoration: 'none' }}>Patient Login</Link></p>
+                </div>
+              </div>
+            </div>
+          </section>
+        </main>
+
+        <footer className="dl-page-footer">
+          <div>© 2026 HealthTrack Systems. Secure Medical Access Port.</div>
+          <div style={{ display: 'flex', gap: '20px' }}>
+            <span>HIPAA Compliant</span>
+            <span>Privacy Guard</span>
           </div>
-
-          {/* Security Features */}
-          <Card className="mt-6">
-            <CardContent className="p-4">
-              <h3 className="font-medium text-sm mb-3 flex items-center">
-                <Shield className="w-4 h-4 mr-2 text-primary" />
-                Security Features:
-              </h3>
-              <ul className="text-xs text-gray-600 space-y-1">
-                <li>• End-to-end encrypted patient data</li>
-                <li>• Multi-factor authentication available</li>
-                <li>• HIPAA compliant data protection</li>
-                <li>• Secure medical records access</li>
-                <li>• Audit trail for all activities</li>
-              </ul>
-            </CardContent>
-          </Card>
-
-          {/* Doctor Dashboard Preview */}
-          <Card className="mt-4">
-            <CardContent className="p-4">
-              <h3 className="font-medium text-sm mb-2">Doctor Dashboard Features:</h3>
-              <ul className="text-xs text-gray-600 space-y-1">
-                <li>• Patient appointment management</li>
-                <li>• Medical records and history access</li>
-                <li>• Prescription and diagnosis tools</li>
-                <li>• Telemedicine consultation platform</li>
-                <li>• Health analytics and reports</li>
-                <li>• Integration with lab results</li>
-              </ul>
-            </CardContent>
-          </Card>
-        </div>
+        </footer>
       </div>
-    </div>
+    </>
   );
 }
