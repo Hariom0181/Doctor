@@ -475,7 +475,7 @@ export default function PatientDashboard() {
 
   // ── Render ──
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50">
+    <div className="min-h-screen bg-[#F2F4F7] font-sans text-[#5A6478]">
 
       <DashboardHeader
         activeTab={activeTab}
@@ -484,8 +484,7 @@ export default function PatientDashboard() {
         logout={logout}
       />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-
+<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <PatientWelcomeSection
           loading={loading}
           patientData={patientData}

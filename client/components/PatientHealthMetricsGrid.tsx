@@ -1,5 +1,15 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { Activity, Heart, Thermometer, Weight, HeartPulse } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import {
+  Activity,
+  Heart,
+  Thermometer,
+  Weight,
+  HeartPulse,
+  Clock,
+  AlertCircle,
+  TrendingUp,
+} from "lucide-react";
 
 interface HealthMetric {
   id?: number;
@@ -14,149 +24,156 @@ interface PatientHealthMetricsGridProps {
   healthMetrics: HealthMetric[];
 }
 
-const getMetricColor = (status: string) => {
+const getStatusStyles = (status: string) => {
   switch (status?.toLowerCase()) {
-    case "normal":   return "text-green-600";
-    case "warning":  return "text-yellow-600";
-    case "critical": return "text-red-600";
-    default:         return "text-gray-500";
+    case "normal":
+      return { bg: "#EDFBF7", text: "#0B6B50", dot: "#0B8A6C" };
+    case "warning":
+      return { bg: "#FFF7E6", text: "#AD6800", dot: "#FAAD14" };
+    case "critical":
+      return { bg: "#FFF1F0", text: "#CF1322", dot: "#FF4D4F" };
+    default:
+      return { bg: "#F2F4F7", text: "#5A6478", dot: "#B0BAC9" };
   }
 };
 
-const getMetricBg = (status: string) => {
-  switch (status?.toLowerCase()) {
-    case "normal":   return "bg-green-50 border-green-100";
-    case "warning":  return "bg-yellow-50 border-yellow-100";
-    case "critical": return "bg-red-50 border-red-100";
-    default:         return "bg-slate-50 border-slate-100";
-  }
+const getMetricIcon = (label: string) => {
+  const l = label.toLowerCase();
+  if (l.includes("blood pressure")) return Heart;
+  if (l.includes("temp")) return Thermometer;
+  if (l.includes("weight")) return Weight;
+  if (l.includes("heart") || l.includes("pulse")) return HeartPulse;
+  return Activity;
 };
 
-const getMetricIconBg = (status: string) => {
-  switch (status?.toLowerCase()) {
-    case "normal":   return "bg-green-100";
-    case "warning":  return "bg-yellow-100";
-    case "critical": return "bg-red-100";
-    default:         return "bg-slate-100";
-  }
-};
-
-const formatDate = (dateString: string) => {
-  if (!dateString) return "Not recorded";
-  const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric'
-  });
-};
-
-const PLACEHOLDER_METRICS = [
-  { label: 'Blood Pressure', icon: Heart },
-  { label: 'Temperature',    icon: Thermometer },
-  { label: 'Weight',         icon: Activity },
-  { label: 'Heart Rate',     icon: HeartPulse },
-];
-
-export function PatientHealthMetricsGrid({ healthMetrics }: PatientHealthMetricsGridProps) {
+export function PatientHealthMetricsGrid({
+  healthMetrics,
+}: PatientHealthMetricsGridProps) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-5 mb-8">
+    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+      {healthMetrics.map((metric, index) => {
+        const status = getStatusStyles(metric.status);
+        const Icon = getMetricIcon(metric.label);
 
-      {healthMetrics.length > 0 ? (
-        healthMetrics.map((metric, index) => (
+        return (
           <Card
             key={metric.id || index}
-            className={`border ${getMetricBg(metric.status)} shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 rounded-2xl overflow-hidden`}
+            className="rounded-xl border border-[#E2E6EE] shadow-sm hover:shadow-md transition-all"
           >
-            {/* Top status strip */}
-            <div className={`h-1 w-full ${
-              metric.status?.toLowerCase() === 'normal'   ? 'bg-green-400' :
-              metric.status?.toLowerCase() === 'warning'  ? 'bg-yellow-400' :
-              metric.status?.toLowerCase() === 'critical' ? 'bg-red-400' :
-              'bg-slate-300'
-            }`} />
+            {/* Slim Accent */}
+            <div
+              style={{
+                height: "3px",
+                background: "#0B4F6C",
+                borderTopLeftRadius: "12px",
+                borderTopRightRadius: "12px",
+              }}
+            />
 
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between">
-                <div className="space-y-1 flex-1 min-w-0">
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-widest truncate">
+            <CardContent className="p-4 space-y-3">
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 8,
+                      background: "#F2F4F7",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Icon size={16} color="#0B4F6C" />
+                  </div>
+
+                  <span
+                    style={{
+                      fontSize: "0.7rem",
+                      fontWeight: 700,
+                      textTransform: "uppercase",
+                      color: "#5A6478",
+                    }}
+                  >
                     {metric.label}
-                  </p>
-                  <p className={`text-2xl font-black tracking-tight ${getMetricColor(metric.status)}`}>
+                  </span>
+                </div>
+
+                <Badge
+                  style={{
+                    background: status.bg,
+                    color: status.text,
+                    border: "none",
+                    fontSize: "0.65rem",
+                    padding: "4px 10px",
+                    borderRadius: "14px",
+                    fontWeight: 600,
+                  }}
+                >
+                  {metric.status}
+                </Badge>
+              </div>
+
+              {/* Value */}
+              <div className="flex items-end justify-between">
+                <div>
+                  <h3
+                    style={{
+                      fontFamily: "DM Serif Display, serif",
+                      fontSize: "1.4rem",
+                      color: "#0D1621",
+                      lineHeight: 1.1,
+                    }}
+                  >
                     {metric.value}
-                  </p>
-                  <p className="text-xs text-slate-400 font-medium">
-                    {formatDate(metric.lastChecked)}
-                  </p>
-                  {metric.notes && (
-                    <p className="text-xs text-slate-400 italic mt-1 line-clamp-1">
-                      {metric.notes}
-                    </p>
-                  )}
+                  </h3>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "4px",
+                      marginTop: "4px",
+                      color: "#8C96A8",
+                      fontSize: "0.65rem",
+                    }}
+                  >
+                    <Clock size={12} />
+                    {new Date(metric.lastChecked).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </div>
                 </div>
 
-                {/* Icon */}
-                <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ml-3 ${getMetricIconBg(metric.status)}`}>
-                  <Activity className={`w-5 h-5 ${getMetricColor(metric.status)}`} />
-                </div>
+                <div
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: "50%",
+                    background: status.dot,
+                  }}
+                />
               </div>
 
-              {/* Status badge */}
-              <div className="mt-3 pt-3 border-t border-slate-200/60">
-                <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-lg ${
-                  metric.status?.toLowerCase() === 'normal'   ? 'bg-green-100 text-green-700' :
-                  metric.status?.toLowerCase() === 'warning'  ? 'bg-yellow-100 text-yellow-700' :
-                  metric.status?.toLowerCase() === 'critical' ? 'bg-red-100 text-red-700' :
-                  'bg-slate-100 text-slate-500'
-                }`}>
-                  <span className={`w-1.5 h-1.5 rounded-full inline-block ${
-                    metric.status?.toLowerCase() === 'normal'   ? 'bg-green-500' :
-                    metric.status?.toLowerCase() === 'warning'  ? 'bg-yellow-500' :
-                    metric.status?.toLowerCase() === 'critical' ? 'bg-red-500' :
-                    'bg-slate-400'
-                  }`} />
-                  {metric.status || 'Unknown'}
-                </span>
-              </div>
+              {/* Optional Notes */}
+              {metric.notes && (
+                <div
+                  style={{
+                    fontSize: "0.7rem",
+                    color: "#8C96A8",
+                    borderTop: "1px solid #EDF0F5",
+                    paddingTop: "6px",
+                  }}
+                >
+                  {metric.notes}
+                </div>
+              )}
             </CardContent>
           </Card>
-        ))
-      ) : (
-        PLACEHOLDER_METRICS.map((item, index) => (
-          <Card
-            key={index}
-            className="border border-slate-100 bg-slate-50/50 rounded-2xl overflow-hidden shadow-sm"
-          >
-            <div className="h-1 w-full bg-slate-200" />
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between">
-                <div className="space-y-1">
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                    {item.label}
-                  </p>
-                  <p className="text-2xl font-black text-slate-300">
-                    — —
-                  </p>
-                  <p className="text-xs text-slate-300 font-medium">
-                    Not recorded yet
-                  </p>
-                </div>
-
-                <div className="w-11 h-11 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 ml-3">
-                  <item.icon className="w-5 h-5 text-slate-300" />
-                </div>
-              </div>
-
-              <div className="mt-3 pt-3 border-t border-slate-200/40">
-                <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-lg bg-slate-100 text-slate-400">
-                  <span className="w-1.5 h-1.5 rounded-full inline-block bg-slate-300" />
-                  No Data
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-        ))
-      )}
+        );
+      })}
     </div>
   );
-}
+} 

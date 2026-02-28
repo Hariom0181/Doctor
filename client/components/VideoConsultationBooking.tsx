@@ -446,135 +446,169 @@ export function VideoConsultationBooking({ patientId }: VideoConsultationBooking
 
   return (
     <>
-      <Card>
-        <CardHeader>
+      {/* ── Main Card ── */}
+      <Card className="rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden mt-6">
+        <div className="h-0.5 w-full bg-gradient-to-r from-blue-500/50 via-violet-400/30 to-transparent" />
+  
+        <CardHeader className="pb-4 pt-6 px-6">
           <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Video className="w-5 h-5 " />
-                Video Consultations
-              </CardTitle>
-              <CardDescription>Book and manage your video consultations</CardDescription>
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center">
+                <Video className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <CardTitle className="text-lg font-black text-slate-800 tracking-tight">
+                  Video Consultations
+                </CardTitle>
+                <CardDescription className="text-xs mt-0.5">
+                  Book and manage your video consultations
+                </CardDescription>
+              </div>
             </div>
-            <Button onClick={() => {
-              resetBooking();
-              setIsBookingOpen(true);
-            }}>
+            <Button
+              className="rounded-xl font-bold text-sm shadow-md shadow-primary/15 hover:-translate-y-0.5 transition-all"
+              onClick={() => { resetBooking(); setIsBookingOpen(true); }}
+            >
               <Video className="w-4 h-4 mr-2" />
               Book Consultation
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="max-h-80 overflow-y-auto">
-
-
+  
+        <CardContent className="px-6 pb-6 max-h-80 overflow-y-auto">
           {loadingConsultations ? (
-            <div className="text-center py-8 ">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-              <p className="mt-4 text-gray-600">Loading consultations...</p>
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="animate-pulse border border-slate-100 rounded-2xl p-4 bg-slate-50">
+                  <div className="flex justify-between mb-3">
+                    <div className="h-4 bg-slate-200 rounded-lg w-1/3" />
+                    <div className="h-4 bg-slate-200 rounded-lg w-20" />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="h-3 bg-slate-200 rounded-lg w-1/2" />
+                    <div className="h-3 bg-slate-200 rounded-lg w-2/3" />
+                    <div className="h-3 bg-slate-200 rounded-lg w-1/4" />
+                  </div>
+                </div>
+              ))}
             </div>
           ) : consultations.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              <Video className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-              <p className="font-medium">No consultations yet</p>
-              <p className="text-sm mt-1">Book your first video consultation to get started</p>
+            <div className="text-center py-12">
+              <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
+                <Video className="w-7 h-7 text-slate-300" />
+              </div>
+              <p className="font-bold text-slate-600">No consultations yet</p>
+              <p className="text-xs text-slate-400 mt-1">
+                Book your first video consultation to get started
+              </p>
             </div>
           ) : (
             <div className="space-y-3">
               {latestThree.map((consultation) => (
-                <div key={consultation.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h4 className="font-semibold">{consultation.doctor_name}</h4>
-                        {getStatusBadge(consultation.status)}
+                <div
+                  key={consultation.id}
+                  className="group border border-slate-200/80 rounded-2xl p-4 bg-white hover:shadow-lg hover:shadow-slate-200/60 hover:-translate-y-0.5 transition-all duration-200 overflow-hidden relative"
+                >
+                  <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-400/60 to-violet-400/30 opacity-0 group-hover:opacity-100 transition-opacity" />
+  
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3 flex-1 min-w-0">
+                      {/* Avatar */}
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-100 to-violet-100 border border-blue-100 flex items-center justify-center shrink-0">
+                        <span className="text-blue-700 font-black text-sm">
+                          {consultation.doctor_name?.charAt(0)}
+                        </span>
                       </div>
-
-                      <div className="space-y-1 text-sm text-gray-600">
-                        <p className="flex items-center gap-2">
-                          <User className="w-4 h-4" />
-                          {consultation.doctor_specialization}
-                        </p>
-                        <p className="flex items-center gap-2">
-                          <CalendarIcon className="w-4 h-4" />
-                          {new Date(consultation.scheduled_date).toLocaleDateString()} at {formatTime(consultation.scheduled_time)}
-                        </p>
-                        <p className="flex items-center gap-2">
-                          <Clock className="w-4 h-4" />
-                          {consultation.duration_minutes} minutes • ₹{formatFee(consultation.consultation_fee)}
-                        </p>
-                        <p className="flex items-center gap-2">
-                          <DollarSign className="w-4 h-4" />
-                          Payment: <span className="font-medium">{consultation.payment_status}</span>
-                        </p>
-                      </div>
-
-                      {consultation.rejection_reason && (
-                        <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-800">
-                          <strong>Reason:</strong> {consultation.rejection_reason}
+  
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <h4 className="font-black text-slate-800 text-sm">
+                            {consultation.doctor_name}
+                          </h4>
+                          {getStatusBadge(consultation.status)}
                         </div>
-                      )}
+  
+                        <div className="space-y-1">
+                          <p className="text-xs text-slate-500 font-medium flex items-center gap-1.5">
+                            <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            {consultation.doctor_specialization}
+                          </p>
+                          <p className="text-xs text-slate-500 font-medium flex items-center gap-1.5">
+                            <CalendarIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            {new Date(consultation.scheduled_date).toLocaleDateString()} · {formatTime(consultation.scheduled_time)}
+                          </p>
+                          <p className="text-xs text-slate-500 font-medium flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            {consultation.duration_minutes} min · ₹{formatFee(consultation.consultation_fee)}
+                          </p>
+                          <p className="text-xs text-slate-500 font-medium flex items-center gap-1.5">
+                            <DollarSign className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            Payment: <span className="font-bold text-slate-700 ml-1">{consultation.payment_status}</span>
+                          </p>
+                        </div>
+  
+                        {consultation.rejection_reason && (
+                          <div className="mt-2 p-2.5 bg-red-50 border border-red-100 rounded-xl text-xs text-red-700 font-medium">
+                            <strong>Reason:</strong> {consultation.rejection_reason}
+                          </div>
+                        )}
+                      </div>
                     </div>
-
-                    <div className="flex flex-col gap-2 ml-4">
-                      {/* Join Meeting Button (Confirmed consultations only) */}
-                      {/* Join Meeting Button - Allow join for both 'confirmed' and 'in_progress' */}
+  
+                    {/* Action Buttons */}
+                    <div className="flex flex-col gap-2 shrink-0">
                       {(consultation.status === 'confirmed' || consultation.status === 'in_progress') &&
                         !isMeetingExpired(consultation.scheduled_date, consultation.scheduled_time, consultation.duration_minutes) && (
                           <>
-                            {/* Demo Mode Button */}
                             <Button
                               size="sm"
-                              className="bg-purple-600 hover:bg-purple-700"
+                              className="h-8 rounded-xl bg-violet-600 hover:bg-violet-700 font-bold text-xs px-3"
                               onClick={() => handleJoinMeeting(consultation, true)}
                             >
-                              <Video className="w-4 h-4 mr-1" />
-                              Join (Demo)
+                              <Video className="w-3.5 h-3.5 mr-1" />
+                              Demo
                             </Button>
-
-                            {/* Real Mode Button */}
                             <Button
                               size="sm"
+                              className="h-8 rounded-xl font-bold text-xs px-3"
                               disabled={!canJoinMeeting(consultation.scheduled_date, consultation.scheduled_time, false)}
                               onClick={() => handleJoinMeeting(consultation, false)}
                             >
-                              <Video className="w-4 h-4 mr-1" />
-                              {getMeetingStatus(consultation.scheduled_date, consultation.scheduled_time)}
+                              <Video className="w-3.5 h-3.5 mr-1" />
+                              Join
                             </Button>
                           </>
                         )}
-
-                      {/* Show expired message if meeting has passed */}
-                      {/* Show "In Progress" badge */}
+  
                       {consultation.status === 'in_progress' && (
-                        <Badge className="bg-blue-500 animate-pulse">
+                        <Badge className="bg-blue-500 animate-pulse text-[10px] px-2 py-1 rounded-lg">
                           <Video className="w-3 h-3 mr-1" />
-                          In Progress
+                          Live
                         </Badge>
                       )}
-
-                      {/* Pending Approval */}
+  
                       {consultation.status === 'pending_approval' && (
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => handleCancelConsultation(consultation.id)}
-                        >
-                          <XCircle className="w-4 h-4 mr-1" />
-                          Cancel
-                        </Button>
-                      )}
-
-                      {/* Confirmed but can still cancel */}
-                      {consultation.status === 'confirmed' && canJoinMeeting(consultation.scheduled_date, consultation.scheduled_time, false) && (
-                        <Button
-                          size="sm"
-                          variant="outline"
+                          className="h-8 rounded-xl border-red-100 text-red-500 font-bold text-xs hover:bg-red-50 px-3"
                           onClick={() => handleCancelConsultation(consultation.id)}
                         >
                           Cancel
                         </Button>
                       )}
+  
+                      {consultation.status === 'confirmed' &&
+                        canJoinMeeting(consultation.scheduled_date, consultation.scheduled_time, false) && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 rounded-xl border-slate-200 font-bold text-xs hover:bg-slate-50 px-3"
+                            onClick={() => handleCancelConsultation(consultation.id)}
+                          >
+                            Cancel
+                          </Button>
+                        )}
                     </div>
                   </div>
                 </div>
@@ -583,253 +617,377 @@ export function VideoConsultationBooking({ patientId }: VideoConsultationBooking
           )}
         </CardContent>
       </Card>
-
-      {/* Booking Dialog */}
+  
+      {/* ── Booking Dialog ── */}
       <Dialog open={isBookingOpen} onOpenChange={setIsBookingOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Book Video Consultation</DialogTitle>
-            <DialogDescription>
-              Follow the steps to book your consultation
-            </DialogDescription>
-          </DialogHeader>
-
-          {/* Wallet Balance Display */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-blue-900">Wallet Balance:</span>
-              <span className="text-lg font-bold text-blue-900">₹{walletBalance.toFixed(2)}</span>
+        <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto rounded-[2rem] border-none shadow-2xl p-0">
+  
+          {/* Dialog Header */}
+          <div className="relative bg-gradient-to-br from-blue-600 via-blue-700 to-violet-700 p-8 text-white overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+            <div className="absolute bottom-0 left-0 w-40 h-40 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2 pointer-events-none" />
+            <DialogHeader className="relative z-10">
+              <div className="inline-flex items-center gap-2 bg-white/15 px-3 py-1.5 rounded-full mb-3 w-fit">
+                <Video className="w-3 h-3 text-white" />
+                <span className="text-xs font-bold text-white/90 tracking-wider uppercase">Patient Portal</span>
+              </div>
+              <DialogTitle className="text-2xl font-black text-white tracking-tight">
+                Book Video Consultation
+              </DialogTitle>
+              <DialogDescription className="text-blue-100/90 text-sm mt-1 font-medium">
+                Follow the steps to book your consultation
+              </DialogDescription>
+            </DialogHeader>
+  
+            {/* Wallet Balance */}
+            <div className="relative z-10 mt-4 inline-flex items-center gap-3 bg-white/15 border border-white/20 rounded-2xl px-4 py-2.5">
+              <DollarSign className="w-4 h-4 text-white/80" />
+              <span className="text-xs font-bold text-white/80 uppercase tracking-widest">Wallet</span>
+              <span className="text-lg font-black text-white">₹{walletBalance.toFixed(2)}</span>
             </div>
           </div>
-
-          {/* Steps Indicator */}
-          <div className="flex items-center justify-center gap-2 mb-6">
-            <div className={`flex items-center gap-2 ${step === 'doctor' ? 'text-blue-600 font-medium' : step === 'duration' || step === 'datetime' || step === 'confirm' ? 'text-green-600' : 'text-gray-400'}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${step === 'doctor' ? 'bg-blue-600 text-white' : step === 'duration' || step === 'datetime' || step === 'confirm' ? 'bg-green-600 text-white' : 'bg-gray-200'}`}>
-                1
-              </div>
-              <span className="text-sm">Doctor</span>
+  
+          <div className="p-8 bg-white space-y-6">
+  
+            {/* Steps Indicator */}
+            <div className="flex items-center justify-center gap-1">
+              {[
+                { key: 'doctor',   label: 'Doctor' },
+                { key: 'duration', label: 'Duration' },
+                { key: 'datetime', label: 'Date & Time' },
+                { key: 'confirm',  label: 'Confirm' },
+              ].map((s, index, arr) => {
+                const stepOrder = ['doctor', 'duration', 'datetime', 'confirm'];
+                const currentIndex = stepOrder.indexOf(step);
+                const thisIndex = stepOrder.indexOf(s.key);
+                const isActive = step === s.key;
+                const isDone = currentIndex > thisIndex;
+  
+                return (
+                  <div key={s.key} className="flex items-center gap-1">
+                    <div className="flex flex-col items-center gap-1">
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black transition-all ${
+                        isActive ? 'bg-primary text-white shadow-md shadow-primary/30' :
+                        isDone  ? 'bg-green-500 text-white' :
+                        'bg-slate-100 text-slate-400'
+                      }`}>
+                        {isDone ? <CheckCircle className="w-4 h-4" /> : index + 1}
+                      </div>
+                      <span className={`text-[10px] font-bold whitespace-nowrap ${
+                        isActive ? 'text-primary' : isDone ? 'text-green-600' : 'text-slate-400'
+                      }`}>
+                        {s.label}
+                      </span>
+                    </div>
+                    {index < arr.length - 1 && (
+                      <div className={`w-10 h-0.5 mb-4 rounded-full transition-all ${
+                        isDone ? 'bg-green-400' : 'bg-slate-200'
+                      }`} />
+                    )}
+                  </div>
+                );
+              })}
             </div>
-            <div className="w-12 h-0.5 bg-gray-300"></div>
-            <div className={`flex items-center gap-2 ${step === 'duration' ? 'text-blue-600 font-medium' : step === 'datetime' || step === 'confirm' ? 'text-green-600' : 'text-gray-400'}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${step === 'duration' ? 'bg-blue-600 text-white' : step === 'datetime' || step === 'confirm' ? 'bg-green-600 text-white' : 'bg-gray-200'}`}>
-                2
-              </div>
-              <span className="text-sm">Duration</span>
-            </div>
-            <div className="w-12 h-0.5 bg-gray-300"></div>
-            <div className={`flex items-center gap-2 ${step === 'datetime' ? 'text-blue-600 font-medium' : step === 'confirm' ? 'text-green-600' : 'text-gray-400'}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${step === 'datetime' ? 'bg-blue-600 text-white' : step === 'confirm' ? 'bg-green-600 text-white' : 'bg-gray-200'}`}>
-                3
-              </div>
-              <span className="text-sm">Date & Time</span>
-            </div>
-            <div className="w-12 h-0.5 bg-gray-300"></div>
-            <div className={`flex items-center gap-2 ${step === 'confirm' ? 'text-blue-600 font-medium' : 'text-gray-400'}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${step === 'confirm' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}>
-                4
-              </div>
-              <span className="text-sm">Confirm</span>
-            </div>
-          </div>
-
-          {/* Step 1: Select Doctor */}
-          {step === 'doctor' && (
-            <div className="space-y-3">
-              <h3 className="font-semibold mb-3">Select Your Doctor</h3>
-              {linkedDoctors.length === 0 ? (
-                <p className="text-gray-500 text-center py-8">
-                  No linked doctors found. Please link with a doctor first.
+  
+            {/* ── Step 1: Doctor ── */}
+            {step === 'doctor' && (
+              <div className="space-y-3">
+                <p className="text-xs font-black text-slate-500 uppercase tracking-widest">
+                  Select Your Doctor
                 </p>
-              ) : (
-                linkedDoctors.map(doctor => (
+                {linkedDoctors.length === 0 ? (
+                  <div className="text-center py-10">
+                    <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-3">
+                      <User className="w-6 h-6 text-slate-300" />
+                    </div>
+                    <p className="font-bold text-slate-500 text-sm">No linked doctors found</p>
+                    <p className="text-xs text-slate-400 mt-1">Please link with a doctor first</p>
+                  </div>
+                ) : (
+                  linkedDoctors.map(doctor => (
+                    <div
+                      key={doctor.id}
+                      onClick={() => handleDoctorSelect(doctor)}
+                      className="group border border-slate-200/80 rounded-2xl p-4 cursor-pointer hover:border-primary/40 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 bg-white relative overflow-hidden"
+                    >
+                      <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-primary/50 to-blue-400/30 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-blue-400/20 border border-primary/10 flex items-center justify-center shrink-0">
+                            <span className="text-primary font-black text-sm">
+                              {doctor.name?.charAt(0)}
+                            </span>
+                          </div>
+                          <div>
+                            <h4 className="font-black text-slate-800 text-sm">{doctor.name}</h4>
+                            <p className="text-xs text-primary font-bold">{doctor.specialization}</p>
+                            <p className="text-xs text-slate-400 font-medium">{doctor.hospital}</p>
+                          </div>
+                        </div>
+                        <Button size="sm" variant="outline" className="rounded-xl border-slate-200 font-bold text-xs hover:border-primary/30 hover:bg-primary/5">
+                          Select
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+  
+            {/* ── Step 2: Duration ── */}
+            {step === 'duration' && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-black text-slate-500 uppercase tracking-widest">
+                    Select Duration
+                  </p>
+                  <Button variant="ghost" size="sm" className="rounded-xl font-bold text-xs text-slate-500" onClick={() => setStep('doctor')}>
+                    ← Back
+                  </Button>
+                </div>
+  
+                <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-100 mb-2">
+                  <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <User className="w-3.5 h-3.5 text-primary" />
+                  </div>
+                  <p className="text-xs font-bold text-slate-600">
+                    Consulting with <span className="text-primary">{selectedDoctor?.name}</span>
+                  </p>
+                </div>
+  
+                {consultationFees.map(fee => (
                   <div
-                    key={doctor.id}
-                    onClick={() => handleDoctorSelect(doctor)}
-                    className="border rounded-lg p-4 cursor-pointer hover:border-blue-600 hover:bg-blue-50 transition-all"
+                    key={fee.duration_minutes}
+                    onClick={() => handleDurationSelect(fee)}
+                    className={`group border rounded-2xl p-4 cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 relative overflow-hidden ${
+                      selectedFee?.duration_minutes === fee.duration_minutes
+                        ? 'border-primary/50 bg-primary/5'
+                        : 'border-slate-200/80 bg-white hover:border-primary/30'
+                    }`}
                   >
+                    <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-primary/50 to-blue-400/30 opacity-0 group-hover:opacity-100 transition-opacity" />
                     <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className="font-medium">{doctor.name}</h4>
-                        <p className="text-sm text-gray-600">{doctor.specialization}</p>
-                        <p className="text-xs text-gray-500">{doctor.hospital}</p>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center">
+                          <Clock className="w-5 h-5 text-blue-600" />
+                        </div>
+                        <div>
+                          <p className="font-black text-slate-800 text-sm">
+                            {getDurationLabel(fee.duration_minutes)}
+                          </p>
+                          <p className="text-xs text-slate-400 font-medium">Video consultation</p>
+                        </div>
                       </div>
-                      <Button size="sm" variant="outline">
-                        Select
-                      </Button>
+                      <div className="text-right">
+                        <p className="text-xl font-black text-primary">₹{fee.fee.toFixed(2)}</p>
+                        {walletBalance < fee.fee && (
+                          <p className="text-[10px] font-bold text-red-500">Insufficient balance</p>
+                        )}
+                      </div>
                     </div>
                   </div>
-                ))
-              )}
-            </div>
-          )}
-
-          {/* Step 2: Select Duration */}
-          {step === 'duration' && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold">Select Consultation Duration</h3>
-                <Button variant="ghost" size="sm" onClick={() => setStep('doctor')}>
-                  ← Back
-                </Button>
+                ))}
               </div>
-              <p className="text-sm text-gray-600 mb-4">
-                Consulting with: <strong>{selectedDoctor?.name}</strong>
-              </p>
-              {consultationFees.map(fee => (
-                <div
-                  key={fee.duration_minutes}
-                  onClick={() => handleDurationSelect(fee)}
-                  className={`border rounded-lg p-4 cursor-pointer hover:border-blue-600 hover:bg-blue-50 transition-all ${selectedFee?.duration_minutes === fee.duration_minutes ? 'border-blue-600 bg-blue-50' : ''}`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Clock className="w-5 h-5 text-blue-600" />
-                      <div>
-                        <p className="font-medium">{getDurationLabel(fee.duration_minutes)}</p>
-                        <p className="text-sm text-gray-600">Video consultation</p>
-                      </div>
+            )}
+  
+            {/* ── Step 3: Date & Time ── */}
+            {step === 'datetime' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-black text-slate-500 uppercase tracking-widest">
+                    Select Date & Time
+                  </p>
+                  <Button variant="ghost" size="sm" className="rounded-xl font-bold text-xs text-slate-500" onClick={() => setStep('duration')}>
+                    ← Back
+                  </Button>
+                </div>
+  
+                <div className="grid grid-cols-2 gap-6">
+                  {/* Calendar */}
+                  <div className="space-y-2">
+                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                      Select Date
+                    </p>
+                    <div className="border border-slate-200 rounded-2xl overflow-hidden">
+                      <Calendar
+                        mode="single"
+                        selected={selectedDate}
+                        onSelect={handleDateSelect}
+                        disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                        className="rounded-2xl"
+                      />
                     </div>
-                    <div className="text-right">
-                      <p className="text-xl font-bold text-blue-600">₹{fee.fee.toFixed(2)}</p>
-                      {walletBalance < fee.fee && (
-                        <p className="text-xs text-red-600">Insufficient balance</p>
+                  </div>
+  
+                  {/* Time Slots */}
+                  <div className="space-y-2">
+                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                      Available Slots
+                      {selectedDate && (
+                        <span className="ml-2 normal-case font-bold text-slate-300">
+                          — {selectedDate.toLocaleDateString()}
+                        </span>
                       )}
-                    </div>
+                    </p>
+  
+                    {!selectedDate ? (
+                      <div className="text-center py-10 border-2 border-dashed border-slate-200 rounded-2xl">
+                        <CalendarIcon className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                        <p className="text-xs text-slate-400 font-medium">Select a date first</p>
+                      </div>
+                    ) : loadingSlots ? (
+                      <div className="grid grid-cols-2 gap-2">
+                        {Array.from({ length: 6 }).map((_, i) => (
+                          <div key={i} className="animate-pulse h-11 bg-slate-100 rounded-xl" />
+                        ))}
+                      </div>
+                    ) : availableSlots.length === 0 ? (
+                      <div className="text-center py-10 border-2 border-dashed border-slate-200 rounded-2xl">
+                        <Clock className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                        <p className="text-xs text-slate-400 font-medium">No slots available</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-1">
+                        {availableSlots.map(slot => {
+                          const isDisabled = !slot.available || isPastSlot(selectedDate, slot.time);
+                          const isSelected = selectedSlot === slot.time;
+                          return (
+                            <Button
+                              key={slot.time}
+                              variant="outline"
+                              disabled={isDisabled}
+                              onClick={() => !isDisabled && handleSlotSelect(slot.time)}
+                              className={`h-11 rounded-xl font-bold text-xs transition-all ${
+                                isSelected
+                                  ? 'bg-primary text-white border-primary shadow-md shadow-primary/20'
+                                  : isDisabled
+                                  ? 'opacity-40 cursor-not-allowed bg-slate-50'
+                                  : 'border-slate-200 hover:border-primary/40 hover:bg-primary/5 hover:text-primary'
+                              }`}
+                            >
+                              {formatTime(slot.time)}
+                            </Button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-
-          {/* Step 3: Select Date & Time */}
-          {step === 'datetime' && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold">Select Date & Time</h3>
-                <Button variant="ghost" size="sm" onClick={() => setStep('duration')}>
-                  ← Back
-                </Button>
               </div>
-
-              <div className="grid grid-cols-2 gap-6">
-                {/* Calendar */}
-                <div>
-                  <h4 className="text-sm font-medium mb-2">Select Date</h4>
-                  <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={handleDateSelect}
-                    disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-                    className="rounded-md border"
-                  />
+            )}
+  
+            {/* ── Step 4: Confirm ── */}
+            {step === 'confirm' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-black text-slate-500 uppercase tracking-widest">
+                    Confirm Booking
+                  </p>
+                  <Button variant="ghost" size="sm" className="rounded-xl font-bold text-xs text-slate-500" onClick={() => setStep('datetime')}>
+                    ← Back
+                  </Button>
                 </div>
-
-                {/* Time Slots */}
-                <div>
-                  <h4 className="text-sm font-medium mb-2">
-                    Available Time Slots
-                    {selectedDate && ` - ${selectedDate.toLocaleDateString()}`}
-                  </h4>
-                  {!selectedDate ? (
-                    <p className="text-gray-500 text-sm">Please select a date first</p>
-                  ) : loadingSlots ? (
-                    <div className="text-center py-8">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                    </div>
-                  ) : availableSlots.length === 0 ? (
-                    <p className="text-gray-500 text-sm">No slots available for this date</p>) : (
-                    <div className="grid grid-cols-2 gap-2 max-h-96 overflow-y-auto">
-                      {availableSlots.map(slot => {
-                        const isDisabled =
-                          !slot.available || isPastSlot(selectedDate, slot.time);
-
-                        return (
-                          <Button
-                            key={slot.time}
-                            variant={selectedSlot === slot.time ? "default" : "outline"}
-                            disabled={isDisabled}
-                            onClick={() => !isDisabled && handleSlotSelect(slot.time)}
-                            className="h-auto py-3"
-                          >
-                            {formatTime(slot.time)}
-                          </Button>
-                        );
-                      })}
-
-
-                    </div>
-                  )}
-
-                </div>
-              </div>
-            </div>
-          )}{/* Step 4: Confirm */}
-          {step === 'confirm' && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold">Confirm Booking</h3>
-                <Button variant="ghost" size="sm" onClick={() => setStep('datetime')}>
-                  ← Back
-                </Button>
-              </div>
-
-              <div className="border rounded-lg p-6 space-y-4">
-                <div className="flex items-start gap-3">
-                  <User className="w-5 h-5 text-gray-600 mt-1" />
-                  <div>
-                    <p className="text-sm text-gray-600">Doctor</p>
-                    <p className="font-medium">{selectedDoctor?.name}</p>
-                    <p className="text-sm text-gray-600">{selectedDoctor?.specialization}</p>
+  
+                {/* Summary Card */}
+                <div className="border border-slate-200/80 rounded-2xl overflow-hidden">
+                  <div className="h-0.5 w-full bg-gradient-to-r from-primary/50 to-blue-400/30" />
+                  <div className="p-5 space-y-4">
+                    {[
+                      {
+                        icon: User,
+                        label: 'Doctor',
+                        value: selectedDoctor?.name,
+                        sub: selectedDoctor?.specialization,
+                        color: 'text-primary',
+                        bg: 'bg-primary/10'
+                      },
+                      {
+                        icon: CalendarIcon,
+                        label: 'Date & Time',
+                        value: `${selectedDate?.toLocaleDateString()}`,
+                        sub: selectedSlot ? `at ${formatTime(selectedSlot)}` : '',
+                        color: 'text-violet-600',
+                        bg: 'bg-violet-50'
+                      },
+                      {
+                        icon: Clock,
+                        label: 'Duration',
+                        value: selectedFee ? getDurationLabel(selectedFee.duration_minutes) : '',
+                        sub: 'Video consultation',
+                        color: 'text-blue-600',
+                        bg: 'bg-blue-50'
+                      },
+                      {
+                        icon: DollarSign,
+                        label: 'Consultation Fee',
+                        value: `₹${selectedFee?.fee.toFixed(2)}`,
+                        sub: 'Deducted after approval',
+                        color: 'text-green-600',
+                        bg: 'bg-green-50'
+                      },
+                    ].map((item) => (
+                      <div key={item.label} className="flex items-center gap-3">
+                        <div className={`w-9 h-9 rounded-xl ${item.bg} flex items-center justify-center shrink-0`}>
+                          <item.icon className={`w-4 h-4 ${item.color}`} />
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                            {item.label}
+                          </p>
+                          <p className={`font-black text-sm ${item.color}`}>{item.value}</p>
+                          {item.sub && (
+                            <p className="text-xs text-slate-400 font-medium">{item.sub}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-
-                <div className="flex items-start gap-3">
-                  <CalendarIcon className="w-5 h-5 text-gray-600 mt-1" />
+  
+                {/* Note */}
+                <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-50/70 border border-amber-100">
+                  <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center shrink-0 mt-0.5">
+                    <CheckCircle className="w-4 h-4 text-amber-600" />
+                  </div>
                   <div>
-                    <p className="text-sm text-gray-600">Date & Time</p>
-                    <p className="font-medium">
-                      {selectedDate?.toLocaleDateString()} at {selectedSlot && formatTime(selectedSlot)}
+                    <p className="text-xs font-black text-amber-700 uppercase tracking-widest mb-1">
+                      Important Note
+                    </p>
+                    <p className="text-xs text-amber-700 font-medium leading-relaxed">
+                      Your booking request will be sent to the doctor for approval.
+                      The consultation fee will be deducted from your wallet only after the doctor approves.
                     </p>
                   </div>
                 </div>
-
-                <div className="flex items-start gap-3">
-                  <Clock className="w-5 h-5 text-gray-600 mt-1" />
-                  <div>
-                    <p className="text-sm text-gray-600">Duration</p>
-                    <p className="font-medium">{selectedFee && getDurationLabel(selectedFee.duration_minutes)}</p>
-                  </div>
+  
+                {/* Actions */}
+                <div className="flex gap-3 pt-1">
+                  <Button
+                    className="flex-1 h-12 rounded-2xl font-bold text-sm shadow-md shadow-primary/15 hover:-translate-y-0.5 transition-all"
+                    onClick={handleBooking}
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <><span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin mr-2" />Booking...</>
+                    ) : (
+                      <><CheckCircle className="w-4 h-4 mr-2" />Confirm Booking</>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="px-6 h-12 rounded-2xl font-bold border-slate-200 text-slate-500 hover:bg-slate-50"
+                    onClick={() => setIsBookingOpen(false)}
+                  >
+                    Cancel
+                  </Button>
                 </div>
-
-                <div className="flex items-start gap-3">
-                  <DollarSign className="w-5 h-5 text-gray-600 mt-1" />
-                  <div>
-                    <p className="text-sm text-gray-600">Consultation Fee</p>
-                    <p className="font-medium text-blue-600">₹{selectedFee?.fee.toFixed(2)}</p>
-                  </div>
-                </div>
               </div>
-
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <p className="text-sm text-yellow-800">
-                  <strong>Note:</strong> Your booking request will be sent to the doctor for approval.
-                  The consultation fee will be deducted from your wallet only after the doctor approves.
-                </p>
-              </div>
-
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setIsBookingOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleBooking} disabled={loading}>
-                  {loading ? 'Booking...' : 'Confirm Booking'}
-                </Button>
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </DialogContent>
       </Dialog>
+  
+      {/* ── Video Call Room ── */}
       {isInCall && activeConsultation && (
         <VideoCallRoom
           consultationId={activeConsultation.id}
@@ -840,5 +998,6 @@ export function VideoConsultationBooking({ patientId }: VideoConsultationBooking
           onEndCall={handleEndCall}
         />
       )}
-    </>);
+    </>
+  );
 }

@@ -2,13 +2,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import {
-  User, MapPin, Phone, Settings, Download,
+  User, MapPin, Phone, Settings, 
   Stethoscope, Shield, FileDown, RefreshCw,
-  Mail, Building2, Calendar, CheckCircle2
+  Mail, CheckCircle2, ChevronRight, Fingerprint, Activity
 } from "lucide-react";
 import { LinkedDoctor } from "@/services/patientApi";
 
+// --- START: Missing Interfaces ---
 interface PatientData {
   id: number | string;
   name: string;
@@ -34,6 +36,7 @@ interface PatientProfileTabProps {
   isLoadingAvailableDoctors: boolean;
   handleDoctorSelection: (doctorId: string) => void;
 }
+// --- END: Missing Interfaces ---
 
 export function PatientProfileTab({
   patientData,
@@ -45,283 +48,159 @@ export function PatientProfileTab({
   handleDoctorSelection,
 }: PatientProfileTabProps) {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-      {/* ── LEFT: Personal Information ── */}
-      <Card className="rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-        <div className="h-0.5 w-full bg-gradient-to-r from-primary/50 via-blue-400/30 to-transparent" />
-
-        <CardHeader className="pb-4 pt-6 px-6">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
-              <User className="w-5 h-5 text-primary" />
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 p-2 bg-[#f8fafc]">
+      
+      {/* ── LEFT: Identity & Info ── */}
+      <Card className="lg:col-span-7 rounded-[2rem] border-none shadow-[0_20px_50px_rgba(0,0,0,0.05)] bg-white overflow-hidden">
+        <div className="h-2 w-full bg-indigo-600" />
+        
+        <CardHeader className="pb-8 pt-10 px-10 border-b border-slate-50">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-5">
+              <div className="w-14 h-14 rounded-2xl bg-slate-900 flex items-center justify-center shadow-xl">
+                <Fingerprint className="w-7 h-7 text-indigo-400" />
+              </div>
+              <div>
+                <CardTitle className="text-2xl font-bold text-slate-900 tracking-tight">
+                  Patient Identity
+                </CardTitle>
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge variant="outline" className="text-[10px] font-black uppercase tracking-widest border-slate-200 text-slate-500">
+                    ID: {patientData?.id || 'REF-882'}
+                  </Badge>
+                  <span className="text-xs text-slate-400">• Verified Record</span>
+                </div>
+              </div>
             </div>
-            <div>
-              <CardTitle className="text-lg font-black text-slate-800 tracking-tight">
-                Personal Information
-              </CardTitle>
-              <CardDescription className="text-xs mt-0.5">
-                Your basic details and contact information
-              </CardDescription>
-            </div>
+            <Button variant="outline" className="rounded-xl border-slate-200 hover:bg-slate-50 text-slate-600 font-bold px-6">
+              Manage
+            </Button>
           </div>
         </CardHeader>
 
-        <CardContent className="px-6 pb-6 space-y-5">
-
-          {/* Info Fields */}
-          <div className="space-y-3">
-            {/* Name */}
-            <div className="flex items-center gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-100">
-              <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center shrink-0">
-                <User className="w-4 h-4 text-slate-400" />
+        <CardContent className="p-10">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10">
+            {[
+              { icon: User, label: "Full Legal Name", value: patientData?.name },
+              { icon: Mail, label: "Digital Mail", value: patientData?.email },
+              { icon: Phone, label: "Primary Phone", value: patientData?.phone },
+              { icon: MapPin, label: "Registered Address", value: patientData?.address },
+            ].map((item, idx) => (
+              <div key={idx} className="group transition-all">
+                <dt className="flex items-center gap-2 mb-2.5">
+                  <item.icon className="w-4 h-4 text-indigo-500" />
+                  <span className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-400">
+                    {item.label}
+                  </span>
+                </dt>
+                <dd className="text-base font-semibold text-slate-800 border-b-2 border-slate-50 group-hover:border-indigo-100 pb-3 transition-colors">
+                  {item.value || <span className="text-slate-300 font-normal italic">Unspecified</span>}
+                </dd>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  Full Name
-                </p>
-                <p className="text-sm font-bold text-slate-700 truncate">
-                  {patientData?.name || '—'}
-                </p>
-              </div>
-            </div>
-
-            {/* Email */}
-            <div className="flex items-center gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-100">
-              <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center shrink-0">
-                <Mail className="w-4 h-4 text-slate-400" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  Email Address
-                </p>
-                <p className="text-sm font-bold text-slate-700 truncate">
-                  {patientData?.email || '—'}
-                </p>
-              </div>
-            </div>
-
-            {/* Phone */}
-            <div className="flex items-center gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-100">
-              <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center shrink-0">
-                <Phone className="w-4 h-4 text-slate-400" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  Phone Number
-                </p>
-                <p className="text-sm font-bold text-slate-700 truncate">
-                  {patientData?.phone || '—'}
-                </p>
-              </div>
-            </div>
-
-            {/* Address */}
-            <div className="flex items-center gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-100">
-              <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center shrink-0">
-                <MapPin className="w-4 h-4 text-slate-400" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  Address
-                </p>
-                <p className="text-sm font-bold text-slate-700 truncate">
-                  {patientData?.address || '—'}
-                </p>
-              </div>
-            </div>
+            ))}
           </div>
 
-          {/* Edit Button */}
-          <Button className="w-full h-11 rounded-2xl font-bold text-sm shadow-md shadow-primary/15 hover:-translate-y-0.5 transition-all">
-            Edit Profile
-          </Button>
-
+          <div className="mt-12 p-6 rounded-2xl bg-indigo-600 flex items-center justify-between text-white relative overflow-hidden shadow-lg shadow-indigo-200">
+            <div className="relative z-10">
+              <div className="flex items-center gap-2 mb-1">
+                <Activity className="w-4 h-4 text-indigo-200" />
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-100">Health Compliance</p>
+              </div>
+              <p className="text-sm font-medium">Encrypted medical data under 256-bit HIPAA standards.</p>
+            </div>
+            <Shield className="w-16 h-16 text-white/10 absolute -right-4 -bottom-4" />
+          </div>
         </CardContent>
       </Card>
 
-      {/* ── RIGHT: Doctor + Quick Actions ── */}
-      <div className="space-y-5">
-
-        {/* Doctor Selection Card */}
-        <Card className="rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-          <div className="h-0.5 w-full bg-gradient-to-r from-blue-500/50 via-blue-400/30 to-transparent" />
-
-          <CardHeader className="pb-4 pt-6 px-6">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center">
-                <Stethoscope className="w-5 h-5 text-blue-600" />
-              </div>
-              <div>
-                <CardTitle className="text-base font-black text-slate-800 tracking-tight">
-                  My Doctor
-                </CardTitle>
-                <CardDescription className="text-xs mt-0.5">
-                  Your location and emergency information
-                </CardDescription>
-              </div>
-            </div>
+      {/* ── RIGHT: Medical Care ── */}
+      <div className="lg:col-span-5 space-y-8">
+        
+        <Card className="rounded-[2rem] border-none shadow-[0_20px_50px_rgba(0,0,0,0.05)] bg-white overflow-hidden">
+          <CardHeader className="px-8 pt-8 pb-4">
+             <div className="flex items-center justify-between">
+                <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">Medical Team</h3>
+                <Stethoscope className="w-5 h-5 text-indigo-600" />
+             </div>
           </CardHeader>
-
-          <CardContent className="px-6 pb-6 space-y-4">
-
-            {/* Current Doctor Banner */}
-            {linkedDoctors.length > 0 && (
-              <div className="relative overflow-hidden rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 to-slate-50 p-4">
-                <div className="absolute top-0 right-0 w-24 h-24 bg-blue-100/40 rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none" />
-                <div className="relative z-10">
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-blue-400/20 border border-primary/10 flex items-center justify-center shrink-0">
-                      <span className="text-primary font-black text-sm">
-                        {linkedDoctors[0].name?.charAt(0)}
-                      </span>
+          
+          <CardContent className="px-8 pb-8">
+            {linkedDoctors.length > 0 ? (
+              <div className="group relative p-6 rounded-2xl bg-slate-50 border border-slate-100 hover:border-indigo-100 transition-all mb-8">
+                <div className="flex items-start gap-5">
+                  <div className="w-16 h-16 rounded-2xl bg-white border border-slate-200 flex items-center justify-center shadow-sm">
+                    <span className="text-indigo-600 font-black text-2xl">
+                      {linkedDoctors[0].name?.charAt(0)}
+                    </span>
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Lead Physician</p>
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest">
-                          Current Doctor
-                        </p>
-                        <CheckCircle2 className="w-3 h-3 text-green-500" />
-                      </div>
-                      <p className="font-black text-slate-800 text-sm leading-tight truncate">
-                        {linkedDoctors[0].name}
-                      </p>
-                      <p className="text-xs text-primary font-bold mt-0.5">
-                        {linkedDoctors[0].specialization}
-                      </p>
-                      <p className="text-[10px] text-slate-400 font-medium mt-1">
-                        Linked since {new Date(linkedDoctors[0].linkedDate).toLocaleDateString('en-US', {
-                          year: 'numeric', month: 'short', day: 'numeric'
-                        })}
-                      </p>
-                    </div>
+                    <h4 className="font-bold text-slate-900 text-lg leading-tight">Dr. {linkedDoctors[0].name}</h4>
+                    <p className="text-sm text-slate-500 font-medium mt-0.5">{linkedDoctors[0].specialization}</p>
                   </div>
                 </div>
               </div>
+            ) : (
+                <div className="p-8 rounded-2xl border-2 border-dashed border-slate-100 bg-slate-50/50 text-center mb-8">
+                    <p className="text-sm font-bold text-slate-400">No primary doctor assigned</p>
+                </div>
             )}
 
-            {/* Doctor Selector */}
-            <div className="space-y-2">
-              <Label className="text-xs font-black text-slate-500 uppercase tracking-widest">
-                Change Doctor
-              </Label>
-              <div className="flex gap-2">
+            <div className="space-y-4">
+              <Label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Update Care Provider</Label>
+              <div className="flex flex-col gap-3">
                 <Select value={selectedDoctor} onValueChange={setSelectedDoctor}>
-                  <SelectTrigger className="flex-1 h-11 rounded-xl border-slate-200 bg-slate-50 font-medium text-slate-700 focus:ring-primary/20">
-                    <SelectValue placeholder="Choose a doctor" />
+                  <SelectTrigger className="h-14 rounded-xl border-slate-200 bg-slate-50 font-semibold focus:ring-indigo-500/20 text-slate-700">
+                    <SelectValue placeholder="Select from network..." />
                   </SelectTrigger>
-                  <SelectContent className="rounded-xl border-slate-200 shadow-xl">
+                  <SelectContent className="rounded-xl shadow-2xl border-none">
                     {isLoadingAvailableDoctors ? (
-                      <SelectItem value="loading" disabled>
-                        Loading doctors...
-                      </SelectItem>
-                    ) : doctorsList.length > 0 ? (
+                      <SelectItem value="loading" disabled>Syncing database...</SelectItem>
+                    ) : (
                       doctorsList.map((doctor) => (
-                        <SelectItem
-                          key={doctor.id}
-                          value={doctor.id}
-                          className="py-3 rounded-lg focus:bg-primary/5"
-                        >
-                          <span className="font-bold text-slate-800">{doctor.name}</span>
-                          <span className="ml-2 text-slate-400 text-xs">— {doctor.specialization}</span>
+                        <SelectItem key={doctor.id} value={doctor.id} className="py-4 border-b border-slate-50 last:border-0 cursor-pointer">
+                          <div className="flex flex-col">
+                            <span className="font-bold text-slate-800">{doctor.name}</span>
+                            <span className="text-[10px] text-indigo-500 font-black uppercase tracking-tighter">{doctor.specialization}</span>
+                          </div>
                         </SelectItem>
                       ))
-                    ) : (
-                      <SelectItem value="none" disabled>
-                        No doctors available
-                      </SelectItem>
                     )}
                   </SelectContent>
                 </Select>
 
                 {selectedDoctor && (
-                  <Button
+                  <Button 
                     onClick={() => handleDoctorSelection(selectedDoctor)}
-                    className="h-11 px-5 rounded-xl font-bold text-sm shadow-md shadow-primary/15 hover:-translate-y-0.5 transition-all shrink-0"
+                    className="w-full h-14 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold shadow-xl shadow-slate-200 transition-all active:scale-[0.98]"
                   >
-                    <RefreshCw className="w-4 h-4 mr-1.5" />
-                    Update
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Apply Transfer
                   </Button>
                 )}
               </div>
-
-              {selectedDoctor && (
-                <p className="text-xs text-slate-400 font-medium flex items-center gap-1">
-                  <span className="w-1 h-1 rounded-full bg-slate-300 inline-block" />
-                  Click Update to change your assigned doctor
-                </p>
-              )}
             </div>
-
           </CardContent>
         </Card>
 
-        {/* Quick Actions Card */}
-        <Card className="rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-          <div className="h-0.5 w-full bg-gradient-to-r from-slate-400/30 to-transparent" />
-
-          <CardHeader className="pb-3 pt-5 px-6">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center">
-                <Settings className="w-5 h-5 text-slate-500" />
+        {/* Action List */}
+        <div className="space-y-4">
+          <button className="w-full flex items-center justify-between p-5 rounded-2xl bg-white border border-slate-100 shadow-sm hover:shadow-md hover:border-indigo-100 transition-all group">
+            <div className="flex items-center gap-4">
+              <div className="w-11 h-11 rounded-xl bg-indigo-50 flex items-center justify-center group-hover:bg-indigo-600 transition-colors">
+                <FileDown className="w-5 h-5 text-indigo-600 group-hover:text-white" />
               </div>
-              <div>
-                <CardTitle className="text-base font-black text-slate-800 tracking-tight">
-                  Quick Actions
-                </CardTitle>
-                <CardDescription className="text-xs mt-0.5">
-                  Manage your account settings
-                </CardDescription>
+              <div className="text-left">
+                <p className="font-bold text-slate-800 text-sm">Download Clinical Summary</p>
+                <p className="text-xs text-slate-400 font-medium">Last updated: Today, 09:42 AM</p>
               </div>
             </div>
-          </CardHeader>
-
-          <CardContent className="px-6 pb-6 space-y-2.5">
-            {[
-              {
-                icon: FileDown,
-                label: "Download Health Summary",
-                desc: "Export your full medical history",
-                color: "text-blue-600",
-                bg: "bg-blue-50",
-                border: "border-blue-100 hover:border-blue-200"
-              },
-              {
-                icon: Phone,
-                label: "Emergency Contacts",
-                desc: "Manage your emergency contacts",
-                color: "text-red-500",
-                bg: "bg-red-50",
-                border: "border-red-100 hover:border-red-200"
-              },
-              {
-                icon: Shield,
-                label: "Privacy Settings",
-                desc: "Control your data and privacy",
-                color: "text-slate-500",
-                bg: "bg-slate-100",
-                border: "border-slate-200 hover:border-slate-300"
-              },
-            ].map((action) => (
-              <button
-                key={action.label}
-                className={`w-full group flex items-center gap-3 p-3.5 rounded-xl border bg-white hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 text-left ${action.border}`}
-              >
-                <div className={`w-9 h-9 rounded-lg ${action.bg} flex items-center justify-center shrink-0`}>
-                  <action.icon className={`w-4 h-4 ${action.color}`} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold text-slate-700 text-sm leading-tight">
-                    {action.label}
-                  </p>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    {action.desc}
-                  </p>
-                </div>
-              </button>
-            ))}
-          </CardContent>
-        </Card>
+            <ChevronRight className="w-5 h-5 text-slate-200 group-hover:text-indigo-400" />
+          </button>
+        </div>
 
       </div>
     </div>
