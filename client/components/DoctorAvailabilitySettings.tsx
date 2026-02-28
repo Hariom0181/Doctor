@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Calendar, Clock, DollarSign, Save } from 'lucide-react';
+import { Calendar, Clock, DollarSign, Save, Loader2, Info, CheckCircle2 } from 'lucide-react';
 import { videoConsultationApiService } from '@/services/videoConsultationApi';
 import { useToast } from '@/hooks/use-toast';
 
@@ -55,11 +55,7 @@ export function DoctorAvailabilitySettings({ doctorId }: DoctorAvailabilitySetti
   const loadSettings = async () => {
     try {
       setLoading(true);
-      
-      // Load availability
       const availabilityData = await videoConsultationApiService.getDoctorAvailability(doctorId);
-      console.log("fetching availability of doctor id ",doctorId);
-      console.log("fetching availability data ",availabilityData);
       
       if (availabilityData.length > 0) {
         setAvailability(prev => 
@@ -69,7 +65,7 @@ export function DoctorAvailabilitySettings({ doctorId }: DoctorAvailabilitySetti
               return {
                 ...day,
                 is_available: existing.is_available,
-                start_time: existing.start_time.substring(0, 5), // Remove seconds
+                start_time: existing.start_time.substring(0, 5),
                 end_time: existing.end_time.substring(0, 5),
                 slot_duration_minutes: existing.slot_duration_minutes
               };
@@ -79,28 +75,22 @@ export function DoctorAvailabilitySettings({ doctorId }: DoctorAvailabilitySetti
         );
       }
 
-      // Load fees
       const feesData = await videoConsultationApiService.getDoctorConsultationFees(doctorId);
-      
       if (feesData.length > 0) {
         setFees(prev => 
           prev.map(feeItem => {
             const existing = feesData.find(f => f.duration_minutes === feeItem.duration_minutes);
             if (existing) {
-              return {
-                ...feeItem,
-                fee: existing.fee.toString()
-              };
+              return { ...feeItem, fee: existing.fee.toString() };
             }
             return feeItem;
           })
         );
       }
     } catch (error) {
-      console.error('Error loading settings:', error);
       toast({
-        title: "Info",
-        description: "No existing settings found. Please configure your availability.",
+        title: "Configuration Needed",
+        description: "Please set up your preferred consultation hours and fees.",
       });
     } finally {
       setLoading(false);
@@ -126,8 +116,6 @@ export function DoctorAvailabilitySettings({ doctorId }: DoctorAvailabilitySetti
   const handleSave = async () => {
     try {
       setSaving(true);
-
-      // Validate fees
       const invalidFees = fees.some(f => !f.fee || parseFloat(f.fee) <= 0);
       if (invalidFees) {
         toast({
@@ -138,7 +126,6 @@ export function DoctorAvailabilitySettings({ doctorId }: DoctorAvailabilitySetti
         return;
       }
 
-      // Save availability
       const availabilityToSave = availability.map(day => ({
         day_of_week: day.day_of_week,
         start_time: day.start_time + ':00',
@@ -149,7 +136,6 @@ export function DoctorAvailabilitySettings({ doctorId }: DoctorAvailabilitySetti
 
       await videoConsultationApiService.setDoctorAvailability(availabilityToSave);
 
-      // Save fees
       const feesToSave = fees.map(f => ({
         duration_minutes: f.duration_minutes,
         fee: parseFloat(f.fee)
@@ -158,11 +144,10 @@ export function DoctorAvailabilitySettings({ doctorId }: DoctorAvailabilitySetti
       await videoConsultationApiService.setConsultationFees(feesToSave);
 
       toast({
-        title: "Success!",
-        description: "Your availability and consultation fees have been updated",
+        title: "Settings Saved",
+        description: "Your profile has been updated successfully.",
       });
     } catch (error) {
-      console.error('Error saving settings:', error);
       toast({
         title: "Error",
         description: "Failed to save settings. Please try again.",
@@ -175,11 +160,11 @@ export function DoctorAvailabilitySettings({ doctorId }: DoctorAvailabilitySetti
 
   if (loading) {
     return (
-      <Card>
-        <CardContent className="py-8">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Loading settings...</p>
+      <Card className="border-none shadow-md">
+        <CardContent className="py-20">
+          <div className="flex flex-col items-center justify-center">
+            <Loader2 className="h-10 w-10 animate-spin text-blue-600 mb-4" />
+            <p className="text-muted-foreground font-medium">Synchronizing your schedule...</p>
           </div>
         </CardContent>
       </Card>
@@ -187,66 +172,82 @@ export function DoctorAvailabilitySettings({ doctorId }: DoctorAvailabilitySetti
   }
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500">
       {/* Availability Settings */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="w-5 h-5" />
-            Weekly Availability
-          </CardTitle>
-          <CardDescription>
-            Set your available days and time slots for video consultations
-          </CardDescription>
+      <Card className="border-none shadow-xl bg-white/80 backdrop-blur-md">
+        <CardHeader className="border-b bg-gray-50/50 rounded-t-xl">
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <CardTitle className="text-2xl flex items-center gap-3 text-slate-800">
+                <Calendar className="w-6 h-6 text-blue-600" />
+                Working Hours
+              </CardTitle>
+              <CardDescription className="text-base text-slate-500">
+                Define when patients can book video consultations with you.
+              </CardDescription>
+            </div>
+          </div>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
+        <CardContent className="pt-6">
+          <div className="grid gap-3">
             {availability.map((day, index) => (
-              <div key={day.day_of_week} className="flex items-center gap-4 p-4 border rounded-lg">
-                <div className="flex items-center gap-3 w-32">
+              <div 
+                key={day.day_of_week} 
+                className={`flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl border transition-all duration-200 ${
+                  day.is_available 
+                  ? "bg-white border-blue-100 shadow-sm" 
+                  : "bg-slate-50/50 border-slate-100 opacity-70"
+                }`}
+              >
+                <div className="flex items-center gap-4 min-w-[140px]">
                   <Switch
+                    id={`day-${day.day_of_week}`}
                     checked={day.is_available}
                     onCheckedChange={(checked) => handleAvailabilityChange(index, 'is_available', checked)}
+                    className="data-[state=checked]:bg-blue-600"
                   />
-                  <Label className="font-medium">{day.day_name}</Label>
+                  <Label htmlFor={`day-${day.day_of_week}`} className="font-bold text-slate-700 cursor-pointer">
+                    {day.day_name}
+                  </Label>
                 </div>
 
-                {day.is_available && (
-                  <>
-                    <div className="flex items-center gap-2">
-                      <Clock className="w-4 h-4 text-gray-400" />
+                {day.is_available ? (
+                  <div className="flex flex-1 flex-wrap items-center gap-6 justify-end">
+                    <div className="flex items-center gap-3 bg-slate-50 p-1.5 rounded-lg border border-slate-200">
+                      <Clock className="w-4 h-4 text-slate-400 ml-2" />
                       <Input
                         type="time"
                         value={day.start_time}
                         onChange={(e) => handleAvailabilityChange(index, 'start_time', e.target.value)}
-                        className="w-32"
+                        className="w-28 border-none bg-transparent shadow-none focus-visible:ring-0 h-8"
                       />
-                      <span className="text-gray-500">to</span>
+                      <span className="text-slate-400 font-medium">to</span>
                       <Input
                         type="time"
                         value={day.end_time}
                         onChange={(e) => handleAvailabilityChange(index, 'end_time', e.target.value)}
-                        className="w-32"
+                        className="w-28 border-none bg-transparent shadow-none focus-visible:ring-0 h-8"
                       />
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <Label className="text-sm text-gray-600">Slot Duration:</Label>
+                    <div className="flex items-center gap-3 min-w-[180px]">
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Slots:</span>
                       <select
                         value={day.slot_duration_minutes}
                         onChange={(e) => handleAvailabilityChange(index, 'slot_duration_minutes', parseInt(e.target.value))}
-                        className="border rounded px-3 py-2"
+                        className="bg-white border border-slate-200 rounded-lg text-sm font-medium px-3 py-1.5 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                       >
                         <option value={15}>15 mins</option>
                         <option value={30}>30 mins</option>
                         <option value={60}>60 mins</option>
                       </select>
                     </div>
-                  </>
-                )}
-
-                {!day.is_available && (
-                  <span className="text-gray-400 italic">Not Available</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-slate-400 py-2">
+                    <Info className="w-4 h-4" />
+                    <span className="text-sm italic">Offline</span>
+                  </div>
                 )}
               </div>
             ))}
@@ -254,65 +255,69 @@ export function DoctorAvailabilitySettings({ doctorId }: DoctorAvailabilitySetti
         </CardContent>
       </Card>
 
-      {/* Consultation Fees */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <DollarSign className="w-5 h-5" />
-            Consultation Fees
-          </CardTitle>
-          <CardDescription>
-            Set your consultation fees based on duration
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
+      {/* Fees Section */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card className="md:col-span-2 border-none shadow-xl bg-white">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-xl flex items-center gap-2">
+              <DollarSign className="w-5 h-5 text-emerald-600" />
+              Service Pricing
+            </CardTitle>
+            <CardDescription>Determine the cost per session duration</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
             {fees.map((fee, index) => (
-              <div key={fee.duration_minutes} className="flex items-center gap-4 p-4 border rounded-lg">
-                <Label className="w-32 font-medium">{fee.label}</Label>
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-600">₹</span>
+              <div key={fee.duration_minutes} className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100 hover:border-emerald-200 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="bg-emerald-100 p-2 rounded-full">
+                    <Clock className="w-4 h-4 text-emerald-700" />
+                  </div>
+                  <Label className="font-semibold text-slate-700">{fee.label}</Label>
+                </div>
+                <div className="relative group">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">₹</span>
                   <Input
                     type="number"
                     value={fee.fee}
                     onChange={(e) => handleFeeChange(index, e.target.value)}
-                    placeholder="Enter fee"
-                    className="w-40"
+                    className="pl-8 w-40 h-11 bg-white border-slate-200 rounded-lg focus:ring-emerald-500 font-mono font-bold text-lg"
                     min="0"
                   />
                 </div>
               </div>
             ))}
-          </div>
+          </CardContent>
+        </Card>
 
-          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-sm text-blue-800">
-              <strong>Note:</strong> Patients will be charged based on the selected consultation duration. 
-              If you end the consultation early, they will receive a partial refund.
+        {/* Info Box */}
+        <div className="space-y-4">
+          <div className="bg-blue-600 p-6 rounded-2xl text-white shadow-lg shadow-blue-200">
+            <div className="flex items-center gap-2 mb-3">
+              <CheckCircle2 className="w-5 h-5" />
+              <h3 className="font-bold">Patient Policy</h3>
+            </div>
+            <p className="text-blue-50 leading-relaxed text-sm">
+              Patients are charged upfront based on duration. If a session is ended prematurely, the system calculates a fair partial refund automatically.
             </p>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Save Button */}
-      <div className="flex justify-end">
-        <Button
-          onClick={handleSave}
-          disabled={saving}
-          size="lg"
-        >
-          {saving ? (
-            <>
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-              Saving...
-            </>
-          ) : (
-            <>
-              <Save className="w-4 h-4 mr-2" />
-              Save Settings
-            </>
-          )}
-        </Button>
+          
+          <Button
+            onClick={handleSave}
+            disabled={saving}
+            className={`w-full h-16 rounded-2xl text-lg font-bold shadow-xl transition-all active:scale-95 ${
+              saving ? "bg-slate-100" : "bg-slate-900 hover:bg-slate-800"
+            }`}
+          >
+            {saving ? (
+              <Loader2 className="animate-spin h-6 w-6 text-slate-400" />
+            ) : (
+              <span className="flex items-center gap-2">
+                <Save className="w-5 h-5" />
+                Apply Changes
+              </span>
+            )}
+          </Button>
+        </div>
       </div>
     </div>
   );
